@@ -1,0 +1,70 @@
+syntax = "proto3";
+
+package agent.v1;
+
+import "agent/v1/common.proto";
+
+message RegisterCronRequest {
+  string name = 1;
+  string cron_expression = 2;
+  string task_template = 3;
+  map<string, string> parameters = 4;
+}
+
+message RegisterCronResponse {
+  string cron_id = 1;
+  string next_run = 2;
+}
+
+message UnregisterCronRequest {
+  string cron_id = 1;
+}
+
+message UnregisterCronResponse {}
+
+message ListCronsRequest {}
+
+message CronEntry {
+  string cron_id = 1;
+  string name = 2;
+  string cron_expression = 3;
+  string task_template = 4;
+  string next_run = 5;
+  bool enabled = 6;
+}
+
+message ListCronsResponse {
+  repeated CronEntry crons = 1;
+}
+
+message RegisterWatcherRequest {
+  string name = 1;
+  repeated string paths = 2;
+  repeated string ignore_patterns = 3;
+  uint32 debounce_ms = 4;
+}
+
+message RegisterWatcherResponse {
+  string watcher_id = 1;
+}
+
+message UnregisterWatcherRequest {
+  string watcher_id = 1;
+}
+
+message UnregisterWatcherResponse {}
+
+message StreamEventsRequest {}
+
+message StreamEventsResponse {
+  SchedulerEvent event = 1;
+}
+
+service SchedulerService {
+  rpc RegisterCron(RegisterCronRequest) returns (RegisterCronResponse);
+  rpc UnregisterCron(UnregisterCronRequest) returns (UnregisterCronResponse);
+  rpc ListCrons(ListCronsRequest) returns (ListCronsResponse);
+  rpc RegisterWatcher(RegisterWatcherRequest) returns (RegisterWatcherResponse);
+  rpc UnregisterWatcher(UnregisterWatcherRequest) returns (UnregisterWatcherResponse);
+  rpc StreamEvents(StreamEventsRequest) returns (stream StreamEventsResponse);
+}
