@@ -1,0 +1,63 @@
+syntax = "proto3";
+
+package agent.v1;
+
+import "agent/v1/common.proto";
+
+message SubmitTaskRequest {
+  string name = 1;
+  string description = 2;
+  TaskPriority priority = 3;
+  TriggerType trigger_type = 4;
+  ApprovalPolicy approval_policy = 5;
+  map<string, string> parameters = 6;
+}
+
+message SubmitTaskResponse {
+  Task task = 1;
+}
+
+message GetTaskStatusRequest {
+  string task_id = 1;
+}
+
+message GetTaskStatusResponse {
+  Task task = 1;
+}
+
+message ListTasksRequest {
+  optional TaskStatus status_filter = 1;
+  optional TriggerType trigger_filter = 2;
+  int32 limit = 3;
+  int32 offset = 4;
+}
+
+message ListTasksResponse {
+  repeated Task tasks = 1;
+  int32 total_count = 2;
+}
+
+message CancelTaskRequest {
+  string task_id = 1;
+}
+
+message CancelTaskResponse {
+  Task task = 1;
+}
+
+message StreamLogsRequest {
+  string task_id = 1;
+  bool follow = 2;
+}
+
+message StreamLogsResponse {
+  LogEntry entry = 1;
+}
+
+service CoreService {
+  rpc SubmitTask(SubmitTaskRequest) returns (SubmitTaskResponse);
+  rpc GetTaskStatus(GetTaskStatusRequest) returns (GetTaskStatusResponse);
+  rpc ListTasks(ListTasksRequest) returns (ListTasksResponse);
+  rpc CancelTask(CancelTaskRequest) returns (CancelTaskResponse);
+  rpc StreamLogs(StreamLogsRequest) returns (stream StreamLogsResponse);
+}
