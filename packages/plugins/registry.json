@@ -1,0 +1,23 @@
+{
+  "version": 1,
+  "plugins": [
+    {
+      "name": "browser",
+      "version": "0.1.0",
+      "description": "Browser automation using Vercel's agent-browser CLI. Open pages, take snapshots, click, type, fill forms, and take screenshots.",
+      "author": "kraken",
+      "tools": ["browser_open", "browser_snapshot", "browser_click", "browser_type", "browser_fill", "browser_screenshot", "browser_close"],
+      "requires": ["agent-browser"],
+      "directory": "browser"
+    },
+    {
+      "name": "nanobanana",
+      "version": "0.2.0",
+      "description": "Generate images using Google Gemini 2.5 Flash Image model via OpenRouter.",
+      "author": "Valen",
+      "tools": ["generateImage"],
+      "requires": [],
+      "directory": "nanobanana"
+    }
+  ]
+}

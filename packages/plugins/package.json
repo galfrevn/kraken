@@ -1,0 +1,15 @@
+{
+  "name": "@kraken/plugins",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "exports": {
+    ".": "./registry.json"
+  },
+  "devDependencies": {
+    "@kraken/configuration": "workspace:*",
+    "@kraken/sdk": "workspace:*",
+    "@types/bun": "latest",
+    "typescript": "^5"
+  }
+}
