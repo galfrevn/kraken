@@ -1,0 +1,70 @@
+syntax = "proto3";
+
+package agent.v1;
+
+import "google/protobuf/timestamp.proto";
+import "google/protobuf/struct.proto";
+
+enum TaskStatus {
+  TASK_STATUS_UNSPECIFIED = 0;
+  TASK_STATUS_PENDING = 1;
+  TASK_STATUS_RUNNING = 2;
+  TASK_STATUS_COMPLETED = 3;
+  TASK_STATUS_FAILED = 4;
+  TASK_STATUS_CANCELLED = 5;
+}
+
+enum TriggerType {
+  TRIGGER_TYPE_UNSPECIFIED = 0;
+  TRIGGER_TYPE_MANUAL = 1;
+  TRIGGER_TYPE_CRON = 2;
+  TRIGGER_TYPE_WEBHOOK = 3;
+  TRIGGER_TYPE_FILE_CHANGE = 4;
+  TRIGGER_TYPE_COMPANION = 5;
+}
+
+enum TaskPriority {
+  TASK_PRIORITY_UNSPECIFIED = 0;
+  TASK_PRIORITY_LOW = 1;
+  TASK_PRIORITY_MEDIUM = 2;
+  TASK_PRIORITY_HIGH = 3;
+  TASK_PRIORITY_CRITICAL = 4;
+}
+
+enum ApprovalPolicy {
+  APPROVAL_POLICY_UNSPECIFIED = 0;
+  APPROVAL_POLICY_AUTO = 1;
+  APPROVAL_POLICY_REVIEW_REQUIRED = 2;
+}
+
+message Task {
+  string id = 1;
+  string name = 2;
+  string description = 3;
+  TaskStatus status = 4;
+  TaskPriority priority = 5;
+  TriggerType trigger_type = 6;
+  ApprovalPolicy approval_policy = 7;
+  google.protobuf.Struct parameters = 8;
+  string output = 9;
+  string error_message = 10;
+  google.protobuf.Timestamp created_at = 11;
+  google.protobuf.Timestamp started_at = 12;
+  google.protobuf.Timestamp completed_at = 13;
+}
+
+message SchedulerEvent {
+  string id = 1;
+  TriggerType trigger_type = 2;
+  string source = 3;
+  google.protobuf.Struct payload = 4;
+  google.protobuf.Timestamp timestamp = 5;
+}
+
+message LogEntry {
+  string task_id = 1;
+  string level = 2;
+  string message = 3;
+  google.protobuf.Timestamp timestamp = 4;
+  map<string, string> metadata = 5;
+}
