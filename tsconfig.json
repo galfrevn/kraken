@@ -1,0 +1,3 @@
+{
+  "extends": "@kraken/configuration/tsconfig.base.json"
+}
