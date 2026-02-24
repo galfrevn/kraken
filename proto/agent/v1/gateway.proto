@@ -1,0 +1,97 @@
+syntax = "proto3";
+
+package agent.v1;
+
+message ChatMessage {
+  string role = 1;
+  string content = 2;
+}
+
+message CompleteRequest {
+  string model = 1;
+  repeated ChatMessage messages = 2;
+  optional float temperature = 3;
+  optional int32 max_tokens = 4;
+  optional string system_prompt = 5;
+}
+
+message CompleteResponse {
+  string id = 1;
+  string model = 2;
+  ChatMessage message = 3;
+  int32 prompt_tokens = 4;
+  int32 completion_tokens = 5;
+}
+
+message StreamCompleteRequest {
+  string model = 1;
+  repeated ChatMessage messages = 2;
+  optional float temperature = 3;
+  optional int32 max_tokens = 4;
+  optional string system_prompt = 5;
+}
+
+message StreamCompleteResponse {
+  string id = 1;
+  string delta = 2;
+  bool done = 3;
+  int32 prompt_tokens = 4;
+  int32 completion_tokens = 5;
+}
+
+message RegisterWebhookRequest {
+  string name = 1;
+  string provider = 2;
+  string secret = 3;
+  repeated string events = 4;
+}
+
+message RegisterWebhookResponse {
+  string webhook_id = 1;
+  string endpoint_url = 2;
+}
+
+message ListWebhooksRequest {}
+
+message WebhookEntry {
+  string webhook_id = 1;
+  string name = 2;
+  string provider = 3;
+  string endpoint_url = 4;
+  repeated string events = 5;
+}
+
+message ListWebhooksResponse {
+  repeated WebhookEntry webhooks = 1;
+}
+
+message WebhookEvent {
+  string webhook_id = 1;
+  string provider = 2;
+  string event_type = 3;
+  string payload = 4;
+  map<string, string> headers = 5;
+}
+
+message StreamWebhookEventsRequest {}
+
+message StreamWebhookEventsResponse {
+  WebhookEvent event = 1;
+}
+
+message HealthCheckRequest {}
+
+message HealthCheckResponse {
+  bool healthy = 1;
+  string version = 2;
+  map<string, bool> services = 3;
+}
+
+service GatewayService {
+  rpc Complete(CompleteRequest) returns (CompleteResponse);
+  rpc StreamComplete(StreamCompleteRequest) returns (stream StreamCompleteResponse);
+  rpc RegisterWebhook(RegisterWebhookRequest) returns (RegisterWebhookResponse);
+  rpc ListWebhooks(ListWebhooksRequest) returns (ListWebhooksResponse);
+  rpc StreamWebhookEvents(StreamWebhookEventsRequest) returns (stream StreamWebhookEventsResponse);
+  rpc HealthCheck(HealthCheckRequest) returns (HealthCheckResponse);
+}
