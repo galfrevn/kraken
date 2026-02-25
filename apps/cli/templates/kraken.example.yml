@@ -1,0 +1,45 @@
+# Kraken Configuration
+# Copy this file to kraken.yml in your project root.
+
+repo: .
+databasePath: .kraken/agent.db
+
+languageModel:
+  provider: openrouter
+  model: deepseek/deepseek-v3.2
+  temperature: 0.7
+  maxTokens: 16384
+
+security:
+  defaultPolicy: review_required
+  rules:
+    - trigger: manual
+      policy: auto
+    - trigger: cron
+      policy: review_required
+    - trigger: webhook
+      policy: review_required
+    - trigger: file_change
+      policy: review_required
+    - trigger: companion
+      policy: review_required
+
+git:
+  branchPrefix: kraken/
+  autoCommit: true
+  commitPrefix: "kraken:"
+
+services:
+  schedulerUrl: http://localhost:50051
+  gatewayUrl: http://localhost:50052
+
+scheduler:
+  crons: []
+  watchers: []
+
+# Plugins - paths relative to this file
+# plugins:
+#   - .kraken/plugins/my-plugin
+#   - path: .kraken/plugins/another
+#     config:
+#       key: value
