@@ -1,0 +1,13 @@
+{
+  "extends": ["//"],
+  "tasks": {
+    "build": {
+      "outputs": ["target/release/**"],
+      "inputs": ["src/**", "Cargo.toml", "build.rs", "../../proto/**"]
+    },
+    "dev": {
+      "cache": false,
+      "persistent": true
+    }
+  }
+}
