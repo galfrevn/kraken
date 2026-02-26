@@ -1,0 +1,20 @@
+{
+  "extends": "@kraken/configuration/tsconfig.base.json",
+  "compilerOptions": {
+    "outDir": "dist",
+    "rootDir": "../..",
+    "baseUrl": ".",
+    "types": ["bun"],
+    "lib": ["ESNext", "DOM"],
+    "allowImportingTsExtensions": true,
+    "noEmit": true,
+    "jsx": "react-jsx",
+    "jsxImportSource": "@opentui/react",
+    "paths": {
+      "@/*": ["./src/*", "../core/src/*"],
+      "@core/*": ["../core/src/*"],
+      "@gen/*": ["../../gen/ts/*"]
+    }
+  },
+  "include": ["src/**/*.ts", "src/**/*.tsx", "../core/src/**/*.ts", "../../gen/ts/**/*.ts"]
+}
