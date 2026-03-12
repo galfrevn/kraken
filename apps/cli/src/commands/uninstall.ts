@@ -69,9 +69,7 @@ export async function execute(_args: string[]): Promise<void> {
 
   // Remove the global node_modules symlink created by `bun link`
   const bunGlobalLink = join(home, ".bun", "install", "global", "node_modules", "kraken");
-  if (existsSync(bunGlobalLink)) {
-    rmSync(bunGlobalLink, { recursive: true, force: true });
-  }
+  tryRemove(bunGlobalLink, deferredDeletes);
 
   const pathMarker = ".kraken/bin";
   const shellConfigs = [
@@ -85,15 +83,25 @@ export async function execute(_args: string[]): Promise<void> {
     removeFromShellConfig(rcFile, pathMarker);
   }
 
-  // On Windows the running .exe can't delete itself — schedule deletion after exit
+  // On Windows the running .exe can't delete itself — schedule deletion after exit.
+  // We use a PowerShell loop that retries until the files are unlocked.
   if (deferredDeletes.length > 0 && process.platform === "win32") {
-    const delArgs = deferredDeletes.map((f) => `"${f}"`).join(" & del /f /q ");
-    Bun.spawn(["cmd", "/c", `ping -n 2 127.0.0.1 >nul & del /f /q ${delArgs}`], {
+    const psCommands = deferredDeletes
+      .map(
+        (f) =>
+          `$p='${f.replaceAll("'", "''")}';for($i=0;$i -lt 10;$i++){Start-Sleep -Seconds 1;if(Test-Path $p){Remove-Item -Force -Recurse $p -ErrorAction SilentlyContinue}else{break}}`,
+      )
+      .join(";");
+    Bun.spawn(["powershell", "-WindowStyle", "Hidden", "-Command", psCommands], {
       stdio: ["ignore", "ignore", "ignore"],
     });
   }
 
   spinnerInstance.stop("Kraken removed");
+
+  if (deferredDeletes.length > 0) {
+    p.log.info("Some files are locked and will be cleaned up in a few seconds.");
+  }
 
   p.outro("Restart your terminal to apply PATH changes.");
 }

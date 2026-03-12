@@ -1,3 +1,5 @@
+import "opentui-spinner/react";
+
 import { useState, useEffect } from "react";
 import { COLORS } from "@/theme.ts";
 import type { ThreadManager, ThreadSummary } from "@/threads.ts";
@@ -17,7 +19,14 @@ export function ThreadSidebar({ threadManager, width, onSelectThread }: ThreadSi
     };
 
     threadManager.onThreadChange(refreshThreadList);
-    return () => threadManager.offThreadChange(refreshThreadList);
+
+    // Poll to detect processing state changes (engine events don't propagate to sidebar)
+    const interval = setInterval(refreshThreadList, 1000);
+
+    return () => {
+      threadManager.offThreadChange(refreshThreadList);
+      clearInterval(interval);
+    };
   }, [threadManager]);
 
   const maxTitleLength = width - 8;
@@ -66,7 +75,9 @@ export function ThreadSidebar({ threadManager, width, onSelectThread }: ThreadSi
               {prefix + title}
             </text>
             <box flexGrow={1} />
-            {count ? (
+            {thread.isProcessing ? (
+              <spinner fg={COLORS.cyan} />
+            ) : count ? (
               <text fg={COLORS.textMuted}>{count}</text>
             ) : null}
           </box>

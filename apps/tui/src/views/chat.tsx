@@ -192,6 +192,7 @@ export function ChatView({ threadManager, focused, onRequestFocus, onRequestBlur
   const [queueLength, setQueueLength] = useState(0);
   const [threadTitle, setThreadTitle] = useState(threadManager.getActiveThreadTitle());
   const [threadCount, setThreadCount] = useState(threadManager.getThreadCount());
+  const [activeThreadId, setActiveThreadId] = useState(threadManager.getActiveThreadIdentifier());
   const lastEscapeTimestamp = useRef(0);
   const textareaReference = useRef<TextareaRenderable>(null);
   const messageHistory = useRef<string[]>([]);
@@ -398,6 +399,7 @@ export function ChatView({ threadManager, focused, onRequestFocus, onRequestBlur
       setProcessing(currentEngine.isProcessing());
       setThreadTitle(threadManager.getActiveThreadTitle());
       setThreadCount(threadManager.getThreadCount());
+      setActiveThreadId(threadManager.getActiveThreadIdentifier());
     }
 
     attachToEngine();
@@ -483,6 +485,7 @@ export function ChatView({ threadManager, focused, onRequestFocus, onRequestBlur
       </box>
 
       <scrollbox
+        key={activeThreadId}
         flexGrow={1}
         width="100%"
         paddingRight={1}
@@ -525,6 +528,7 @@ export function ChatView({ threadManager, focused, onRequestFocus, onRequestBlur
               backgroundColor={COLORS.inputBackground}
               textColor={COLORS.text}
               width="100%"
+              wrapMode="word"
               focused={focused && !dialogIsOpen}
               onSubmit={handleSubmit}
               keyBindings={[

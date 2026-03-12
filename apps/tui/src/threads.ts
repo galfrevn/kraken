@@ -15,6 +15,7 @@ export interface ThreadSummary {
   messageCount: number;
   createdAt: Date;
   active: boolean;
+  isProcessing: boolean;
 }
 
 const UNTITLED_THREAD_PREFIX = "new conversation";
@@ -388,6 +389,7 @@ export class ThreadManager {
         messageCount: conversationCount,
         createdAt: metadata?.createdAt ?? new Date(),
         active: identifier === this.activeThreadIdentifier,
+        isProcessing: engine.isProcessing(),
       });
     }
 
