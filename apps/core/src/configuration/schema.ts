@@ -1,6 +1,8 @@
-import { resolve } from "node:path";
+import { resolve, isAbsolute } from "node:path";
 import { homedir } from "node:os";
 import { z } from "zod";
+
+const KRAKEN_HOME = resolve(homedir(), ".kraken");
 
 const languageModelConfigurationSchema = z.object({
   provider: z.enum(["openrouter", "openai", "anthropic", "ollama"]).default("openrouter"),
@@ -77,7 +79,9 @@ const servicesConfigurationSchema = z.object({
 export const agentConfigurationSchema = z
   .object({
     repo: z.string().default("."),
-    databasePath: z.string().default(resolve(homedir(), ".kraken", "agent.db")),
+    databasePath: z.string().default(resolve(KRAKEN_HOME, "agent.db")).transform((p) =>
+      isAbsolute(p) ? p : resolve(KRAKEN_HOME, p),
+    ),
     languageModel: languageModelConfigurationSchema.optional(),
     security: securityConfigurationSchema.optional(),
     scheduler: schedulerConfigurationSchema.optional(),

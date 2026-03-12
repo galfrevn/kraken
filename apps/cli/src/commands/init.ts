@@ -44,7 +44,6 @@ function generateKrakenYml(options: {
 }): string {
   const lines = [
     "repo: .",
-    `databasePath: ${join(KRAKEN_HOME, "agent.db")}`,
     "",
     "languageModel:",
     `  provider: ${options.provider}`,

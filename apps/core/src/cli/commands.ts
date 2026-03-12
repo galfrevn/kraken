@@ -27,7 +27,6 @@ function buildConfigurationTemplate(openrouterApiKey?: string): string {
 # docs: https://github.com/kraken-agent/kraken
 
 repo: "."
-databasePath: ".kraken/agent.db"
 
 languageModel:
   provider: openrouter

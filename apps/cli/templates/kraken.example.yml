@@ -1,8 +1,7 @@
 # Kraken Configuration
-# Copy this file to kraken.yml in your project root.
+# Global config: ~/.kraken/kraken.yml
 
 repo: .
-databasePath: .kraken/agent.db
 
 languageModel:
   provider: openrouter
