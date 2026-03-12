@@ -371,40 +371,63 @@ export class ChatEngine {
           this.removeLastMessage();
         }
 
-        for (const toolCall of completionResult.toolCalls) {
-          this.checkCancelled();
-
-          let parameters: Record<string, unknown>;
-          try {
-            parameters = JSON.parse(toolCall.function.arguments);
-          } catch {
-            parameters = {};
-          }
-
-          if (this.hookDispatcher) {
-            parameters = await this.hookDispatcher.dispatchBeforeToolCall(toolCall.function.name, parameters);
-          }
-
-          this.pushMessage({
-            role: "tool_call",
-            content: JSON.stringify(parameters, null, 2),
-            toolName: toolCall.function.name,
-            timestamp: new Date(),
-          });
-
-          try {
-            const toolResult = await this.raceWithAbort(
-              this.toolRegistry.executeTool(
-                toolCall.function.name,
-                parameters,
-                toolContext,
-              ),
-            );
-
-            if (this.hookDispatcher) {
-              await this.hookDispatcher.dispatchAfterToolCall(toolCall.function.name, parameters, toolResult);
+        // Parse parameters and push tool_call messages first
+        const preparedCalls = await Promise.all(
+          completionResult.toolCalls.map(async (toolCall) => {
+            let parameters: Record<string, unknown>;
+            try {
+              parameters = JSON.parse(toolCall.function.arguments);
+            } catch {
+              parameters = {};
             }
 
+            if (this.hookDispatcher) {
+              parameters = await this.hookDispatcher.dispatchBeforeToolCall(toolCall.function.name, parameters);
+            }
+
+            this.pushMessage({
+              role: "tool_call",
+              content: JSON.stringify(parameters, null, 2),
+              toolName: toolCall.function.name,
+              timestamp: new Date(),
+            });
+
+            return { toolCall, parameters };
+          }),
+        );
+
+        this.checkCancelled();
+
+        // Execute all tools in parallel
+        const results = await Promise.all(
+          preparedCalls.map(async ({ toolCall, parameters }) => {
+            try {
+              const toolResult = await this.raceWithAbort(
+                this.toolRegistry.executeTool(
+                  toolCall.function.name,
+                  parameters,
+                  toolContext,
+                ),
+              );
+
+              if (this.hookDispatcher) {
+                await this.hookDispatcher.dispatchAfterToolCall(toolCall.function.name, parameters, toolResult);
+              }
+
+              return { toolCall, parameters, toolResult, error: null };
+            } catch (toolError) {
+              if (toolError instanceof CancelledError) throw toolError;
+              const toolErrorMessage = toolError instanceof Error
+                ? toolError.message
+                : String(toolError);
+              return { toolCall, parameters, toolResult: null, error: toolErrorMessage };
+            }
+          }),
+        );
+
+        // Push results in order and add to conversation history
+        for (const { toolCall, toolResult, error } of results) {
+          if (toolResult) {
             const resultPreview = toolResult.output.length > 3000
               ? toolResult.output.slice(0, 3000) + "..."
               : toolResult.output;
@@ -423,17 +446,11 @@ export class ChatEngine {
               toolCall.function.name,
               toolResult.success ? toolResult.output : (toolResult.error ?? toolResult.output),
             );
-          } catch (toolError) {
-            if (toolError instanceof CancelledError) throw toolError;
-
-            const toolErrorMessage = toolError instanceof Error
-              ? toolError.message
-              : String(toolError);
-
+          } else {
             this.pushMessage({
               role: "tool_result",
-              content: toolErrorMessage,
-              rawContent: toolErrorMessage,
+              content: error!,
+              rawContent: error!,
               toolName: toolCall.function.name,
               toolSuccess: false,
               timestamp: new Date(),
@@ -442,7 +459,7 @@ export class ChatEngine {
             this.conversation.addToolResultMessage(
               toolCall.id,
               toolCall.function.name,
-              toolErrorMessage,
+              error!,
             );
           }
         }

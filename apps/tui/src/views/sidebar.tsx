@@ -49,7 +49,10 @@ export function ThreadSidebar({ threadManager, width, onSelectThread }: ThreadSi
         <text fg={COLORS.textSecondary}>{"threads"}</text>
         <box flexGrow={1} />
         <box onMouseUp={() => {
-          threadManager.createThread();
+          if (threadManager.isActiveThreadEmpty()) return;
+          const id = threadManager.createThread();
+          threadManager.switchThread(id);
+          onSelectThread(id);
           setThreads(threadManager.listThreads());
         }}>
           <text fg={COLORS.textMuted}>{"[+]"}</text>
@@ -67,18 +70,19 @@ export function ThreadSidebar({ threadManager, width, onSelectThread }: ThreadSi
             key={thread.identifier}
             flexDirection="row"
             width="100%"
+            height={1}
             paddingLeft={1}
             backgroundColor={isActive ? COLORS.inputBackground : undefined}
             onMouseUp={() => onSelectThread(thread.identifier)}
           >
             <text fg={isActive ? COLORS.cyan : COLORS.textMuted}>
-              {prefix + title}
+              {prefix + title + count}
             </text>
-            <box flexGrow={1} />
             {thread.isProcessing ? (
-              <spinner name="dots" color={COLORS.cyan} />
-            ) : count ? (
-              <text fg={COLORS.textMuted}>{count}</text>
+              <>
+                <text fg={COLORS.textMuted}>{" "}</text>
+                <spinner name="dots" color={COLORS.cyan} />
+              </>
             ) : null}
           </box>
         );

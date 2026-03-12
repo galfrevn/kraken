@@ -43,6 +43,9 @@ const newThreadCommand: SlashCommand = {
   description: "Start a new conversation thread",
   usage: "/new [title]",
   execute(args, threadManager) {
+    if (threadManager.isActiveThreadEmpty()) {
+      return { output: "current thread is empty — use it first" };
+    }
     const title = args.trim() || undefined;
     const identifier = threadManager.createThread(title);
     threadManager.switchThread(identifier);

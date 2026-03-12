@@ -128,6 +128,12 @@ export class ThreadManager {
     };
   }
 
+  isActiveThreadEmpty(): boolean {
+    const engine = this.threads.get(this.activeThreadIdentifier);
+    if (!engine) return true;
+    return engine.getMessages().length === 0;
+  }
+
   createThread(title?: string): string {
     const identifier = generateThreadIdentifier();
     const displayTitle = title ?? generateDefaultTitle();

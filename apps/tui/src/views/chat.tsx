@@ -198,6 +198,16 @@ export function ChatView({ threadManager, focused, onRequestFocus, onRequestBlur
   const messageHistory = useRef<string[]>([]);
   const historyIndex = useRef(-1);
   const historyDraftText = useRef("");
+  const [commandFilter, setCommandFilter] = useState<string | null>(null);
+  const [selectedCommandIndex, setSelectedCommandIndex] = useState(0);
+
+  const filteredCommands = useMemo(() => {
+    if (commandFilter === null) return [];
+    const query = commandFilter.toLowerCase();
+    return ALL_COMMANDS.filter((cmd) =>
+      cmd.name.startsWith(query) || cmd.aliases.some((a) => a.startsWith(query)),
+    );
+  }, [commandFilter]);
 
   const renderer = useRenderer();
   const dialog = useDialog();
@@ -274,6 +284,29 @@ export function ChatView({ threadManager, focused, onRequestFocus, onRequestBlur
     });
   }, [dialog, executeCommandDirectly, onRequestFocus]);
 
+  const updateCommandFilter = useCallback(() => {
+    const textarea = textareaReference.current;
+    if (!textarea) { setCommandFilter(null); return; }
+    const text = textarea.plainText;
+    if (text.startsWith("/") && !text.includes(" ") && text.length >= 1) {
+      setCommandFilter(text.slice(1));
+      setSelectedCommandIndex(0);
+    } else {
+      setCommandFilter(null);
+    }
+  }, []);
+
+  const acceptCommand = useCallback((command: SlashCommand) => {
+    const textarea = textareaReference.current;
+    if (!textarea) return;
+    const needsArgs = command.usage.includes("<");
+    const replacement = "/" + command.name + (needsArgs ? " " : "");
+    textarea.selectAll();
+    textarea.deleteChar();
+    textarea.insertText(replacement);
+    setCommandFilter(null);
+  }, []);
+
   useKeyboard((key) => {
     if (dialogIsOpen) return;
 
@@ -307,7 +340,29 @@ export function ChatView({ threadManager, focused, onRequestFocus, onRequestBlur
       return;
     }
 
+    if (key.name === "escape" && commandFilter !== null) {
+      setCommandFilter(null);
+      return;
+    }
+
     if (!focused) return;
+
+    // Command autocomplete navigation
+    if (commandFilter !== null && filteredCommands.length > 0) {
+      if (key.name === "up") {
+        setSelectedCommandIndex((prev) => Math.max(0, prev - 1));
+        return;
+      }
+      if (key.name === "down") {
+        setSelectedCommandIndex((prev) => Math.min(filteredCommands.length - 1, prev + 1));
+        return;
+      }
+      if (key.name === "tab") {
+        const selected = filteredCommands[selectedCommandIndex];
+        if (selected) acceptCommand(selected);
+        return;
+      }
+    }
 
     if (key.name === "up") {
       const textarea = textareaReference.current;
@@ -352,6 +407,9 @@ export function ChatView({ threadManager, focused, onRequestFocus, onRequestBlur
         historyDraftText.current = "";
       }
     }
+
+    // Track input for command autocomplete (runs after key is processed by textarea)
+    setTimeout(updateCommandFilter, 0);
   });
 
   useEffect(() => {
@@ -433,6 +491,7 @@ export function ChatView({ threadManager, focused, onRequestFocus, onRequestBlur
       textarea.deleteChar();
     }
     setInputValue("");
+    setCommandFilter(null);
 
     const commandResult = await handleSlashCommand(currentText, threadManager);
     if (commandResult) {
@@ -507,6 +566,28 @@ export function ChatView({ threadManager, focused, onRequestFocus, onRequestBlur
       </scrollbox>
 
       <box flexDirection="column" width="100%" flexShrink={0} marginTop={1}>
+        {commandFilter !== null && filteredCommands.length > 0 ? (
+          <box flexDirection="column" width="100%" paddingBottom={1}>
+            {filteredCommands.map((cmd, idx) => {
+              const isSelected = idx === selectedCommandIndex;
+              const cmdName = "/" + cmd.name;
+              const padding = " ".repeat(Math.max(1, 16 - cmdName.length));
+              return (
+                <box
+                  key={cmd.name}
+                  width="100%"
+                  height={1}
+                  backgroundColor={isSelected ? COLORS.cyan : undefined}
+                  onMouseUp={() => acceptCommand(cmd)}
+                >
+                  <text fg={isSelected ? COLORS.background : COLORS.text}>
+                    {cmdName + padding + cmd.description}
+                  </text>
+                </box>
+              );
+            })}
+          </box>
+        ) : null}
         <box flexDirection="row" width="100%" height={6} flexShrink={0}>
           <box paddingRight={1} paddingTop={1} flexShrink={0}>
             <Avatar state={avatarState} />
@@ -1209,7 +1290,7 @@ function ToolAccordion({ call, result }: { call: ChatMessage; result?: ChatMessa
   const succeeded = result?.toolSuccess ?? true;
   const statusIcon = hasResult ? (succeeded ? "✓" : "✗") : "⋯";
   const statusColor = hasResult ? (succeeded ? COLORS.green : COLORS.red) : COLORS.textMuted;
-  const [expanded, setExpanded] = useState(false);
+  const [expanded, setExpanded] = useState(toolName === "edit_file");
   const summary = buildToolSummary(call);
 
   const imageResult = hasResult && succeeded ? parseImageResult(result.content) : null;
