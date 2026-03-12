@@ -11,6 +11,15 @@
       "directory": "browser"
     },
     {
+      "name": "playwright",
+      "version": "0.1.0",
+      "description": "Native browser automation using Playwright. No external CLI needed — open pages, snapshots, click, type, fill, screenshot, and eval JS.",
+      "author": "kraken",
+      "tools": ["browser_setup", "browser_open", "browser_snapshot", "browser_click", "browser_type", "browser_fill", "browser_screenshot", "browser_eval", "browser_close"],
+      "requires": [],
+      "directory": "playwright"
+    },
+    {
       "name": "nanobanana",
       "version": "0.2.0",
       "description": "Generate images using Google Gemini 2.5 Flash Image model via OpenRouter.",
