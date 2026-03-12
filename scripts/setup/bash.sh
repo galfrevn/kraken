@@ -175,18 +175,11 @@ else
 fi
 
 # -------------------------------------------------------------------
-# Done
+# Done — run init
 # -------------------------------------------------------------------
 echo ""
-echo -e "${GREEN}${BOLD}  setup complete!${RESET}"
+echo -e "${GREEN}${BOLD}  build complete!${RESET}"
 echo ""
-echo -e "  ${BOLD}quick start:${RESET}"
-echo -e "    ${CYAN}kraken${RESET}                    start kraken (scheduler + gateway + tui)"
-echo -e "    ${CYAN}kraken init${RESET}               setup kraken in a project"
-echo -e "    ${CYAN}kraken doctor${RESET}             check system health"
-echo -e "    ${CYAN}kraken help${RESET}               see all commands"
-echo ""
-echo -e "  ${BOLD}use in another project:${RESET}"
-echo -e "    ${CYAN}cd ~/your-project${RESET}"
-echo -e "    ${CYAN}kraken init${RESET}"
-echo ""
+
+step "running kraken init"
+kraken init

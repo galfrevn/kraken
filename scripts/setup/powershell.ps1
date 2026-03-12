@@ -183,16 +183,13 @@ if (Get-Command kraken -ErrorAction SilentlyContinue) {
 }
 
 # -------------------------------------------------------------------
-# Done
+# Done — run init
 # -------------------------------------------------------------------
 Pop-Location
 
 Write-Host ""
-Write-Host "  setup complete!" -ForegroundColor Green
+Write-Host "  build complete!" -ForegroundColor Green
 Write-Host ""
-Write-Host "  quick start:" -ForegroundColor White
-Write-Host "    kraken                    start kraken" -ForegroundColor Cyan
-Write-Host "    kraken init               setup kraken in a project" -ForegroundColor Cyan
-Write-Host "    kraken doctor             check system health" -ForegroundColor Cyan
-Write-Host "    kraken help               see all commands" -ForegroundColor Cyan
-Write-Host ""
+
+Step "running kraken init"
+kraken init
