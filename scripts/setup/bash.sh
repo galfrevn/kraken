@@ -101,63 +101,14 @@ success "gateway built → apps/gateway/bin/gateway"
 cd "$PROJECT_ROOT"
 
 # -------------------------------------------------------------------
-# 6. Setup environment
-# -------------------------------------------------------------------
-step "setting up environment"
-
-KRAKEN_HOME="$HOME/.kraken"
-mkdir -p "$KRAKEN_HOME"
-
-ENV_FILE="$KRAKEN_HOME/.env"
-if [ ! -f "$ENV_FILE" ]; then
-  cp "$PROJECT_ROOT/apps/cli/templates/env.example" "$ENV_FILE"
-  success "created ~/.kraken/.env from template"
-
-  echo ""
-  echo -e "   ${YELLOW}enter your OpenRouter API key (https://openrouter.ai/keys):${RESET}"
-  read -r -p "   > " API_KEY
-
-  if [ -n "$API_KEY" ]; then
-    if [[ "$OSTYPE" == "darwin"* ]]; then
-      sed -i '' "s|^OPENROUTER_API_KEY=.*|OPENROUTER_API_KEY=$API_KEY|" "$ENV_FILE"
-    else
-      sed -i "s|^OPENROUTER_API_KEY=.*|OPENROUTER_API_KEY=$API_KEY|" "$ENV_FILE"
-    fi
-    success "API key saved to ~/.kraken/.env"
-  else
-    warn "no API key provided — edit ~/.kraken/.env manually before running kraken"
-  fi
-else
-  success "~/.kraken/.env already exists, skipping"
-fi
-
-CONFIG_FILE="$KRAKEN_HOME/kraken.yml"
-if [ ! -f "$CONFIG_FILE" ]; then
-  cp "$PROJECT_ROOT/apps/cli/templates/kraken.example.yml" "$CONFIG_FILE"
-
-  if [ -n "${API_KEY:-}" ]; then
-    if [[ "$OSTYPE" == "darwin"* ]]; then
-      sed -i '' "/^languageModel:/a\\
-\\  apiKey: $API_KEY" "$CONFIG_FILE"
-    else
-      sed -i "/^languageModel:/a\\  apiKey: $API_KEY" "$CONFIG_FILE"
-    fi
-  fi
-
-  success "created ~/.kraken/kraken.yml from template"
-else
-  success "~/.kraken/kraken.yml already exists, skipping"
-fi
-
-# -------------------------------------------------------------------
-# 7. Register global CLI
+# 6. Register global CLI
 # -------------------------------------------------------------------
 step "registering kraken CLI"
 bun link 2>&1 | tail -2
 success "kraken command registered globally"
 
 # -------------------------------------------------------------------
-# 8. Verify
+# 7. Verify
 # -------------------------------------------------------------------
 step "verifying installation"
 

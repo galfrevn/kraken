@@ -5,6 +5,7 @@ import { Toaster, toast } from "@opentui-ui/toast/react";
 import { COLORS } from "@/theme.ts";
 import type { TuiStore } from "@/store.ts";
 import type { ThreadManager } from "@/threads.ts";
+import type { PluginRegistry } from "@core/plugins/registry.ts";
 import { ChatView } from "@/views/chat.tsx";
 import { DashboardView } from "@/views/dashboard.tsx";
 import { TasksView } from "@/views/tasks.tsx";
@@ -42,10 +43,11 @@ export interface PluginLoadFailure {
 interface ApplicationProps {
   store: TuiStore;
   threadManager: ThreadManager;
+  pluginRegistry: PluginRegistry;
   pluginFailures?: PluginLoadFailure[];
 }
 
-export function Application({ store, threadManager, pluginFailures }: ApplicationProps) {
+export function Application({ store, threadManager, pluginRegistry, pluginFailures }: ApplicationProps) {
   const [activeView, setActiveView] = useState<ViewName>("chat");
   const [chatInputFocused, setChatInputFocused] = useState(true);
   const { width, height } = useTerminalDimensions();
@@ -166,7 +168,7 @@ export function Application({ store, threadManager, pluginFailures }: Applicatio
                 onRequestBlur={requestChatBlur}
               />
             )}
-            {activeView === "dashboard" && <DashboardView store={store} />}
+            {activeView === "dashboard" && <DashboardView store={store} pluginRegistry={pluginRegistry} />}
             {activeView === "tasks" && (
               <TasksView store={store} focused={activeView === "tasks"} />
             )}

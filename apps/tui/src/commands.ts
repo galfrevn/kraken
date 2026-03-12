@@ -182,6 +182,16 @@ const continueCommand: SlashCommand = {
   },
 };
 
+const exitCommand: SlashCommand = {
+  name: "exit",
+  aliases: ["quit", "q"],
+  description: "Exit kraken",
+  usage: "/exit",
+  execute() {
+    process.exit(0);
+  },
+};
+
 const purgeCommand: SlashCommand = {
   name: "purge",
   aliases: ["reset", "wipe"],
@@ -206,6 +216,7 @@ export const ALL_COMMANDS: SlashCommand[] = [
   renameCommand,
   continueCommand,
   purgeCommand,
+  exitCommand,
 ];
 
 export function registerPluginsCommand(

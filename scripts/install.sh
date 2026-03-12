@@ -35,28 +35,6 @@ prompt() {
   echo "${answer:-$default_value}"
 }
 
-prompt_select() {
-  local question="$1"
-  shift
-  local options=("$@")
-
-  echo -e "\n  ${BOLD}$question${RESET}\n" >&2
-  for i in "${!options[@]}"; do
-    echo -e "    ${CYAN}$((i + 1)))${RESET} ${options[$i]}" >&2
-  done
-  echo "" >&2
-
-  local answer
-  answer=$(prompt "Choose an option" "1")
-  local index=$((answer - 1))
-
-  if [ "$index" -ge 0 ] && [ "$index" -lt "${#options[@]}" ]; then
-    echo "$index"
-  else
-    echo "0"
-  fi
-}
-
 detect_platform() {
   local os arch
 
@@ -254,51 +232,12 @@ if [ -d "$KRAKEN_HOME/lib/tui/apps/cli/templates" ]; then
 fi
 
 # -------------------------------------------------------------------
-# 7. Interactive wizard (skip if updating)
+# 7. Write version marker
 # -------------------------------------------------------------------
-if [ "$UPDATING" = false ]; then
-  step "configuration wizard"
-
-  PROVIDER_OPTIONS=("OpenRouter (recommended)" "Anthropic (Claude)" "OpenAI (GPT)")
-  PROVIDER_IDS=("openrouter" "anthropic" "openai")
-  PROVIDER_IDX=$(prompt_select "Select LLM provider" "${PROVIDER_OPTIONS[@]}")
-  PROVIDER="${PROVIDER_IDS[$PROVIDER_IDX]}"
-  success "provider: $PROVIDER"
-
-  if [ "$PROVIDER" = "openrouter" ]; then
-    MODEL_OPTIONS=("Claude Sonnet 4 (recommended)" "DeepSeek V3.2 (fast, cheap)" "Gemini 2.5 Pro")
-    MODEL_IDS=("anthropic/claude-sonnet-4" "deepseek/deepseek-v3.2" "google/gemini-2.5-pro")
-  elif [ "$PROVIDER" = "anthropic" ]; then
-    MODEL_OPTIONS=("Claude Sonnet 4" "Claude Sonnet 4.6")
-    MODEL_IDS=("claude-sonnet-4" "claude-sonnet-4.6")
-  else
-    MODEL_OPTIONS=("GPT-4o" "o3-mini")
-    MODEL_IDS=("gpt-4o" "o3-mini")
-  fi
-
-  MODEL_IDX=$(prompt_select "Select model" "${MODEL_OPTIONS[@]}")
-  MODEL="${MODEL_IDS[$MODEL_IDX]}"
-  success "model: $MODEL"
-
-  echo ""
-  API_KEY=$(prompt "Enter your $PROVIDER API key")
-
-  if [ -n "$API_KEY" ]; then
-    echo "OPENROUTER_API_KEY=$API_KEY" > "$KRAKEN_HOME/config/.env"
-    success "API key saved"
-  else
-    warn "no API key provided -- set it later in ~/.kraken/config/.env"
-    touch "$KRAKEN_HOME/config/.env"
-  fi
-
-  # Write version marker
-  if [ -n "${RELEASE_TAG:-}" ]; then
-    echo "$RELEASE_TAG" > "$KRAKEN_HOME/version"
-  else
-    echo "source" > "$KRAKEN_HOME/version"
-  fi
+if [ -n "${RELEASE_TAG:-}" ]; then
+  echo "$RELEASE_TAG" > "$KRAKEN_HOME/version"
 else
-  success "keeping existing configuration"
+  echo "source" > "$KRAKEN_HOME/version"
 fi
 
 # -------------------------------------------------------------------

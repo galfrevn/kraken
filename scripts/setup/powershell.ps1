@@ -128,50 +128,14 @@ Pop-Location
 Success "gateway built -> apps/gateway/bin/gateway.exe"
 
 # -------------------------------------------------------------------
-# 7. Setup environment
-# -------------------------------------------------------------------
-Step "setting up environment"
-
-$KrakenHome = Join-Path $env:USERPROFILE ".kraken"
-if (-not (Test-Path $KrakenHome)) {
-    New-Item -ItemType Directory -Path $KrakenHome -Force | Out-Null
-}
-
-$EnvFile = Join-Path $KrakenHome ".env"
-if (-not (Test-Path $EnvFile)) {
-    Copy-Item "apps/cli/templates/env.example" $EnvFile
-    Success "created ~/.kraken/.env from template"
-
-    Write-Host ""
-    $ApiKey = Read-Host "   enter your OpenRouter API key (https://openrouter.ai/keys)"
-
-    if ($ApiKey) {
-        (Get-Content $EnvFile) -replace "^# OPENROUTER_API_KEY=.*", "OPENROUTER_API_KEY=$ApiKey" | Set-Content $EnvFile
-        Success "API key saved to ~/.kraken/.env"
-    } else {
-        Warn "no API key provided - edit ~/.kraken/.env manually before running kraken"
-    }
-} else {
-    Success "~/.kraken/.env already exists, skipping"
-}
-
-$ConfigFile = Join-Path $KrakenHome "kraken.yml"
-if (-not (Test-Path $ConfigFile)) {
-    Copy-Item "apps/cli/templates/kraken.example.yml" $ConfigFile
-    Success "created ~/.kraken/kraken.yml from template"
-} else {
-    Success "~/.kraken/kraken.yml already exists, skipping"
-}
-
-# -------------------------------------------------------------------
-# 8. Register global CLI
+# 7. Register global CLI
 # -------------------------------------------------------------------
 Step "registering kraken CLI"
 bun link
 Success "kraken command registered globally"
 
 # -------------------------------------------------------------------
-# 9. Verify
+# 8. Verify
 # -------------------------------------------------------------------
 Step "verifying installation"
 

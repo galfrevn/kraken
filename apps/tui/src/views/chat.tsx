@@ -528,6 +528,7 @@ export function ChatView({ threadManager, focused, onRequestFocus, onRequestBlur
               backgroundColor={COLORS.inputBackground}
               textColor={COLORS.text}
               width="100%"
+              height="100%"
               wrapMode="word"
               focused={focused && !dialogIsOpen}
               onSubmit={handleSubmit}

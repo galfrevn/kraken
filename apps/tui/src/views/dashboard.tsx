@@ -3,6 +3,7 @@ import { COLORS, STATUS_ICONS, STATUS_COLORS } from "@/theme.ts";
 import type { TuiStore, ServiceHealth, TaskSummary } from "@/store.ts";
 import type { TaskRow } from "@core/storage/database.ts";
 import type { TimerSummary } from "@core/scheduling/timers.ts";
+import type { PluginRegistry } from "@core/plugins/registry.ts";
 import { Avatar } from "@/avatar.tsx";
 
 const REFRESH_INTERVAL_MILLISECONDS = 3_000;
@@ -19,9 +20,10 @@ function formatRemainingTime(milliseconds: number): string {
 
 interface DashboardViewProps {
   store: TuiStore;
+  pluginRegistry: PluginRegistry;
 }
 
-export function DashboardView({ store }: DashboardViewProps) {
+export function DashboardView({ store, pluginRegistry }: DashboardViewProps) {
   const [health, setHealth] = useState<ServiceHealth>({
     gateway: false,
     scheduler: false,
@@ -38,6 +40,7 @@ export function DashboardView({ store }: DashboardViewProps) {
   });
   const [recentTasks, setRecentTasks] = useState<TaskRow[]>([]);
   const [pendingTimers, setPendingTimers] = useState<TimerSummary[]>([]);
+  const plugins = pluginRegistry.getLoadedPlugins();
 
   useEffect(() => {
     const refresh = async () => {
@@ -104,11 +107,16 @@ export function DashboardView({ store }: DashboardViewProps) {
           padding={1}
           flexGrow={1}
         >
-          <text fg={COLORS.textSecondary}>info</text>
-          <text fg={COLORS.text}>{"  total:    " + summary.total}</text>
-          <text fg={summary.awaitingReview > 0 ? COLORS.yellow : COLORS.textMuted}>
-            {"  reviews:  " + summary.awaitingReview}
-          </text>
+          <text fg={COLORS.textSecondary}>plugins</text>
+          {plugins.length === 0 ? (
+            <text fg={COLORS.textMuted}>{"  no plugins installed"}</text>
+          ) : (
+            plugins.map((p) => (
+              <text key={p.plugin.name} fg={p.enabled ? COLORS.green : COLORS.textMuted}>
+                {"  " + (p.enabled ? "●" : "○") + " " + p.plugin.name + " v" + p.plugin.version}
+              </text>
+            ))
+          )}
         </box>
       </box>
 

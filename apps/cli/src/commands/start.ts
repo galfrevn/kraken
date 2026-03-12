@@ -2,7 +2,6 @@ import { spawn, type Subprocess } from "bun";
 import { existsSync } from "node:fs";
 import { join } from "node:path";
 import { KRAKEN_ROOT, KRAKEN_HOME } from "@/constants.ts";
-import { startSplashScreen } from "@/splash.ts";
 
 const childProcesses: Subprocess[] = [];
 let shuttingDown = false;
@@ -62,28 +61,12 @@ function spawnGateway(dev: boolean): Subprocess {
   return spawn({ cmd: ["go", "run", "./cmd/gateway"], cwd: gatewayDirectory, stdout: "ignore", stderr: "ignore", env: envVars });
 }
 
-async function waitForService(url: string, timeoutMs: number = 5000): Promise<boolean> {
-  const start = Date.now();
-  while (Date.now() - start < timeoutMs) {
-    try {
-      await fetch(url, { signal: AbortSignal.timeout(500) });
-      return true;
-    } catch {
-      await Bun.sleep(200);
-    }
-  }
-  return false;
-}
-
 export async function execute(args: string[]): Promise<void> {
   const flags = parseStartFlags(args);
 
   process.on("SIGINT", () => { killAllChildren(); process.exit(0); });
   process.on("SIGTERM", () => { killAllChildren(); process.exit(0); });
   process.on("exit", () => { killAllChildren(); });
-
-  const needsServices = !flags.noScheduler || !flags.noGateway;
-  const splash = needsServices ? startSplashScreen() : null;
 
   if (!flags.noScheduler) {
     childProcesses.push(spawnScheduler(flags.dev));
@@ -92,16 +75,6 @@ export async function execute(args: string[]): Promise<void> {
   if (!flags.noGateway) {
     childProcesses.push(spawnGateway(flags.dev));
   }
-
-  if (needsServices) {
-    const checks: Promise<boolean>[] = [];
-    if (!flags.noScheduler) checks.push(waitForService("http://localhost:50051"));
-    if (!flags.noGateway) checks.push(waitForService("http://localhost:50052"));
-
-    await Promise.all(checks);
-  }
-
-  splash?.stop();
 
   // @ts-expect-error -- dynamic cross-package import resolved by Bun at runtime
   const { main } = (await import("../../../tui/src/index.tsx")) as { main: () => Promise<void> };

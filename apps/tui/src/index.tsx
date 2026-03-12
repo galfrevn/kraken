@@ -181,6 +181,7 @@ export async function main(): Promise<void> {
     <Application
       store={store}
       threadManager={threadManager}
+      pluginRegistry={pluginRegistry}
       pluginFailures={pluginResult.failed}
     />,
   );

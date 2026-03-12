@@ -76,7 +76,7 @@ export function ThreadSidebar({ threadManager, width, onSelectThread }: ThreadSi
             </text>
             <box flexGrow={1} />
             {thread.isProcessing ? (
-              <spinner fg={COLORS.cyan} />
+              <spinner name="dots" color={COLORS.cyan} />
             ) : count ? (
               <text fg={COLORS.textMuted}>{count}</text>
             ) : null}
