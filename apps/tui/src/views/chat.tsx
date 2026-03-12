@@ -479,9 +479,15 @@ export function ChatView({ threadManager, focused, onRequestFocus, onRequestBlur
   return (
     <box flexDirection="column" flexGrow={1} width="100%">
       <box flexDirection="row" paddingBottom={1}>
-        <text fg={COLORS.textSecondary}>
-          {threadLabel + "  ·  " + statusLabel + (tokenLabel ? "  ·  " + tokenLabel : "")}
-        </text>
+        <text fg={COLORS.textSecondary}>{threadLabel}</text>
+        <text fg={COLORS.textMuted}>{"  ·  "}</text>
+        <text fg={processing ? COLORS.yellow : COLORS.textMuted}>{statusLabel}</text>
+        {tokenLabel ? (
+          <>
+            <text fg={COLORS.textMuted}>{"  ·  "}</text>
+            <text fg={COLORS.textMuted}>{tokenLabel}</text>
+          </>
+        ) : null}
       </box>
 
       <scrollbox
@@ -496,15 +502,7 @@ export function ChatView({ threadManager, focused, onRequestFocus, onRequestBlur
         {messages.length === 0 ? (
           <EmptyState />
         ) : (
-          <box flexDirection="column" width="100%">
-            {groupMessages(messages).map((item, index) =>
-              item.type === "tool" ? (
-                <ToolAccordion key={index} call={item.call} result={item.result} />
-              ) : (
-                <MessageBubble key={index} message={item.message} />
-              ),
-            )}
-          </box>
+          <MessageList messages={messages} />
         )}
       </scrollbox>
 
@@ -924,19 +922,58 @@ function PluginStoreContent({
   );
 }
 
+function MessageList({ messages }: { messages: ChatMessage[] }) {
+  const items = useMemo(() => groupMessages(messages), [messages]);
+
+  return (
+    <box flexDirection="column" width="100%">
+      {items.map((item, index) =>
+        item.type === "tool" ? (
+          <ToolAccordion key={index} call={item.call} result={item.result} />
+        ) : (
+          <MessageBubble key={index} message={item.message} />
+        ),
+      )}
+    </box>
+  );
+}
+
 function EmptyState() {
   return (
-    <box flexDirection="column" padding={2}>
-      <text fg={COLORS.text}>{"kraken"}</text>
-      <text fg={COLORS.textMuted}>{"autonomous developer agent"}</text>
-      <text fg={COLORS.textMuted}>{" "}</text>
-      <text fg={COLORS.textMuted}>{"ask me anything about your codebase."}</text>
-      <text fg={COLORS.textMuted}>{"i can read files, write code, run commands, and search."}</text>
-      <text fg={COLORS.textMuted}>{" "}</text>
-      <text fg={COLORS.textMuted}>{"examples:"}</text>
-      <text fg={COLORS.textSecondary}>{'  "list the files in this project"'}</text>
-      <text fg={COLORS.textSecondary}>{'  "read package.json and explain the project"'}</text>
-      <text fg={COLORS.textSecondary}>{'  "create a hello world script in src/"'}</text>
+    <box flexDirection="row" padding={2}>
+      <box flexDirection="column" flexShrink={0} width={2}>
+        <text fg={COLORS.cyan}>{"┃"}</text>
+        <text fg={COLORS.cyan}>{"┃"}</text>
+        <text fg={COLORS.cyan}>{"┃"}</text>
+        <text fg={COLORS.cyan}>{"┃"}</text>
+        <text fg={COLORS.cyan}>{"┃"}</text>
+        <text fg={COLORS.cyan}>{"┃"}</text>
+        <text fg={COLORS.cyan}>{"┃"}</text>
+        <text fg={COLORS.cyan}>{"┃"}</text>
+      </box>
+      <box flexDirection="column">
+        <text fg={COLORS.text}><b>{"kraken"}</b></text>
+        <text fg={COLORS.textMuted}>{"autonomous developer agent"}</text>
+        <text fg={COLORS.textMuted}>{" "}</text>
+        <text fg={COLORS.textMuted}>{"ask me anything about your codebase."}</text>
+        <text fg={COLORS.textMuted}>{" "}</text>
+        <text fg={COLORS.textMuted}>{"examples:"}</text>
+        <text fg={COLORS.textSecondary}>{'  "list the files in this project"'}</text>
+        <text fg={COLORS.textSecondary}>{'  "read package.json and explain the project"'}</text>
+      </box>
+    </box>
+  );
+}
+
+function LeftBorder({ color, children }: { color: string; children: React.ReactNode }) {
+  return (
+    <box flexDirection="row" paddingTop={1} width="100%">
+      <box flexShrink={0} width={2}>
+        <text fg={color}>{"┃"}</text>
+      </box>
+      <box flexDirection="column" flexGrow={1} flexShrink={1} width="100%">
+        {children}
+      </box>
     </box>
   );
 }
@@ -945,10 +982,9 @@ function MessageBubble({ message }: { message: ChatMessage }) {
   switch (message.role) {
     case "user":
       return (
-        <box flexDirection="column" paddingTop={1} paddingLeft={1} width="100%">
-          <text fg={COLORS.blue}>{"→ you:"}</text>
-          <text fg={COLORS.text}>{"  " + message.content}</text>
-        </box>
+        <LeftBorder color={COLORS.blue}>
+          <text fg={COLORS.text}><b>{message.content}</b></text>
+        </LeftBorder>
       );
 
     case "assistant":
@@ -960,17 +996,16 @@ function MessageBubble({ message }: { message: ChatMessage }) {
 
     case "error":
       return (
-        <box flexDirection="column" paddingTop={1} paddingLeft={1} width="100%">
-          <text fg={COLORS.red}>{"→ error"}</text>
-          <text fg={COLORS.red}>{"  " + message.content}</text>
-        </box>
+        <LeftBorder color={COLORS.red}>
+          <text fg={COLORS.red}>{message.content}</text>
+        </LeftBorder>
       );
 
     case "status":
       return (
-        <box paddingTop={1} paddingLeft={1}>
-          <text fg={COLORS.yellow}>{"⚠ " + message.content}</text>
-        </box>
+        <LeftBorder color={COLORS.yellow}>
+          <text fg={COLORS.yellow}>{message.content}</text>
+        </LeftBorder>
       );
 
     default:
@@ -1055,30 +1090,141 @@ function ImageResultCard({ imageData }: { imageData: ImageResultData }) {
   );
 }
 
+function ToolExpandedContent({ call, result, toolName }: { call: ChatMessage; result?: ChatMessage; toolName: string }) {
+  const hasResult = result !== undefined && result !== call;
+  const succeeded = result?.toolSuccess ?? true;
+  const params = parseToolCallParams(call.content);
+  const resultContent = hasResult ? (result.rawContent ?? result.content) : "";
+
+  // edit_file → show diff
+  if (toolName === "edit_file" && params) {
+    const oldStr = params.old_string as string | undefined;
+    const newStr = params.new_string as string | undefined;
+    const filePath = (params.path as string) ?? "file";
+    if (oldStr && newStr) {
+      const diffStr = generateUnifiedDiff(oldStr, newStr, filePath);
+      return (
+        <box flexDirection="column" paddingLeft={2} width="100%">
+          <diff
+            diff={diffStr}
+            view="unified"
+            syntaxStyle={syntaxStyle}
+            addedBg={COLORS.diffAddedBg}
+            removedBg={COLORS.diffRemovedBg}
+            width="100%"
+          />
+        </box>
+      );
+    }
+  }
+
+  // write_file → show file content with syntax highlighting
+  if (toolName === "write_file" && params) {
+    const filePath = (params.path as string) ?? "";
+    const content = (params.content as string) ?? "";
+    const fileType = detectFileType(filePath);
+    return (
+      <box flexDirection="column" paddingLeft={2} width="100%">
+        <code content={content} filetype={fileType} syntaxStyle={syntaxStyle} width="100%" />
+      </box>
+    );
+  }
+
+  // read_file / read_lines → show result with syntax highlighting
+  if ((toolName === "read_file" || toolName === "read_lines") && hasResult) {
+    const filePath = params?.path as string ?? "";
+    const fileType = detectFileType(filePath);
+    return (
+      <box flexDirection="column" paddingLeft={2} width="100%">
+        <code content={resultContent} filetype={fileType} syntaxStyle={syntaxStyle} width="100%" />
+      </box>
+    );
+  }
+
+  // run_command → show output as bash
+  if (COMMAND_TOOLS.has(toolName) && hasResult) {
+    return (
+      <box flexDirection="column" paddingLeft={2} width="100%">
+        <code content={resultContent} filetype="bash" syntaxStyle={syntaxStyle} width="100%" />
+      </box>
+    );
+  }
+
+  // git_diff → result is already unified diff
+  if (toolName === "git_diff" && hasResult) {
+    return (
+      <box flexDirection="column" paddingLeft={2} width="100%">
+        <diff
+          diff={resultContent}
+          view="unified"
+          syntaxStyle={syntaxStyle}
+          addedBg={COLORS.diffAddedBg}
+          removedBg={COLORS.diffRemovedBg}
+          width="100%"
+        />
+      </box>
+    );
+  }
+
+  // git_log / git_status → show as shell output
+  if ((toolName === "git_log" || toolName === "git_status") && hasResult) {
+    return (
+      <box flexDirection="column" paddingLeft={2} width="100%">
+        <code content={resultContent} filetype="bash" syntaxStyle={syntaxStyle} width="100%" />
+      </box>
+    );
+  }
+
+  // Default: plain text input/output
+  return (
+    <box flexDirection="column" paddingLeft={2} width="100%">
+      {call.content.split("\n").slice(0, 20).map((line, lineIndex) => (
+        <box key={lineIndex} width="100%">
+          <text fg={COLORS.textMuted}>{line}</text>
+        </box>
+      ))}
+      {call.content.split("\n").length > 20 ? (
+        <text fg={COLORS.textMuted}>{"..."}</text>
+      ) : null}
+      {hasResult ? (
+        <box flexDirection="column" marginTop={1} width="100%">
+          {resultContent.split("\n").slice(0, 20).map((line, lineIndex) => (
+            <box key={lineIndex} width="100%">
+              <text fg={succeeded ? COLORS.textMuted : COLORS.red}>{line}</text>
+            </box>
+          ))}
+          {resultContent.split("\n").length > 20 ? (
+            <text fg={COLORS.textMuted}>{"..."}</text>
+          ) : null}
+        </box>
+      ) : null}
+    </box>
+  );
+}
+
 function ToolAccordion({ call, result }: { call: ChatMessage; result?: ChatMessage }) {
-  const name = toolDisplayName(call.toolName ?? "tool");
+  const toolName = call.toolName ?? "tool";
+  const name = toolDisplayName(toolName);
   const hasResult = result !== undefined && result !== call;
   const succeeded = result?.toolSuccess ?? true;
   const statusIcon = hasResult ? (succeeded ? "✓" : "✗") : "⋯";
   const statusColor = hasResult ? (succeeded ? COLORS.green : COLORS.red) : COLORS.textMuted;
   const [expanded, setExpanded] = useState(false);
-  const chevron = expanded ? "▾" : "▸";
   const summary = buildToolSummary(call);
 
   const imageResult = hasResult && succeeded ? parseImageResult(result.content) : null;
 
   return (
     <box
-      flexDirection="column"
-      paddingLeft={3}
-      paddingRight={1}
+      flexDirection="row"
+      paddingTop={1}
       width="100%"
     >
+      <box flexShrink={0} width={2}>
+        <text fg={COLORS.textMuted}>{"┃"}</text>
+      </box>
       <box
-        backgroundColor={COLORS.inputBackground}
         width="100%"
-        paddingLeft={1}
-        paddingRight={1}
         flexDirection="column"
         onMouseUp={() => setExpanded((previous) => !previous)}
       >
@@ -1087,7 +1233,6 @@ function ToolAccordion({ call, result }: { call: ChatMessage; result?: ChatMessa
         ) : (
           <>
             <box flexDirection="row" width="100%">
-              <text fg={COLORS.textMuted}>{chevron + " "}</text>
               <text fg={statusColor}>{statusIcon + " "}</text>
               <text fg={COLORS.purple}>{name}</text>
               {summary ? (
@@ -1096,39 +1241,7 @@ function ToolAccordion({ call, result }: { call: ChatMessage; result?: ChatMessa
             </box>
 
             {expanded ? (
-              <box flexDirection="column" paddingLeft={4} width="100%">
-                <box width="100%">
-                  <text fg={COLORS.textMuted}>{"input"}</text>
-                </box>
-                {call.content.split("\n").slice(0, 12).map((line, lineIndex) => (
-                  <box key={lineIndex} width="100%">
-                    <text fg={COLORS.textSecondary}>{"  " + line}</text>
-                  </box>
-                ))}
-                {call.content.split("\n").length > 12 ? (
-                  <box width="100%">
-                    <text fg={COLORS.textMuted}>{"  ..."}</text>
-                  </box>
-                ) : null}
-
-                {hasResult ? (
-                  <>
-                    <box width="100%" marginTop={1}>
-                      <text fg={COLORS.textMuted}>{"output"}</text>
-                    </box>
-                    {result.content.split("\n").slice(0, 12).map((line, lineIndex) => (
-                      <box key={lineIndex} width="100%">
-                        <text fg={succeeded ? COLORS.textSecondary : COLORS.red}>{"  " + line}</text>
-                      </box>
-                    ))}
-                    {result.content.split("\n").length > 12 ? (
-                      <box width="100%">
-                        <text fg={COLORS.textMuted}>{"  ..."}</text>
-                      </box>
-                    ) : null}
-                  </>
-                ) : null}
-              </box>
+              <ToolExpandedContent call={call} result={result} toolName={toolName} />
             ) : null}
           </>
         )}
@@ -1158,6 +1271,46 @@ function buildToolSummary(call: ChatMessage): string {
   }
 }
 
+const COMMAND_TOOLS = new Set(["run_command"]);
+
+function parseToolCallParams(content: string): Record<string, unknown> | null {
+  try {
+    return JSON.parse(content) as Record<string, unknown>;
+  } catch {
+    return null;
+  }
+}
+
+function detectFileType(filePath: string): string | undefined {
+  const ext = filePath.split(".").pop()?.toLowerCase();
+  const map: Record<string, string> = {
+    ts: "typescript", tsx: "typescript", js: "javascript", jsx: "javascript",
+    go: "go", rs: "rust", py: "python", rb: "ruby", java: "java",
+    json: "json", yaml: "yaml", yml: "yaml", toml: "toml",
+    md: "markdown", html: "html", css: "css", scss: "scss",
+    sql: "sql", sh: "bash", bash: "bash", zsh: "bash",
+    c: "c", cpp: "cpp", h: "c", hpp: "cpp",
+    proto: "protobuf", xml: "xml", dockerfile: "dockerfile",
+  };
+  return ext ? map[ext] : undefined;
+}
+
+function generateUnifiedDiff(oldStr: string, newStr: string, filePath: string): string {
+  const oldLines = oldStr.split("\n");
+  const newLines = newStr.split("\n");
+  const lines: string[] = [];
+  lines.push(`--- a/${filePath}`);
+  lines.push(`+++ b/${filePath}`);
+  lines.push(`@@ -1,${oldLines.length} +1,${newLines.length} @@`);
+  for (const line of oldLines) {
+    lines.push(`-${line}`);
+  }
+  for (const line of newLines) {
+    lines.push(`+${line}`);
+  }
+  return lines.join("\n");
+}
+
 function extractToolNameFromPartialCall(content: string): string | undefined {
   const jsonNameMatch = content.match(/"name"\s*:\s*"([^"]+)"/);
   if (jsonNameMatch?.[1]) return jsonNameMatch[1];
@@ -1173,7 +1326,7 @@ function extractToolNameFromPartialCall(content: string): string | undefined {
 
 function AssistantBubble({ message }: { message: ChatMessage }) {
   const displayContent = message.rawContent ?? message.content;
-  const segments = parseAssistantContent(displayContent);
+  const segments = useMemo(() => parseAssistantContent(displayContent), [displayContent]);
   const hasThinking = segments.some((s) => s.type === "thinking");
   const hasText = segments.some((s) => s.type === "text");
   const hasToolCall = segments.some((s) => s.type === "tool_call");
@@ -1193,93 +1346,66 @@ function AssistantBubble({ message }: { message: ChatMessage }) {
     : null;
 
   return (
-    <box flexDirection="column" paddingTop={1} paddingLeft={1} width="100%">
-      <box flexDirection="row">
-        {message.streaming ? (
-          <spinner name="dots" color={COLORS.cyan} />
-        ) : (
-          <text fg={COLORS.cyan}>{"→"}</text>
-        )}
-        <text fg={COLORS.cyan}>{" kraken:"}</text>
-        {streamingHint ? (
-          <text fg={COLORS.textMuted}>{"  " + streamingHint}</text>
-        ) : null}
+    <box flexDirection="row" paddingTop={1} width="100%">
+      <box flexShrink={0} width={2}>
+        <text fg={COLORS.cyan}>{"┃"}</text>
       </box>
+      <box flexDirection="column" flexGrow={1} flexShrink={1} width="100%">
+        {streamingHint ? (
+          <box flexDirection="row">
+            {message.streaming ? (
+              <spinner name="dots" color={COLORS.cyan} />
+            ) : null}
+            <text fg={COLORS.textMuted}>{" " + streamingHint}</text>
+          </box>
+        ) : null}
 
-      {segments.map((segment) => {
-        if (segment.type === "thinking") {
+        {segments.map((segment) => {
+          if (segment.type === "thinking") {
+            const cleaned = stripXmlTags(segment.content);
+            if (!cleaned) return null;
+            return (
+              <box flexDirection="row" width="100%" paddingBottom={1}>
+                <box flexShrink={0} width={2}>
+                  <text fg={COLORS.textMuted}>{"┃"}</text>
+                </box>
+                <box flexDirection="column" flexGrow={1} width="100%">
+                  <text fg={COLORS.textSecondary}>
+                    <i>{cleaned}</i>
+                  </text>
+                </box>
+              </box>
+            );
+          }
+
+          if (segment.type === "tool_call") {
+            if (message.streaming) {
+              const extractedToolName = extractToolNameFromPartialCall(segment.content);
+              return extractedToolName ? (
+                <box flexDirection="row" marginTop={1} width="100%">
+                  <spinner name="dots" color={COLORS.purple} />
+                  <text fg={COLORS.purple}>{" " + toolDisplayName(extractedToolName)}</text>
+                </box>
+              ) : null;
+            }
+            return null;
+          }
+
           const cleaned = stripXmlTags(segment.content);
           if (!cleaned) return null;
+
           return (
-            <box
-              flexDirection="column"
-              paddingLeft={3}
-              paddingRight={1}
-              width="100%"
-            >
-              <box
-                backgroundColor={COLORS.inputBackground}
+            <box paddingRight={1} width="100%" flexShrink={0}>
+              <markdown
+                content={cleaned}
+                syntaxStyle={syntaxStyle}
+                streaming={message.streaming ?? false}
                 width="100%"
-                paddingLeft={1}
-                paddingRight={1}
-                flexDirection="column"
-              >
-                <box flexDirection="row" width="100%">
-                  <text fg={COLORS.textMuted}>{"reasoning"}</text>
-                </box>
-                <box width="100%">
-                  <text fg={COLORS.textMuted}>{"  " + cleaned}</text>
-                </box>
-              </box>
+              />
             </box>
           );
-        }
-
-        if (segment.type === "tool_call") {
-          if (message.streaming) {
-            const toolName = extractToolNameFromPartialCall(segment.content);
-            return toolName ? (
-              <box
-                flexDirection="column"
-                paddingLeft={3}
-                paddingRight={1}
-                marginTop={1}
-                width="100%"
-              >
-                <box
-                  backgroundColor={COLORS.inputBackground}
-                  width="100%"
-                  paddingLeft={1}
-                  paddingRight={1}
-                  flexDirection="row"
-                >
-                  <spinner name="dots" color={COLORS.purple} />
-                  <text fg={COLORS.purple}>{" " + toolDisplayName(toolName)}</text>
-                </box>
-              </box>
-            ) : null;
-          }
-          return null;
-        }
-
-        const cleaned = stripXmlTags(segment.content);
-        if (!cleaned) return null;
-
-        return (
-          <box paddingLeft={2} paddingRight={1} width="100%" flexShrink={0}>
-            <markdown
-              content={cleaned}
-              syntaxStyle={syntaxStyle}
-              streaming={message.streaming ?? false}
-              width="100%"
-            />
-          </box>
-        );
-      })}
-
-      {message.streaming ? (
-        <text fg={COLORS.blue}>{"  ▊"}</text>
-      ) : null}
+        })}
+      </box>
     </box>
   );
 }

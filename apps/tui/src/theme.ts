@@ -17,6 +17,9 @@ export const COLORS = {
   blue: "#58a6ff",
   purple: "#bc8cff",
   cyan: "#39d2c0",
+
+  diffAddedBg: "#1a2e1a",
+  diffRemovedBg: "#2e1a1a",
 } as const;
 
 export const STATUS_COLORS: Record<string, string> = {

@@ -178,32 +178,46 @@ export class LanguageModelClient {
       maxTokens: options?.maxTokens ?? this.defaultMaxTokens,
       systemPrompt,
       tools: this.buildGatewayTools() ?? [],
-    });
+    }, signal ? { signal } : undefined);
 
     let fullContent = "";
+    let fullReasoning = "";
     let toolCalls: ToolCallEntry[] = [];
     let finishReason = "stop";
 
     const iterator = stream[Symbol.asyncIterator]();
     const INACTIVITY_TIMEOUT_MILLISECONDS = 30_000;
 
+    let inactivityTimer: ReturnType<typeof setTimeout> | null = null;
+    let inactivityReject: ((reason: Error) => void) | null = null;
+
+    function resetInactivityTimeout() {
+      if (inactivityTimer !== null) clearTimeout(inactivityTimer);
+      inactivityTimer = setTimeout(() => {
+        if (inactivityReject) inactivityReject(new Error("stream inactivity timeout"));
+      }, INACTIVITY_TIMEOUT_MILLISECONDS);
+    }
+
+    if (signal) {
+      signal.addEventListener("abort", () => {
+        if (inactivityTimer !== null) clearTimeout(inactivityTimer);
+      }, { once: true });
+    }
+
     while (true) {
       if (signal?.aborted) break;
 
+      resetInactivityTimeout();
+
       const timeoutPromise = new Promise<{ done: true; value: undefined }>((_, reject) => {
-        const timer = setTimeout(
-          () => reject(new Error("stream inactivity timeout")),
-          INACTIVITY_TIMEOUT_MILLISECONDS,
-        );
-        if (signal) {
-          signal.addEventListener("abort", () => clearTimeout(timer), { once: true });
-        }
+        inactivityReject = reject;
       });
 
       let result: IteratorResult<typeof stream extends AsyncIterable<infer T> ? T : never>;
       try {
         result = (await Promise.race([iterator.next(), timeoutPromise])) as typeof result;
       } catch (raceError) {
+        if (signal?.aborted) break;
         if (raceError instanceof Error && raceError.message === "stream inactivity timeout") {
           onDelta({ content: "", done: true });
           break;
@@ -215,7 +229,10 @@ export class LanguageModelClient {
 
       const chunk = result.value;
       fullContent += chunk.delta;
-      onDelta({ content: chunk.delta, done: chunk.done });
+      if (chunk.reasoning) {
+        fullReasoning += chunk.reasoning;
+      }
+      onDelta({ content: chunk.delta, reasoning: chunk.reasoning || undefined, done: chunk.done });
 
       if (chunk.promptTokens > 0) {
         this.tokenUsage.totalPromptTokens += chunk.promptTokens;
@@ -240,6 +257,8 @@ export class LanguageModelClient {
       }
     }
 
+    if (inactivityTimer !== null) clearTimeout(inactivityTimer);
+
     if (toolCalls.length > 0) {
       conversation.addAssistantToolCallMessage(fullContent, toolCalls);
     } else {
@@ -252,6 +271,7 @@ export class LanguageModelClient {
       id: "",
       model: this.model,
       content: fullContent,
+      reasoning: fullReasoning || undefined,
       promptTokens: 0,
       completionTokens: 0,
       toolCalls,

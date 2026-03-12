@@ -74,6 +74,7 @@ message StreamCompleteResponse {
   int32 completion_tokens = 5;
   repeated ToolCallEntry tool_calls = 6;
   string finish_reason = 7;
+  string reasoning = 8;
 }
 
 message RegisterWebhookRequest {

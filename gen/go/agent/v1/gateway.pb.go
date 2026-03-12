@@ -650,6 +650,7 @@ type StreamCompleteResponse struct {
 	CompletionTokens int32                  `protobuf:"varint,5,opt,name=completion_tokens,json=completionTokens,proto3" json:"completion_tokens,omitempty"`
 	ToolCalls        []*ToolCallEntry       `protobuf:"bytes,6,rep,name=tool_calls,json=toolCalls,proto3" json:"tool_calls,omitempty"`
 	FinishReason     string                 `protobuf:"bytes,7,opt,name=finish_reason,json=finishReason,proto3" json:"finish_reason,omitempty"`
+	Reasoning        string                 `protobuf:"bytes,8,opt,name=reasoning,proto3" json:"reasoning,omitempty"`
 	unknownFields    protoimpl.UnknownFields
 	sizeCache        protoimpl.SizeCache
 }
@@ -729,6 +730,13 @@ func (x *StreamCompleteResponse) GetToolCalls() []*ToolCallEntry {
 func (x *StreamCompleteResponse) GetFinishReason() string {
 	if x != nil {
 		return x.FinishReason
+	}
+	return ""
+}
+
+func (x *StreamCompleteResponse) GetReasoning() string {
+	if x != nil {
+		return x.Reasoning
 	}
 	return ""
 }
@@ -1325,7 +1333,7 @@ const file_agent_v1_gateway_proto_rawDesc = "" +
 	"\x05tools\x18\x06 \x03(\v2\x0e.agent.v1.ToolR\x05toolsB\x0e\n" +
 	"\f_temperatureB\r\n" +
 	"\v_max_tokensB\x10\n" +
-	"\x0e_system_prompt\"\x81\x02\n" +
+	"\x0e_system_prompt\"\x9f\x02\n" +
 	"\x16StreamCompleteResponse\x12\x0e\n" +
 	"\x02id\x18\x01 \x01(\tR\x02id\x12\x14\n" +
 	"\x05delta\x18\x02 \x01(\tR\x05delta\x12\x12\n" +
@@ -1334,7 +1342,8 @@ const file_agent_v1_gateway_proto_rawDesc = "" +
 	"\x11completion_tokens\x18\x05 \x01(\x05R\x10completionTokens\x126\n" +
 	"\n" +
 	"tool_calls\x18\x06 \x03(\v2\x17.agent.v1.ToolCallEntryR\ttoolCalls\x12#\n" +
-	"\rfinish_reason\x18\a \x01(\tR\ffinishReason\"x\n" +
+	"\rfinish_reason\x18\a \x01(\tR\ffinishReason\x12\x1c\n" +
+	"\treasoning\x18\b \x01(\tR\treasoning\"x\n" +
 	"\x16RegisterWebhookRequest\x12\x12\n" +
 	"\x04name\x18\x01 \x01(\tR\x04name\x12\x1a\n" +
 	"\bprovider\x18\x02 \x01(\tR\bprovider\x12\x16\n" +

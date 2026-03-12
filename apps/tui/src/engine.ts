@@ -62,7 +62,7 @@ export class ChatEngine {
   private listeners: Set<ChatEventListener> = new Set();
   private processing: boolean = false;
   private workingDirectory: string;
-  private emitScheduled: boolean = false;
+  private emitTimer: ReturnType<typeof setTimeout> | null = null;
   private abortController: AbortController | null = null;
   private messageQueue: string[] = [];
   private processingQueue: boolean = false;
@@ -147,20 +147,21 @@ export class ChatEngine {
   }
 
   private emit(): void {
-    if (this.emitScheduled) return;
-    this.emitScheduled = true;
-
-    queueMicrotask(() => {
-      this.emitScheduled = false;
+    if (this.emitTimer !== null) return;
+    this.emitTimer = setTimeout(() => {
+      this.emitTimer = null;
       const snapshot = this.messages;
       for (const listener of this.listeners) {
         listener(snapshot);
       }
-    });
+    }, 16);
   }
 
   private emitImmediate(): void {
-    this.emitScheduled = false;
+    if (this.emitTimer !== null) {
+      clearTimeout(this.emitTimer);
+      this.emitTimer = null;
+    }
     const snapshot = this.messages;
     for (const listener of this.listeners) {
       listener(snapshot);
@@ -271,17 +272,34 @@ export class ChatEngine {
     });
 
     try {
+      let accumulatedReasoning = "";
+      let reasoningDirty = false;
+      let cachedRawPrefix = "";
+
       const completionResult = await this.languageModelClient.streamConversation(
         this.conversation,
         inputMessage,
         (delta) => {
           if (this.abortController?.signal.aborted) return;
 
-          this.updateLastMessage((message) => ({
-            ...message,
-            content: message.content + delta.content,
-            streaming: !delta.done,
-          }));
+          if (delta.reasoning) {
+            accumulatedReasoning += delta.reasoning;
+            reasoningDirty = true;
+          }
+
+          this.updateLastMessage((message) => {
+            const content = message.content + delta.content;
+            if (reasoningDirty) {
+              cachedRawPrefix = `<thinking>${accumulatedReasoning}</thinking>\n\n`;
+              reasoningDirty = false;
+            }
+            return {
+              ...message,
+              content,
+              rawContent: cachedRawPrefix ? cachedRawPrefix + content : undefined,
+              streaming: !delta.done,
+            };
+          });
         },
         undefined,
         this.abortController?.signal,
@@ -289,10 +307,14 @@ export class ChatEngine {
 
       this.checkCancelled();
 
+      const reasoningPrefix = accumulatedReasoning
+        ? `<thinking>${accumulatedReasoning}</thinking>\n\n`
+        : "";
+
       this.updateLastMessage((message) => ({
         ...message,
         streaming: false,
-        rawContent: completionResult.content,
+        rawContent: reasoningPrefix + completionResult.content,
       }));
 
       if (!completionResult.content.trim() && completionResult.toolCalls.length === 0) {
@@ -383,13 +405,14 @@ export class ChatEngine {
               await this.hookDispatcher.dispatchAfterToolCall(toolCall.function.name, parameters, toolResult);
             }
 
-            const resultPreview = toolResult.output.length > 500
-              ? toolResult.output.slice(0, 500) + "..."
+            const resultPreview = toolResult.output.length > 3000
+              ? toolResult.output.slice(0, 3000) + "..."
               : toolResult.output;
 
             this.pushMessage({
               role: "tool_result",
               content: resultPreview,
+              rawContent: toolResult.output,
               toolName: toolCall.function.name,
               toolSuccess: toolResult.success,
               timestamp: new Date(),
@@ -410,6 +433,7 @@ export class ChatEngine {
             this.pushMessage({
               role: "tool_result",
               content: toolErrorMessage,
+              rawContent: toolErrorMessage,
               toolName: toolCall.function.name,
               toolSuccess: false,
               timestamp: new Date(),
@@ -508,11 +532,15 @@ export class ChatEngine {
         this.conversation.addAssistantMessage(completionResult.content);
       }
 
+      const reasoningPrefix = completionResult.reasoning
+        ? `<thinking>${completionResult.reasoning}</thinking>\n\n`
+        : "";
+
       this.updateLastMessage((message) => ({
         ...message,
         content: completionResult.content,
         streaming: false,
-        rawContent: completionResult.content,
+        rawContent: reasoningPrefix + completionResult.content,
       }));
 
       if (!completionResult.content.trim() && completionResult.toolCalls.length === 0) {

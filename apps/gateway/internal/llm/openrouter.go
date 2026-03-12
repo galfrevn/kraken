@@ -46,12 +46,13 @@ type ChatMessage struct {
 }
 
 type CompletionRequest struct {
-	Model       string        `json:"model"`
-	Messages    []ChatMessage `json:"messages"`
-	Temperature *float32      `json:"temperature,omitempty"`
-	MaxTokens   *int32        `json:"max_tokens,omitempty"`
-	Stream      bool          `json:"stream"`
-	Tools       []Tool        `json:"tools,omitempty"`
+	Model            string        `json:"model"`
+	Messages         []ChatMessage `json:"messages"`
+	Temperature      *float32      `json:"temperature,omitempty"`
+	MaxTokens        *int32        `json:"max_tokens,omitempty"`
+	Stream           bool          `json:"stream"`
+	Tools            []Tool        `json:"tools,omitempty"`
+	IncludeReasoning bool          `json:"include_reasoning"`
 }
 
 type CompletionChoice struct {
@@ -96,6 +97,7 @@ func (c *Client) Complete(ctx context.Context, req CompletionRequest) (*Completi
 		req.Model = defaultModel
 	}
 	req.Stream = false
+	req.IncludeReasoning = true
 
 	body, err := json.Marshal(req)
 	if err != nil {
@@ -143,8 +145,18 @@ type StreamToolCallDelta struct {
 }
 
 type StreamDelta struct {
-	Content   string                `json:"content"`
-	ToolCalls []StreamToolCallDelta `json:"tool_calls,omitempty"`
+	Content          string                `json:"content"`
+	Reasoning        string                `json:"reasoning"`
+	ReasoningContent string                `json:"reasoning_content"`
+	ToolCalls        []StreamToolCallDelta `json:"tool_calls,omitempty"`
+}
+
+// GetReasoning returns whichever reasoning field is populated.
+func (d StreamDelta) GetReasoning() string {
+	if d.Reasoning != "" {
+		return d.Reasoning
+	}
+	return d.ReasoningContent
 }
 
 type StreamChoice struct {
@@ -166,6 +178,7 @@ func (c *Client) StreamComplete(ctx context.Context, req CompletionRequest, call
 		req.Model = defaultModel
 	}
 	req.Stream = true
+	req.IncludeReasoning = true
 
 	body, err := json.Marshal(req)
 	if err != nil {

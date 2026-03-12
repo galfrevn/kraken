@@ -32,6 +32,7 @@ export interface CompletionResult {
   id: string;
   model: string;
   content: string;
+  reasoning?: string;
   promptTokens: number;
   completionTokens: number;
   toolCalls: ToolCallEntry[];
@@ -46,6 +47,7 @@ export interface TokenUsageSummary {
 
 export interface StreamDelta {
   content: string;
+  reasoning?: string;
   done: boolean;
   toolCalls?: ToolCallEntry[];
   finishReason?: string;

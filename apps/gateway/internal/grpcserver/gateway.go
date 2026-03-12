@@ -202,11 +202,13 @@ func (s *GatewayServer) StreamComplete(
 		}
 
 		delta := ""
+		reasoning := ""
 		done := false
 
 		if len(chunk.Choices) > 0 {
 			choice := chunk.Choices[0]
 			delta = choice.Delta.Content
+			reasoning = choice.Delta.GetReasoning()
 
 			for _, tcDelta := range choice.Delta.ToolCalls {
 				existing, ok := accumulatedToolCalls[tcDelta.Index]
@@ -240,9 +242,10 @@ func (s *GatewayServer) StreamComplete(
 		}
 
 		resp := &agentv1.StreamCompleteResponse{
-			Id:    streamID,
-			Delta: delta,
-			Done:  done,
+			Id:        streamID,
+			Delta:     delta,
+			Done:      done,
+			Reasoning: reasoning,
 		}
 
 		if chunk.Usage != nil {
