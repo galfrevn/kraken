@@ -31,13 +31,16 @@ function removeFromShellConfig(rcFile: string, marker: string): boolean {
 export async function execute(_args: string[]): Promise<void> {
   p.intro("Uninstall kraken");
 
-  p.log.warn("The following will be removed:");
-  p.log.message(`  ${KRAKEN_HOME}  (installation directory)`);
-  p.log.message(`  ~/.bun/bin/kraken  (CLI binary)`);
-  p.log.message(`  ~/.bun/install/global/node_modules/kraken  (global link)`);
+  p.log.warn("This will permanently delete ALL kraken data:");
+  p.log.message(`  ${KRAKEN_HOME}/kraken.yml     (configuration)`);
+  p.log.message(`  ${KRAKEN_HOME}/.env           (API keys)`);
+  p.log.message(`  ${KRAKEN_HOME}/agent.db       (conversations, tasks, memory)`);
+  p.log.message(`  ${KRAKEN_HOME}/plugins/       (installed plugins)`);
+  p.log.message(`  ${KRAKEN_HOME}/screenshots/   (browser screenshots)`);
+  p.log.message(`  ~/.bun/bin/kraken             (CLI binary)`);
 
   const shouldContinue = await p.confirm({
-    message: "Are you sure you want to uninstall kraken?",
+    message: "Delete everything and uninstall kraken?",
     initialValue: false,
   });
 
