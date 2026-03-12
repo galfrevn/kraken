@@ -1,6 +1,7 @@
 import type { KrakenPlugin, Tool, PluginContext } from "@kraken/sdk";
 import { resolvePluginPaths, type PluginEntry } from "@/plugins/resolver.ts";
 import { loadPlugin, PluginLoadError } from "@/plugins/loader.ts";
+import { ensureSdkResolvable } from "@/plugins/installer.ts";
 import { HookDispatcher } from "@/plugins/hooks.ts";
 
 export interface LoadedPlugin {
@@ -24,6 +25,8 @@ export class PluginRegistry {
     if (entries.length === 0) {
       return { loaded: [], failed: [] };
     }
+
+    ensureSdkResolvable();
 
     const { resolved, failed: unresolvedEntries } = resolvePluginPaths(entries, workingDirectory);
 
@@ -86,6 +89,8 @@ export class PluginRegistry {
     baseContext: Omit<PluginContext, "config">,
     config: Record<string, unknown> = {},
   ): Promise<{ success: true; plugin: KrakenPlugin } | { success: false; error: string }> {
+    ensureSdkResolvable();
+
     const { resolved, failed } = resolvePluginPaths(
       [{ path: pluginPath, config }],
       workingDirectory,

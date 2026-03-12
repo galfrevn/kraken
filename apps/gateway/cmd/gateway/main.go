@@ -61,20 +61,22 @@ func main() {
 }
 
 func loadEnvironmentFiles(logger *slog.Logger) {
-	cwd, err := os.Getwd()
-	if err != nil {
-		return
+	// Prefer DOTENV_PATH set by the CLI (points to ~/.kraken/.env)
+	if dotenvPath := os.Getenv("DOTENV_PATH"); dotenvPath != "" {
+		if _, statErr := os.Stat(dotenvPath); statErr == nil {
+			if loadErr := godotenv.Load(dotenvPath); loadErr == nil {
+				logger.Info("loaded environment file", "path", dotenvPath)
+				return
+			}
+		}
 	}
 
-	candidates := []string{
-		filepath.Join(cwd, ".env"),
-		filepath.Join(cwd, "..", "..", ".env"),
-	}
-
-	for _, path := range candidates {
-		if _, statErr := os.Stat(path); statErr == nil {
-			if loadErr := godotenv.Load(path); loadErr == nil {
-				logger.Info("loaded environment file", "path", path)
+	// Fallback: try ~/.kraken/.env directly
+	if home, err := os.UserHomeDir(); err == nil {
+		krakenEnv := filepath.Join(home, ".kraken", ".env")
+		if _, statErr := os.Stat(krakenEnv); statErr == nil {
+			if loadErr := godotenv.Load(krakenEnv); loadErr == nil {
+				logger.Info("loaded environment file", "path", krakenEnv)
 				return
 			}
 		}

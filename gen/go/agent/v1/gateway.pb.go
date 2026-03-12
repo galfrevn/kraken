@@ -21,17 +21,304 @@ const (
 	_ = protoimpl.EnforceVersion(protoimpl.MaxVersion - 20)
 )
 
+type ToolParameter struct {
+	state          protoimpl.MessageState `protogen:"open.v1"`
+	Type           string                 `protobuf:"bytes,1,opt,name=type,proto3" json:"type,omitempty"`
+	PropertiesJson string                 `protobuf:"bytes,2,opt,name=properties_json,json=propertiesJson,proto3" json:"properties_json,omitempty"`
+	Required       []string               `protobuf:"bytes,3,rep,name=required,proto3" json:"required,omitempty"`
+	unknownFields  protoimpl.UnknownFields
+	sizeCache      protoimpl.SizeCache
+}
+
+func (x *ToolParameter) Reset() {
+	*x = ToolParameter{}
+	mi := &file_agent_v1_gateway_proto_msgTypes[0]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ToolParameter) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ToolParameter) ProtoMessage() {}
+
+func (x *ToolParameter) ProtoReflect() protoreflect.Message {
+	mi := &file_agent_v1_gateway_proto_msgTypes[0]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ToolParameter.ProtoReflect.Descriptor instead.
+func (*ToolParameter) Descriptor() ([]byte, []int) {
+	return file_agent_v1_gateway_proto_rawDescGZIP(), []int{0}
+}
+
+func (x *ToolParameter) GetType() string {
+	if x != nil {
+		return x.Type
+	}
+	return ""
+}
+
+func (x *ToolParameter) GetPropertiesJson() string {
+	if x != nil {
+		return x.PropertiesJson
+	}
+	return ""
+}
+
+func (x *ToolParameter) GetRequired() []string {
+	if x != nil {
+		return x.Required
+	}
+	return nil
+}
+
+type ToolFunction struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Name          string                 `protobuf:"bytes,1,opt,name=name,proto3" json:"name,omitempty"`
+	Description   string                 `protobuf:"bytes,2,opt,name=description,proto3" json:"description,omitempty"`
+	Parameters    *ToolParameter         `protobuf:"bytes,3,opt,name=parameters,proto3" json:"parameters,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *ToolFunction) Reset() {
+	*x = ToolFunction{}
+	mi := &file_agent_v1_gateway_proto_msgTypes[1]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ToolFunction) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ToolFunction) ProtoMessage() {}
+
+func (x *ToolFunction) ProtoReflect() protoreflect.Message {
+	mi := &file_agent_v1_gateway_proto_msgTypes[1]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ToolFunction.ProtoReflect.Descriptor instead.
+func (*ToolFunction) Descriptor() ([]byte, []int) {
+	return file_agent_v1_gateway_proto_rawDescGZIP(), []int{1}
+}
+
+func (x *ToolFunction) GetName() string {
+	if x != nil {
+		return x.Name
+	}
+	return ""
+}
+
+func (x *ToolFunction) GetDescription() string {
+	if x != nil {
+		return x.Description
+	}
+	return ""
+}
+
+func (x *ToolFunction) GetParameters() *ToolParameter {
+	if x != nil {
+		return x.Parameters
+	}
+	return nil
+}
+
+type Tool struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Type          string                 `protobuf:"bytes,1,opt,name=type,proto3" json:"type,omitempty"`
+	Function      *ToolFunction          `protobuf:"bytes,2,opt,name=function,proto3" json:"function,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *Tool) Reset() {
+	*x = Tool{}
+	mi := &file_agent_v1_gateway_proto_msgTypes[2]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *Tool) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*Tool) ProtoMessage() {}
+
+func (x *Tool) ProtoReflect() protoreflect.Message {
+	mi := &file_agent_v1_gateway_proto_msgTypes[2]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use Tool.ProtoReflect.Descriptor instead.
+func (*Tool) Descriptor() ([]byte, []int) {
+	return file_agent_v1_gateway_proto_rawDescGZIP(), []int{2}
+}
+
+func (x *Tool) GetType() string {
+	if x != nil {
+		return x.Type
+	}
+	return ""
+}
+
+func (x *Tool) GetFunction() *ToolFunction {
+	if x != nil {
+		return x.Function
+	}
+	return nil
+}
+
+type ToolCallFunction struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Name          string                 `protobuf:"bytes,1,opt,name=name,proto3" json:"name,omitempty"`
+	Arguments     string                 `protobuf:"bytes,2,opt,name=arguments,proto3" json:"arguments,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *ToolCallFunction) Reset() {
+	*x = ToolCallFunction{}
+	mi := &file_agent_v1_gateway_proto_msgTypes[3]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ToolCallFunction) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ToolCallFunction) ProtoMessage() {}
+
+func (x *ToolCallFunction) ProtoReflect() protoreflect.Message {
+	mi := &file_agent_v1_gateway_proto_msgTypes[3]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ToolCallFunction.ProtoReflect.Descriptor instead.
+func (*ToolCallFunction) Descriptor() ([]byte, []int) {
+	return file_agent_v1_gateway_proto_rawDescGZIP(), []int{3}
+}
+
+func (x *ToolCallFunction) GetName() string {
+	if x != nil {
+		return x.Name
+	}
+	return ""
+}
+
+func (x *ToolCallFunction) GetArguments() string {
+	if x != nil {
+		return x.Arguments
+	}
+	return ""
+}
+
+type ToolCallEntry struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Id            string                 `protobuf:"bytes,1,opt,name=id,proto3" json:"id,omitempty"`
+	Type          string                 `protobuf:"bytes,2,opt,name=type,proto3" json:"type,omitempty"`
+	Function      *ToolCallFunction      `protobuf:"bytes,3,opt,name=function,proto3" json:"function,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *ToolCallEntry) Reset() {
+	*x = ToolCallEntry{}
+	mi := &file_agent_v1_gateway_proto_msgTypes[4]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ToolCallEntry) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ToolCallEntry) ProtoMessage() {}
+
+func (x *ToolCallEntry) ProtoReflect() protoreflect.Message {
+	mi := &file_agent_v1_gateway_proto_msgTypes[4]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ToolCallEntry.ProtoReflect.Descriptor instead.
+func (*ToolCallEntry) Descriptor() ([]byte, []int) {
+	return file_agent_v1_gateway_proto_rawDescGZIP(), []int{4}
+}
+
+func (x *ToolCallEntry) GetId() string {
+	if x != nil {
+		return x.Id
+	}
+	return ""
+}
+
+func (x *ToolCallEntry) GetType() string {
+	if x != nil {
+		return x.Type
+	}
+	return ""
+}
+
+func (x *ToolCallEntry) GetFunction() *ToolCallFunction {
+	if x != nil {
+		return x.Function
+	}
+	return nil
+}
+
 type ChatMessage struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	Role          string                 `protobuf:"bytes,1,opt,name=role,proto3" json:"role,omitempty"`
 	Content       string                 `protobuf:"bytes,2,opt,name=content,proto3" json:"content,omitempty"`
+	ToolCalls     []*ToolCallEntry       `protobuf:"bytes,3,rep,name=tool_calls,json=toolCalls,proto3" json:"tool_calls,omitempty"`
+	ToolCallId    string                 `protobuf:"bytes,4,opt,name=tool_call_id,json=toolCallId,proto3" json:"tool_call_id,omitempty"`
+	Name          *string                `protobuf:"bytes,5,opt,name=name,proto3,oneof" json:"name,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
 
 func (x *ChatMessage) Reset() {
 	*x = ChatMessage{}
-	mi := &file_agent_v1_gateway_proto_msgTypes[0]
+	mi := &file_agent_v1_gateway_proto_msgTypes[5]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -43,7 +330,7 @@ func (x *ChatMessage) String() string {
 func (*ChatMessage) ProtoMessage() {}
 
 func (x *ChatMessage) ProtoReflect() protoreflect.Message {
-	mi := &file_agent_v1_gateway_proto_msgTypes[0]
+	mi := &file_agent_v1_gateway_proto_msgTypes[5]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -56,7 +343,7 @@ func (x *ChatMessage) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ChatMessage.ProtoReflect.Descriptor instead.
 func (*ChatMessage) Descriptor() ([]byte, []int) {
-	return file_agent_v1_gateway_proto_rawDescGZIP(), []int{0}
+	return file_agent_v1_gateway_proto_rawDescGZIP(), []int{5}
 }
 
 func (x *ChatMessage) GetRole() string {
@@ -73,6 +360,27 @@ func (x *ChatMessage) GetContent() string {
 	return ""
 }
 
+func (x *ChatMessage) GetToolCalls() []*ToolCallEntry {
+	if x != nil {
+		return x.ToolCalls
+	}
+	return nil
+}
+
+func (x *ChatMessage) GetToolCallId() string {
+	if x != nil {
+		return x.ToolCallId
+	}
+	return ""
+}
+
+func (x *ChatMessage) GetName() string {
+	if x != nil && x.Name != nil {
+		return *x.Name
+	}
+	return ""
+}
+
 type CompleteRequest struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	Model         string                 `protobuf:"bytes,1,opt,name=model,proto3" json:"model,omitempty"`
@@ -80,13 +388,14 @@ type CompleteRequest struct {
 	Temperature   *float32               `protobuf:"fixed32,3,opt,name=temperature,proto3,oneof" json:"temperature,omitempty"`
 	MaxTokens     *int32                 `protobuf:"varint,4,opt,name=max_tokens,json=maxTokens,proto3,oneof" json:"max_tokens,omitempty"`
 	SystemPrompt  *string                `protobuf:"bytes,5,opt,name=system_prompt,json=systemPrompt,proto3,oneof" json:"system_prompt,omitempty"`
+	Tools         []*Tool                `protobuf:"bytes,6,rep,name=tools,proto3" json:"tools,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
 
 func (x *CompleteRequest) Reset() {
 	*x = CompleteRequest{}
-	mi := &file_agent_v1_gateway_proto_msgTypes[1]
+	mi := &file_agent_v1_gateway_proto_msgTypes[6]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -98,7 +407,7 @@ func (x *CompleteRequest) String() string {
 func (*CompleteRequest) ProtoMessage() {}
 
 func (x *CompleteRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_agent_v1_gateway_proto_msgTypes[1]
+	mi := &file_agent_v1_gateway_proto_msgTypes[6]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -111,7 +420,7 @@ func (x *CompleteRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use CompleteRequest.ProtoReflect.Descriptor instead.
 func (*CompleteRequest) Descriptor() ([]byte, []int) {
-	return file_agent_v1_gateway_proto_rawDescGZIP(), []int{1}
+	return file_agent_v1_gateway_proto_rawDescGZIP(), []int{6}
 }
 
 func (x *CompleteRequest) GetModel() string {
@@ -149,6 +458,13 @@ func (x *CompleteRequest) GetSystemPrompt() string {
 	return ""
 }
 
+func (x *CompleteRequest) GetTools() []*Tool {
+	if x != nil {
+		return x.Tools
+	}
+	return nil
+}
+
 type CompleteResponse struct {
 	state            protoimpl.MessageState `protogen:"open.v1"`
 	Id               string                 `protobuf:"bytes,1,opt,name=id,proto3" json:"id,omitempty"`
@@ -156,13 +472,15 @@ type CompleteResponse struct {
 	Message          *ChatMessage           `protobuf:"bytes,3,opt,name=message,proto3" json:"message,omitempty"`
 	PromptTokens     int32                  `protobuf:"varint,4,opt,name=prompt_tokens,json=promptTokens,proto3" json:"prompt_tokens,omitempty"`
 	CompletionTokens int32                  `protobuf:"varint,5,opt,name=completion_tokens,json=completionTokens,proto3" json:"completion_tokens,omitempty"`
+	ToolCalls        []*ToolCallEntry       `protobuf:"bytes,6,rep,name=tool_calls,json=toolCalls,proto3" json:"tool_calls,omitempty"`
+	FinishReason     string                 `protobuf:"bytes,7,opt,name=finish_reason,json=finishReason,proto3" json:"finish_reason,omitempty"`
 	unknownFields    protoimpl.UnknownFields
 	sizeCache        protoimpl.SizeCache
 }
 
 func (x *CompleteResponse) Reset() {
 	*x = CompleteResponse{}
-	mi := &file_agent_v1_gateway_proto_msgTypes[2]
+	mi := &file_agent_v1_gateway_proto_msgTypes[7]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -174,7 +492,7 @@ func (x *CompleteResponse) String() string {
 func (*CompleteResponse) ProtoMessage() {}
 
 func (x *CompleteResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_agent_v1_gateway_proto_msgTypes[2]
+	mi := &file_agent_v1_gateway_proto_msgTypes[7]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -187,7 +505,7 @@ func (x *CompleteResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use CompleteResponse.ProtoReflect.Descriptor instead.
 func (*CompleteResponse) Descriptor() ([]byte, []int) {
-	return file_agent_v1_gateway_proto_rawDescGZIP(), []int{2}
+	return file_agent_v1_gateway_proto_rawDescGZIP(), []int{7}
 }
 
 func (x *CompleteResponse) GetId() string {
@@ -225,6 +543,20 @@ func (x *CompleteResponse) GetCompletionTokens() int32 {
 	return 0
 }
 
+func (x *CompleteResponse) GetToolCalls() []*ToolCallEntry {
+	if x != nil {
+		return x.ToolCalls
+	}
+	return nil
+}
+
+func (x *CompleteResponse) GetFinishReason() string {
+	if x != nil {
+		return x.FinishReason
+	}
+	return ""
+}
+
 type StreamCompleteRequest struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	Model         string                 `protobuf:"bytes,1,opt,name=model,proto3" json:"model,omitempty"`
@@ -232,13 +564,14 @@ type StreamCompleteRequest struct {
 	Temperature   *float32               `protobuf:"fixed32,3,opt,name=temperature,proto3,oneof" json:"temperature,omitempty"`
 	MaxTokens     *int32                 `protobuf:"varint,4,opt,name=max_tokens,json=maxTokens,proto3,oneof" json:"max_tokens,omitempty"`
 	SystemPrompt  *string                `protobuf:"bytes,5,opt,name=system_prompt,json=systemPrompt,proto3,oneof" json:"system_prompt,omitempty"`
+	Tools         []*Tool                `protobuf:"bytes,6,rep,name=tools,proto3" json:"tools,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
 
 func (x *StreamCompleteRequest) Reset() {
 	*x = StreamCompleteRequest{}
-	mi := &file_agent_v1_gateway_proto_msgTypes[3]
+	mi := &file_agent_v1_gateway_proto_msgTypes[8]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -250,7 +583,7 @@ func (x *StreamCompleteRequest) String() string {
 func (*StreamCompleteRequest) ProtoMessage() {}
 
 func (x *StreamCompleteRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_agent_v1_gateway_proto_msgTypes[3]
+	mi := &file_agent_v1_gateway_proto_msgTypes[8]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -263,7 +596,7 @@ func (x *StreamCompleteRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use StreamCompleteRequest.ProtoReflect.Descriptor instead.
 func (*StreamCompleteRequest) Descriptor() ([]byte, []int) {
-	return file_agent_v1_gateway_proto_rawDescGZIP(), []int{3}
+	return file_agent_v1_gateway_proto_rawDescGZIP(), []int{8}
 }
 
 func (x *StreamCompleteRequest) GetModel() string {
@@ -301,6 +634,13 @@ func (x *StreamCompleteRequest) GetSystemPrompt() string {
 	return ""
 }
 
+func (x *StreamCompleteRequest) GetTools() []*Tool {
+	if x != nil {
+		return x.Tools
+	}
+	return nil
+}
+
 type StreamCompleteResponse struct {
 	state            protoimpl.MessageState `protogen:"open.v1"`
 	Id               string                 `protobuf:"bytes,1,opt,name=id,proto3" json:"id,omitempty"`
@@ -308,13 +648,15 @@ type StreamCompleteResponse struct {
 	Done             bool                   `protobuf:"varint,3,opt,name=done,proto3" json:"done,omitempty"`
 	PromptTokens     int32                  `protobuf:"varint,4,opt,name=prompt_tokens,json=promptTokens,proto3" json:"prompt_tokens,omitempty"`
 	CompletionTokens int32                  `protobuf:"varint,5,opt,name=completion_tokens,json=completionTokens,proto3" json:"completion_tokens,omitempty"`
+	ToolCalls        []*ToolCallEntry       `protobuf:"bytes,6,rep,name=tool_calls,json=toolCalls,proto3" json:"tool_calls,omitempty"`
+	FinishReason     string                 `protobuf:"bytes,7,opt,name=finish_reason,json=finishReason,proto3" json:"finish_reason,omitempty"`
 	unknownFields    protoimpl.UnknownFields
 	sizeCache        protoimpl.SizeCache
 }
 
 func (x *StreamCompleteResponse) Reset() {
 	*x = StreamCompleteResponse{}
-	mi := &file_agent_v1_gateway_proto_msgTypes[4]
+	mi := &file_agent_v1_gateway_proto_msgTypes[9]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -326,7 +668,7 @@ func (x *StreamCompleteResponse) String() string {
 func (*StreamCompleteResponse) ProtoMessage() {}
 
 func (x *StreamCompleteResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_agent_v1_gateway_proto_msgTypes[4]
+	mi := &file_agent_v1_gateway_proto_msgTypes[9]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -339,7 +681,7 @@ func (x *StreamCompleteResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use StreamCompleteResponse.ProtoReflect.Descriptor instead.
 func (*StreamCompleteResponse) Descriptor() ([]byte, []int) {
-	return file_agent_v1_gateway_proto_rawDescGZIP(), []int{4}
+	return file_agent_v1_gateway_proto_rawDescGZIP(), []int{9}
 }
 
 func (x *StreamCompleteResponse) GetId() string {
@@ -377,6 +719,20 @@ func (x *StreamCompleteResponse) GetCompletionTokens() int32 {
 	return 0
 }
 
+func (x *StreamCompleteResponse) GetToolCalls() []*ToolCallEntry {
+	if x != nil {
+		return x.ToolCalls
+	}
+	return nil
+}
+
+func (x *StreamCompleteResponse) GetFinishReason() string {
+	if x != nil {
+		return x.FinishReason
+	}
+	return ""
+}
+
 type RegisterWebhookRequest struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	Name          string                 `protobuf:"bytes,1,opt,name=name,proto3" json:"name,omitempty"`
@@ -389,7 +745,7 @@ type RegisterWebhookRequest struct {
 
 func (x *RegisterWebhookRequest) Reset() {
 	*x = RegisterWebhookRequest{}
-	mi := &file_agent_v1_gateway_proto_msgTypes[5]
+	mi := &file_agent_v1_gateway_proto_msgTypes[10]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -401,7 +757,7 @@ func (x *RegisterWebhookRequest) String() string {
 func (*RegisterWebhookRequest) ProtoMessage() {}
 
 func (x *RegisterWebhookRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_agent_v1_gateway_proto_msgTypes[5]
+	mi := &file_agent_v1_gateway_proto_msgTypes[10]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -414,7 +770,7 @@ func (x *RegisterWebhookRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use RegisterWebhookRequest.ProtoReflect.Descriptor instead.
 func (*RegisterWebhookRequest) Descriptor() ([]byte, []int) {
-	return file_agent_v1_gateway_proto_rawDescGZIP(), []int{5}
+	return file_agent_v1_gateway_proto_rawDescGZIP(), []int{10}
 }
 
 func (x *RegisterWebhookRequest) GetName() string {
@@ -455,7 +811,7 @@ type RegisterWebhookResponse struct {
 
 func (x *RegisterWebhookResponse) Reset() {
 	*x = RegisterWebhookResponse{}
-	mi := &file_agent_v1_gateway_proto_msgTypes[6]
+	mi := &file_agent_v1_gateway_proto_msgTypes[11]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -467,7 +823,7 @@ func (x *RegisterWebhookResponse) String() string {
 func (*RegisterWebhookResponse) ProtoMessage() {}
 
 func (x *RegisterWebhookResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_agent_v1_gateway_proto_msgTypes[6]
+	mi := &file_agent_v1_gateway_proto_msgTypes[11]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -480,7 +836,7 @@ func (x *RegisterWebhookResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use RegisterWebhookResponse.ProtoReflect.Descriptor instead.
 func (*RegisterWebhookResponse) Descriptor() ([]byte, []int) {
-	return file_agent_v1_gateway_proto_rawDescGZIP(), []int{6}
+	return file_agent_v1_gateway_proto_rawDescGZIP(), []int{11}
 }
 
 func (x *RegisterWebhookResponse) GetWebhookId() string {
@@ -505,7 +861,7 @@ type ListWebhooksRequest struct {
 
 func (x *ListWebhooksRequest) Reset() {
 	*x = ListWebhooksRequest{}
-	mi := &file_agent_v1_gateway_proto_msgTypes[7]
+	mi := &file_agent_v1_gateway_proto_msgTypes[12]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -517,7 +873,7 @@ func (x *ListWebhooksRequest) String() string {
 func (*ListWebhooksRequest) ProtoMessage() {}
 
 func (x *ListWebhooksRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_agent_v1_gateway_proto_msgTypes[7]
+	mi := &file_agent_v1_gateway_proto_msgTypes[12]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -530,7 +886,7 @@ func (x *ListWebhooksRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ListWebhooksRequest.ProtoReflect.Descriptor instead.
 func (*ListWebhooksRequest) Descriptor() ([]byte, []int) {
-	return file_agent_v1_gateway_proto_rawDescGZIP(), []int{7}
+	return file_agent_v1_gateway_proto_rawDescGZIP(), []int{12}
 }
 
 type WebhookEntry struct {
@@ -546,7 +902,7 @@ type WebhookEntry struct {
 
 func (x *WebhookEntry) Reset() {
 	*x = WebhookEntry{}
-	mi := &file_agent_v1_gateway_proto_msgTypes[8]
+	mi := &file_agent_v1_gateway_proto_msgTypes[13]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -558,7 +914,7 @@ func (x *WebhookEntry) String() string {
 func (*WebhookEntry) ProtoMessage() {}
 
 func (x *WebhookEntry) ProtoReflect() protoreflect.Message {
-	mi := &file_agent_v1_gateway_proto_msgTypes[8]
+	mi := &file_agent_v1_gateway_proto_msgTypes[13]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -571,7 +927,7 @@ func (x *WebhookEntry) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use WebhookEntry.ProtoReflect.Descriptor instead.
 func (*WebhookEntry) Descriptor() ([]byte, []int) {
-	return file_agent_v1_gateway_proto_rawDescGZIP(), []int{8}
+	return file_agent_v1_gateway_proto_rawDescGZIP(), []int{13}
 }
 
 func (x *WebhookEntry) GetWebhookId() string {
@@ -618,7 +974,7 @@ type ListWebhooksResponse struct {
 
 func (x *ListWebhooksResponse) Reset() {
 	*x = ListWebhooksResponse{}
-	mi := &file_agent_v1_gateway_proto_msgTypes[9]
+	mi := &file_agent_v1_gateway_proto_msgTypes[14]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -630,7 +986,7 @@ func (x *ListWebhooksResponse) String() string {
 func (*ListWebhooksResponse) ProtoMessage() {}
 
 func (x *ListWebhooksResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_agent_v1_gateway_proto_msgTypes[9]
+	mi := &file_agent_v1_gateway_proto_msgTypes[14]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -643,7 +999,7 @@ func (x *ListWebhooksResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ListWebhooksResponse.ProtoReflect.Descriptor instead.
 func (*ListWebhooksResponse) Descriptor() ([]byte, []int) {
-	return file_agent_v1_gateway_proto_rawDescGZIP(), []int{9}
+	return file_agent_v1_gateway_proto_rawDescGZIP(), []int{14}
 }
 
 func (x *ListWebhooksResponse) GetWebhooks() []*WebhookEntry {
@@ -666,7 +1022,7 @@ type WebhookEvent struct {
 
 func (x *WebhookEvent) Reset() {
 	*x = WebhookEvent{}
-	mi := &file_agent_v1_gateway_proto_msgTypes[10]
+	mi := &file_agent_v1_gateway_proto_msgTypes[15]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -678,7 +1034,7 @@ func (x *WebhookEvent) String() string {
 func (*WebhookEvent) ProtoMessage() {}
 
 func (x *WebhookEvent) ProtoReflect() protoreflect.Message {
-	mi := &file_agent_v1_gateway_proto_msgTypes[10]
+	mi := &file_agent_v1_gateway_proto_msgTypes[15]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -691,7 +1047,7 @@ func (x *WebhookEvent) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use WebhookEvent.ProtoReflect.Descriptor instead.
 func (*WebhookEvent) Descriptor() ([]byte, []int) {
-	return file_agent_v1_gateway_proto_rawDescGZIP(), []int{10}
+	return file_agent_v1_gateway_proto_rawDescGZIP(), []int{15}
 }
 
 func (x *WebhookEvent) GetWebhookId() string {
@@ -737,7 +1093,7 @@ type StreamWebhookEventsRequest struct {
 
 func (x *StreamWebhookEventsRequest) Reset() {
 	*x = StreamWebhookEventsRequest{}
-	mi := &file_agent_v1_gateway_proto_msgTypes[11]
+	mi := &file_agent_v1_gateway_proto_msgTypes[16]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -749,7 +1105,7 @@ func (x *StreamWebhookEventsRequest) String() string {
 func (*StreamWebhookEventsRequest) ProtoMessage() {}
 
 func (x *StreamWebhookEventsRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_agent_v1_gateway_proto_msgTypes[11]
+	mi := &file_agent_v1_gateway_proto_msgTypes[16]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -762,7 +1118,7 @@ func (x *StreamWebhookEventsRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use StreamWebhookEventsRequest.ProtoReflect.Descriptor instead.
 func (*StreamWebhookEventsRequest) Descriptor() ([]byte, []int) {
-	return file_agent_v1_gateway_proto_rawDescGZIP(), []int{11}
+	return file_agent_v1_gateway_proto_rawDescGZIP(), []int{16}
 }
 
 type StreamWebhookEventsResponse struct {
@@ -774,7 +1130,7 @@ type StreamWebhookEventsResponse struct {
 
 func (x *StreamWebhookEventsResponse) Reset() {
 	*x = StreamWebhookEventsResponse{}
-	mi := &file_agent_v1_gateway_proto_msgTypes[12]
+	mi := &file_agent_v1_gateway_proto_msgTypes[17]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -786,7 +1142,7 @@ func (x *StreamWebhookEventsResponse) String() string {
 func (*StreamWebhookEventsResponse) ProtoMessage() {}
 
 func (x *StreamWebhookEventsResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_agent_v1_gateway_proto_msgTypes[12]
+	mi := &file_agent_v1_gateway_proto_msgTypes[17]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -799,7 +1155,7 @@ func (x *StreamWebhookEventsResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use StreamWebhookEventsResponse.ProtoReflect.Descriptor instead.
 func (*StreamWebhookEventsResponse) Descriptor() ([]byte, []int) {
-	return file_agent_v1_gateway_proto_rawDescGZIP(), []int{12}
+	return file_agent_v1_gateway_proto_rawDescGZIP(), []int{17}
 }
 
 func (x *StreamWebhookEventsResponse) GetEvent() *WebhookEvent {
@@ -817,7 +1173,7 @@ type HealthCheckRequest struct {
 
 func (x *HealthCheckRequest) Reset() {
 	*x = HealthCheckRequest{}
-	mi := &file_agent_v1_gateway_proto_msgTypes[13]
+	mi := &file_agent_v1_gateway_proto_msgTypes[18]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -829,7 +1185,7 @@ func (x *HealthCheckRequest) String() string {
 func (*HealthCheckRequest) ProtoMessage() {}
 
 func (x *HealthCheckRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_agent_v1_gateway_proto_msgTypes[13]
+	mi := &file_agent_v1_gateway_proto_msgTypes[18]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -842,7 +1198,7 @@ func (x *HealthCheckRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use HealthCheckRequest.ProtoReflect.Descriptor instead.
 func (*HealthCheckRequest) Descriptor() ([]byte, []int) {
-	return file_agent_v1_gateway_proto_rawDescGZIP(), []int{13}
+	return file_agent_v1_gateway_proto_rawDescGZIP(), []int{18}
 }
 
 type HealthCheckResponse struct {
@@ -856,7 +1212,7 @@ type HealthCheckResponse struct {
 
 func (x *HealthCheckResponse) Reset() {
 	*x = HealthCheckResponse{}
-	mi := &file_agent_v1_gateway_proto_msgTypes[14]
+	mi := &file_agent_v1_gateway_proto_msgTypes[19]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -868,7 +1224,7 @@ func (x *HealthCheckResponse) String() string {
 func (*HealthCheckResponse) ProtoMessage() {}
 
 func (x *HealthCheckResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_agent_v1_gateway_proto_msgTypes[14]
+	mi := &file_agent_v1_gateway_proto_msgTypes[19]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -881,7 +1237,7 @@ func (x *HealthCheckResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use HealthCheckResponse.ProtoReflect.Descriptor instead.
 func (*HealthCheckResponse) Descriptor() ([]byte, []int) {
-	return file_agent_v1_gateway_proto_rawDescGZIP(), []int{14}
+	return file_agent_v1_gateway_proto_rawDescGZIP(), []int{19}
 }
 
 func (x *HealthCheckResponse) GetHealthy() bool {
@@ -909,42 +1265,76 @@ var File_agent_v1_gateway_proto protoreflect.FileDescriptor
 
 const file_agent_v1_gateway_proto_rawDesc = "" +
 	"\n" +
-	"\x16agent/v1/gateway.proto\x12\bagent.v1\";\n" +
+	"\x16agent/v1/gateway.proto\x12\bagent.v1\"h\n" +
+	"\rToolParameter\x12\x12\n" +
+	"\x04type\x18\x01 \x01(\tR\x04type\x12'\n" +
+	"\x0fproperties_json\x18\x02 \x01(\tR\x0epropertiesJson\x12\x1a\n" +
+	"\brequired\x18\x03 \x03(\tR\brequired\"}\n" +
+	"\fToolFunction\x12\x12\n" +
+	"\x04name\x18\x01 \x01(\tR\x04name\x12 \n" +
+	"\vdescription\x18\x02 \x01(\tR\vdescription\x127\n" +
+	"\n" +
+	"parameters\x18\x03 \x01(\v2\x17.agent.v1.ToolParameterR\n" +
+	"parameters\"N\n" +
+	"\x04Tool\x12\x12\n" +
+	"\x04type\x18\x01 \x01(\tR\x04type\x122\n" +
+	"\bfunction\x18\x02 \x01(\v2\x16.agent.v1.ToolFunctionR\bfunction\"D\n" +
+	"\x10ToolCallFunction\x12\x12\n" +
+	"\x04name\x18\x01 \x01(\tR\x04name\x12\x1c\n" +
+	"\targuments\x18\x02 \x01(\tR\targuments\"k\n" +
+	"\rToolCallEntry\x12\x0e\n" +
+	"\x02id\x18\x01 \x01(\tR\x02id\x12\x12\n" +
+	"\x04type\x18\x02 \x01(\tR\x04type\x126\n" +
+	"\bfunction\x18\x03 \x01(\v2\x1a.agent.v1.ToolCallFunctionR\bfunction\"\xb7\x01\n" +
 	"\vChatMessage\x12\x12\n" +
 	"\x04role\x18\x01 \x01(\tR\x04role\x12\x18\n" +
-	"\acontent\x18\x02 \x01(\tR\acontent\"\x80\x02\n" +
+	"\acontent\x18\x02 \x01(\tR\acontent\x126\n" +
+	"\n" +
+	"tool_calls\x18\x03 \x03(\v2\x17.agent.v1.ToolCallEntryR\ttoolCalls\x12 \n" +
+	"\ftool_call_id\x18\x04 \x01(\tR\n" +
+	"toolCallId\x12\x17\n" +
+	"\x04name\x18\x05 \x01(\tH\x00R\x04name\x88\x01\x01B\a\n" +
+	"\x05_name\"\xa6\x02\n" +
 	"\x0fCompleteRequest\x12\x14\n" +
 	"\x05model\x18\x01 \x01(\tR\x05model\x121\n" +
 	"\bmessages\x18\x02 \x03(\v2\x15.agent.v1.ChatMessageR\bmessages\x12%\n" +
 	"\vtemperature\x18\x03 \x01(\x02H\x00R\vtemperature\x88\x01\x01\x12\"\n" +
 	"\n" +
 	"max_tokens\x18\x04 \x01(\x05H\x01R\tmaxTokens\x88\x01\x01\x12(\n" +
-	"\rsystem_prompt\x18\x05 \x01(\tH\x02R\fsystemPrompt\x88\x01\x01B\x0e\n" +
+	"\rsystem_prompt\x18\x05 \x01(\tH\x02R\fsystemPrompt\x88\x01\x01\x12$\n" +
+	"\x05tools\x18\x06 \x03(\v2\x0e.agent.v1.ToolR\x05toolsB\x0e\n" +
 	"\f_temperatureB\r\n" +
 	"\v_max_tokensB\x10\n" +
-	"\x0e_system_prompt\"\xbb\x01\n" +
+	"\x0e_system_prompt\"\x98\x02\n" +
 	"\x10CompleteResponse\x12\x0e\n" +
 	"\x02id\x18\x01 \x01(\tR\x02id\x12\x14\n" +
 	"\x05model\x18\x02 \x01(\tR\x05model\x12/\n" +
 	"\amessage\x18\x03 \x01(\v2\x15.agent.v1.ChatMessageR\amessage\x12#\n" +
 	"\rprompt_tokens\x18\x04 \x01(\x05R\fpromptTokens\x12+\n" +
-	"\x11completion_tokens\x18\x05 \x01(\x05R\x10completionTokens\"\x86\x02\n" +
+	"\x11completion_tokens\x18\x05 \x01(\x05R\x10completionTokens\x126\n" +
+	"\n" +
+	"tool_calls\x18\x06 \x03(\v2\x17.agent.v1.ToolCallEntryR\ttoolCalls\x12#\n" +
+	"\rfinish_reason\x18\a \x01(\tR\ffinishReason\"\xac\x02\n" +
 	"\x15StreamCompleteRequest\x12\x14\n" +
 	"\x05model\x18\x01 \x01(\tR\x05model\x121\n" +
 	"\bmessages\x18\x02 \x03(\v2\x15.agent.v1.ChatMessageR\bmessages\x12%\n" +
 	"\vtemperature\x18\x03 \x01(\x02H\x00R\vtemperature\x88\x01\x01\x12\"\n" +
 	"\n" +
 	"max_tokens\x18\x04 \x01(\x05H\x01R\tmaxTokens\x88\x01\x01\x12(\n" +
-	"\rsystem_prompt\x18\x05 \x01(\tH\x02R\fsystemPrompt\x88\x01\x01B\x0e\n" +
+	"\rsystem_prompt\x18\x05 \x01(\tH\x02R\fsystemPrompt\x88\x01\x01\x12$\n" +
+	"\x05tools\x18\x06 \x03(\v2\x0e.agent.v1.ToolR\x05toolsB\x0e\n" +
 	"\f_temperatureB\r\n" +
 	"\v_max_tokensB\x10\n" +
-	"\x0e_system_prompt\"\xa4\x01\n" +
+	"\x0e_system_prompt\"\x81\x02\n" +
 	"\x16StreamCompleteResponse\x12\x0e\n" +
 	"\x02id\x18\x01 \x01(\tR\x02id\x12\x14\n" +
 	"\x05delta\x18\x02 \x01(\tR\x05delta\x12\x12\n" +
 	"\x04done\x18\x03 \x01(\bR\x04done\x12#\n" +
 	"\rprompt_tokens\x18\x04 \x01(\x05R\fpromptTokens\x12+\n" +
-	"\x11completion_tokens\x18\x05 \x01(\x05R\x10completionTokens\"x\n" +
+	"\x11completion_tokens\x18\x05 \x01(\x05R\x10completionTokens\x126\n" +
+	"\n" +
+	"tool_calls\x18\x06 \x03(\v2\x17.agent.v1.ToolCallEntryR\ttoolCalls\x12#\n" +
+	"\rfinish_reason\x18\a \x01(\tR\ffinishReason\"x\n" +
 	"\x16RegisterWebhookRequest\x12\x12\n" +
 	"\x04name\x18\x01 \x01(\tR\x04name\x12\x1a\n" +
 	"\bprovider\x18\x02 \x01(\tR\bprovider\x12\x16\n" +
@@ -1007,51 +1397,64 @@ func file_agent_v1_gateway_proto_rawDescGZIP() []byte {
 	return file_agent_v1_gateway_proto_rawDescData
 }
 
-var file_agent_v1_gateway_proto_msgTypes = make([]protoimpl.MessageInfo, 17)
+var file_agent_v1_gateway_proto_msgTypes = make([]protoimpl.MessageInfo, 22)
 var file_agent_v1_gateway_proto_goTypes = []any{
-	(*ChatMessage)(nil),                 // 0: agent.v1.ChatMessage
-	(*CompleteRequest)(nil),             // 1: agent.v1.CompleteRequest
-	(*CompleteResponse)(nil),            // 2: agent.v1.CompleteResponse
-	(*StreamCompleteRequest)(nil),       // 3: agent.v1.StreamCompleteRequest
-	(*StreamCompleteResponse)(nil),      // 4: agent.v1.StreamCompleteResponse
-	(*RegisterWebhookRequest)(nil),      // 5: agent.v1.RegisterWebhookRequest
-	(*RegisterWebhookResponse)(nil),     // 6: agent.v1.RegisterWebhookResponse
-	(*ListWebhooksRequest)(nil),         // 7: agent.v1.ListWebhooksRequest
-	(*WebhookEntry)(nil),                // 8: agent.v1.WebhookEntry
-	(*ListWebhooksResponse)(nil),        // 9: agent.v1.ListWebhooksResponse
-	(*WebhookEvent)(nil),                // 10: agent.v1.WebhookEvent
-	(*StreamWebhookEventsRequest)(nil),  // 11: agent.v1.StreamWebhookEventsRequest
-	(*StreamWebhookEventsResponse)(nil), // 12: agent.v1.StreamWebhookEventsResponse
-	(*HealthCheckRequest)(nil),          // 13: agent.v1.HealthCheckRequest
-	(*HealthCheckResponse)(nil),         // 14: agent.v1.HealthCheckResponse
-	nil,                                 // 15: agent.v1.WebhookEvent.HeadersEntry
-	nil,                                 // 16: agent.v1.HealthCheckResponse.ServicesEntry
+	(*ToolParameter)(nil),               // 0: agent.v1.ToolParameter
+	(*ToolFunction)(nil),                // 1: agent.v1.ToolFunction
+	(*Tool)(nil),                        // 2: agent.v1.Tool
+	(*ToolCallFunction)(nil),            // 3: agent.v1.ToolCallFunction
+	(*ToolCallEntry)(nil),               // 4: agent.v1.ToolCallEntry
+	(*ChatMessage)(nil),                 // 5: agent.v1.ChatMessage
+	(*CompleteRequest)(nil),             // 6: agent.v1.CompleteRequest
+	(*CompleteResponse)(nil),            // 7: agent.v1.CompleteResponse
+	(*StreamCompleteRequest)(nil),       // 8: agent.v1.StreamCompleteRequest
+	(*StreamCompleteResponse)(nil),      // 9: agent.v1.StreamCompleteResponse
+	(*RegisterWebhookRequest)(nil),      // 10: agent.v1.RegisterWebhookRequest
+	(*RegisterWebhookResponse)(nil),     // 11: agent.v1.RegisterWebhookResponse
+	(*ListWebhooksRequest)(nil),         // 12: agent.v1.ListWebhooksRequest
+	(*WebhookEntry)(nil),                // 13: agent.v1.WebhookEntry
+	(*ListWebhooksResponse)(nil),        // 14: agent.v1.ListWebhooksResponse
+	(*WebhookEvent)(nil),                // 15: agent.v1.WebhookEvent
+	(*StreamWebhookEventsRequest)(nil),  // 16: agent.v1.StreamWebhookEventsRequest
+	(*StreamWebhookEventsResponse)(nil), // 17: agent.v1.StreamWebhookEventsResponse
+	(*HealthCheckRequest)(nil),          // 18: agent.v1.HealthCheckRequest
+	(*HealthCheckResponse)(nil),         // 19: agent.v1.HealthCheckResponse
+	nil,                                 // 20: agent.v1.WebhookEvent.HeadersEntry
+	nil,                                 // 21: agent.v1.HealthCheckResponse.ServicesEntry
 }
 var file_agent_v1_gateway_proto_depIdxs = []int32{
-	0,  // 0: agent.v1.CompleteRequest.messages:type_name -> agent.v1.ChatMessage
-	0,  // 1: agent.v1.CompleteResponse.message:type_name -> agent.v1.ChatMessage
-	0,  // 2: agent.v1.StreamCompleteRequest.messages:type_name -> agent.v1.ChatMessage
-	8,  // 3: agent.v1.ListWebhooksResponse.webhooks:type_name -> agent.v1.WebhookEntry
-	15, // 4: agent.v1.WebhookEvent.headers:type_name -> agent.v1.WebhookEvent.HeadersEntry
-	10, // 5: agent.v1.StreamWebhookEventsResponse.event:type_name -> agent.v1.WebhookEvent
-	16, // 6: agent.v1.HealthCheckResponse.services:type_name -> agent.v1.HealthCheckResponse.ServicesEntry
-	1,  // 7: agent.v1.GatewayService.Complete:input_type -> agent.v1.CompleteRequest
-	3,  // 8: agent.v1.GatewayService.StreamComplete:input_type -> agent.v1.StreamCompleteRequest
-	5,  // 9: agent.v1.GatewayService.RegisterWebhook:input_type -> agent.v1.RegisterWebhookRequest
-	7,  // 10: agent.v1.GatewayService.ListWebhooks:input_type -> agent.v1.ListWebhooksRequest
-	11, // 11: agent.v1.GatewayService.StreamWebhookEvents:input_type -> agent.v1.StreamWebhookEventsRequest
-	13, // 12: agent.v1.GatewayService.HealthCheck:input_type -> agent.v1.HealthCheckRequest
-	2,  // 13: agent.v1.GatewayService.Complete:output_type -> agent.v1.CompleteResponse
-	4,  // 14: agent.v1.GatewayService.StreamComplete:output_type -> agent.v1.StreamCompleteResponse
-	6,  // 15: agent.v1.GatewayService.RegisterWebhook:output_type -> agent.v1.RegisterWebhookResponse
-	9,  // 16: agent.v1.GatewayService.ListWebhooks:output_type -> agent.v1.ListWebhooksResponse
-	12, // 17: agent.v1.GatewayService.StreamWebhookEvents:output_type -> agent.v1.StreamWebhookEventsResponse
-	14, // 18: agent.v1.GatewayService.HealthCheck:output_type -> agent.v1.HealthCheckResponse
-	13, // [13:19] is the sub-list for method output_type
-	7,  // [7:13] is the sub-list for method input_type
-	7,  // [7:7] is the sub-list for extension type_name
-	7,  // [7:7] is the sub-list for extension extendee
-	0,  // [0:7] is the sub-list for field type_name
+	0,  // 0: agent.v1.ToolFunction.parameters:type_name -> agent.v1.ToolParameter
+	1,  // 1: agent.v1.Tool.function:type_name -> agent.v1.ToolFunction
+	3,  // 2: agent.v1.ToolCallEntry.function:type_name -> agent.v1.ToolCallFunction
+	4,  // 3: agent.v1.ChatMessage.tool_calls:type_name -> agent.v1.ToolCallEntry
+	5,  // 4: agent.v1.CompleteRequest.messages:type_name -> agent.v1.ChatMessage
+	2,  // 5: agent.v1.CompleteRequest.tools:type_name -> agent.v1.Tool
+	5,  // 6: agent.v1.CompleteResponse.message:type_name -> agent.v1.ChatMessage
+	4,  // 7: agent.v1.CompleteResponse.tool_calls:type_name -> agent.v1.ToolCallEntry
+	5,  // 8: agent.v1.StreamCompleteRequest.messages:type_name -> agent.v1.ChatMessage
+	2,  // 9: agent.v1.StreamCompleteRequest.tools:type_name -> agent.v1.Tool
+	4,  // 10: agent.v1.StreamCompleteResponse.tool_calls:type_name -> agent.v1.ToolCallEntry
+	13, // 11: agent.v1.ListWebhooksResponse.webhooks:type_name -> agent.v1.WebhookEntry
+	20, // 12: agent.v1.WebhookEvent.headers:type_name -> agent.v1.WebhookEvent.HeadersEntry
+	15, // 13: agent.v1.StreamWebhookEventsResponse.event:type_name -> agent.v1.WebhookEvent
+	21, // 14: agent.v1.HealthCheckResponse.services:type_name -> agent.v1.HealthCheckResponse.ServicesEntry
+	6,  // 15: agent.v1.GatewayService.Complete:input_type -> agent.v1.CompleteRequest
+	8,  // 16: agent.v1.GatewayService.StreamComplete:input_type -> agent.v1.StreamCompleteRequest
+	10, // 17: agent.v1.GatewayService.RegisterWebhook:input_type -> agent.v1.RegisterWebhookRequest
+	12, // 18: agent.v1.GatewayService.ListWebhooks:input_type -> agent.v1.ListWebhooksRequest
+	16, // 19: agent.v1.GatewayService.StreamWebhookEvents:input_type -> agent.v1.StreamWebhookEventsRequest
+	18, // 20: agent.v1.GatewayService.HealthCheck:input_type -> agent.v1.HealthCheckRequest
+	7,  // 21: agent.v1.GatewayService.Complete:output_type -> agent.v1.CompleteResponse
+	9,  // 22: agent.v1.GatewayService.StreamComplete:output_type -> agent.v1.StreamCompleteResponse
+	11, // 23: agent.v1.GatewayService.RegisterWebhook:output_type -> agent.v1.RegisterWebhookResponse
+	14, // 24: agent.v1.GatewayService.ListWebhooks:output_type -> agent.v1.ListWebhooksResponse
+	17, // 25: agent.v1.GatewayService.StreamWebhookEvents:output_type -> agent.v1.StreamWebhookEventsResponse
+	19, // 26: agent.v1.GatewayService.HealthCheck:output_type -> agent.v1.HealthCheckResponse
+	21, // [21:27] is the sub-list for method output_type
+	15, // [15:21] is the sub-list for method input_type
+	15, // [15:15] is the sub-list for extension type_name
+	15, // [15:15] is the sub-list for extension extendee
+	0,  // [0:15] is the sub-list for field type_name
 }
 
 func init() { file_agent_v1_gateway_proto_init() }
@@ -1059,15 +1462,16 @@ func file_agent_v1_gateway_proto_init() {
 	if File_agent_v1_gateway_proto != nil {
 		return
 	}
-	file_agent_v1_gateway_proto_msgTypes[1].OneofWrappers = []any{}
-	file_agent_v1_gateway_proto_msgTypes[3].OneofWrappers = []any{}
+	file_agent_v1_gateway_proto_msgTypes[5].OneofWrappers = []any{}
+	file_agent_v1_gateway_proto_msgTypes[6].OneofWrappers = []any{}
+	file_agent_v1_gateway_proto_msgTypes[8].OneofWrappers = []any{}
 	type x struct{}
 	out := protoimpl.TypeBuilder{
 		File: protoimpl.DescBuilder{
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_agent_v1_gateway_proto_rawDesc), len(file_agent_v1_gateway_proto_rawDesc)),
 			NumEnums:      0,
-			NumMessages:   17,
+			NumMessages:   22,
 			NumExtensions: 0,
 			NumServices:   1,
 		},

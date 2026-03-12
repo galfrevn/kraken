@@ -2,7 +2,7 @@ import { LanguageModelClient } from "@/language/client.ts";
 import { ConversationHistory } from "@/language/conversation.ts";
 import { ToolRegistry } from "@/tools/registry.ts";
 import { buildSystemPrompt } from "@/agent/prompt.ts";
-import { parseAgentResponse, formatToolResultForConversation } from "@/agent/parser.ts";
+import { toolsToNativeFormat } from "@/tools/schema.ts";
 import type { ToolExecutionContext } from "@/tools/schema.ts";
 
 const DEFAULT_SUBAGENT_MAX_ITERATIONS = 25;
@@ -41,6 +41,8 @@ export class SubagentRunner {
     const systemPrompt = buildSystemPrompt(this.toolRegistry.listTools());
     const conversation = new ConversationHistory(systemPrompt);
 
+    this.languageModelClient.setNativeTools(toolsToNativeFormat(this.toolRegistry.listTools()));
+
     const toolExecutionContext: ToolExecutionContext = {
       workingDirectory: this.workingDirectory,
     };
@@ -55,58 +57,55 @@ export class SubagentRunner {
     let totalToolCalls = 0;
 
     try {
-      const initialCompletion = await this.languageModelClient.completeConversation(
+      let completionResult = await this.languageModelClient.completeConversation(
         conversation,
         taskPrompt,
         completionOptions,
       );
 
-      let currentResponse = initialCompletion.content;
-
       while (iterations < maxIterations) {
         iterations += 1;
-        const parsed = parseAgentResponse(currentResponse);
 
-        if (parsed.finalResult) {
+        if (completionResult.finishReason !== "tool_calls" || completionResult.toolCalls.length === 0) {
           return {
             success: true,
-            output: parsed.finalResult,
+            output: completionResult.content,
             iterations,
             toolCalls: totalToolCalls,
           };
         }
 
-        if (parsed.toolCalls.length === 0) {
-          return {
-            success: true,
-            output: currentResponse,
-            iterations,
-            toolCalls: totalToolCalls,
-          };
-        }
+        for (const toolCall of completionResult.toolCalls) {
+          let parameters: Record<string, unknown>;
+          try {
+            parameters = JSON.parse(toolCall.function.arguments);
+          } catch {
+            parameters = {};
+          }
 
-        const toolResultMessages: string[] = [];
-
-        for (const toolCall of parsed.toolCalls) {
           const toolResult = await this.toolRegistry.executeTool(
-            toolCall.name,
-            toolCall.parameters,
+            toolCall.function.name,
+            parameters,
             toolExecutionContext,
           );
 
-          toolResultMessages.push(formatToolResultForConversation(toolCall.name, toolResult));
+          conversation.addToolResultMessage(
+            toolCall.id,
+            toolCall.function.name,
+            toolResult.success ? toolResult.output : (toolResult.error ?? toolResult.output),
+          );
         }
 
-        totalToolCalls += parsed.toolCalls.length;
-        const combinedResults = toolResultMessages.join("\n\n");
+        totalToolCalls += completionResult.toolCalls.length;
 
-        const nextCompletion = await this.languageModelClient.completeConversation(
-          conversation,
-          combinedResults,
-          completionOptions,
-        );
+        const messages = conversation.getMessagesWithSystemPrompt();
+        completionResult = await this.languageModelClient.complete(messages, completionOptions);
 
-        currentResponse = nextCompletion.content;
+        if (completionResult.toolCalls.length > 0) {
+          conversation.addAssistantToolCallMessage(completionResult.content, completionResult.toolCalls);
+        } else {
+          conversation.addAssistantMessage(completionResult.content);
+        }
       }
 
       return {

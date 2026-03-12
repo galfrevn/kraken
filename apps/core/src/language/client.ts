@@ -8,7 +8,9 @@ import type {
   CompletionResult,
   TokenUsageSummary,
   StreamDeltaCallback,
+  ToolCallEntry,
 } from "@/language/schema.ts";
+import type { NativeTool } from "@/tools/schema.ts";
 
 export class LanguageModelClient {
   private gatewayClient: GatewayClient;
@@ -16,6 +18,7 @@ export class LanguageModelClient {
   private defaultTemperature: number;
   private defaultMaxTokens: number;
   private tokenUsage: TokenUsageSummary;
+  private nativeTools: NativeTool[] = [];
 
   constructor(gatewayUrl: string, languageModelConfiguration: LanguageModelConfiguration) {
     this.gatewayClient = createGatewayClient(gatewayUrl);
@@ -29,16 +32,52 @@ export class LanguageModelClient {
     };
   }
 
+  setNativeTools(tools: NativeTool[]): void {
+    this.nativeTools = tools;
+  }
+
+  private buildGatewayTools(): { type: string; function: { name: string; description: string; parameters: { type: string; propertiesJson: string; required: string[] } } }[] | undefined {
+    if (this.nativeTools.length === 0) return undefined;
+    return this.nativeTools.map((tool) => ({
+      type: tool.type,
+      function: {
+        name: tool.function.name,
+        description: tool.function.description,
+        parameters: {
+          type: tool.function.parameters.type,
+          propertiesJson: JSON.stringify(tool.function.parameters.properties),
+          required: tool.function.parameters.required,
+        },
+      },
+    }));
+  }
+
+  private buildGatewayMessages(messages: ConversationMessage[]): { role: string; content: string; toolCalls?: { id: string; type: string; function: { name: string; arguments: string } }[]; toolCallId?: string; name?: string }[] {
+    return messages
+      .filter((message) => message.role !== "system")
+      .map((message) => {
+        const msg: { role: string; content: string; toolCalls?: { id: string; type: string; function: { name: string; arguments: string } }[]; toolCallId?: string; name?: string } = {
+          role: message.role,
+          content: message.content,
+        };
+        if (message.toolCalls && message.toolCalls.length > 0) {
+          msg.toolCalls = message.toolCalls;
+        }
+        if (message.toolCallId) {
+          msg.toolCallId = message.toolCallId;
+        }
+        if (message.name) {
+          msg.name = message.name;
+        }
+        return msg;
+      });
+  }
+
   async complete(
     messages: ConversationMessage[],
     options?: CompletionOptions,
   ): Promise<CompletionResult> {
-    const gatewayMessages = messages
-      .filter((message) => message.role !== "system")
-      .map((message) => ({
-        role: message.role,
-        content: message.content,
-      }));
+    const gatewayMessages = this.buildGatewayMessages(messages);
 
     const systemMessage = messages.find((message) => message.role === "system");
     const systemPrompt = options?.systemPrompt ?? systemMessage?.content;
@@ -49,11 +88,21 @@ export class LanguageModelClient {
       temperature: options?.temperature ?? this.defaultTemperature,
       maxTokens: options?.maxTokens ?? this.defaultMaxTokens,
       systemPrompt,
+      tools: this.buildGatewayTools() ?? [],
     });
 
     this.tokenUsage.totalPromptTokens += response.promptTokens;
     this.tokenUsage.totalCompletionTokens += response.completionTokens;
     this.tokenUsage.requestCount += 1;
+
+    const toolCalls: ToolCallEntry[] = (response.toolCalls ?? []).map((tc) => ({
+      id: tc.id,
+      type: tc.type,
+      function: {
+        name: tc.function?.name ?? "",
+        arguments: tc.function?.arguments ?? "",
+      },
+    }));
 
     return {
       id: response.id,
@@ -61,6 +110,8 @@ export class LanguageModelClient {
       content: response.message?.content ?? "",
       promptTokens: response.promptTokens,
       completionTokens: response.completionTokens,
+      toolCalls,
+      finishReason: response.finishReason ?? "stop",
     };
   }
 
@@ -74,7 +125,11 @@ export class LanguageModelClient {
     const messages = conversation.getMessagesWithSystemPrompt();
     const result = await this.complete(messages, options);
 
-    conversation.addAssistantMessage(result.content);
+    if (result.toolCalls.length > 0) {
+      conversation.addAssistantToolCallMessage(result.content, result.toolCalls);
+    } else {
+      conversation.addAssistantMessage(result.content);
+    }
     return result;
   }
 
@@ -84,7 +139,7 @@ export class LanguageModelClient {
     onDelta: StreamDeltaCallback,
     options?: CompletionOptions,
     signal?: AbortSignal,
-  ): Promise<string> {
+  ): Promise<CompletionResult> {
     conversation.addUserMessage(userMessage);
 
     try {
@@ -93,9 +148,13 @@ export class LanguageModelClient {
       if (signal?.aborted) throw streamError;
       const messages = conversation.getMessagesWithSystemPrompt();
       const result = await this.complete(messages, options);
-      conversation.addAssistantMessage(result.content);
-      onDelta({ content: result.content, done: true });
-      return result.content;
+      if (result.toolCalls.length > 0) {
+        conversation.addAssistantToolCallMessage(result.content, result.toolCalls);
+      } else {
+        conversation.addAssistantMessage(result.content);
+      }
+      onDelta({ content: result.content, done: true, toolCalls: result.toolCalls, finishReason: result.finishReason });
+      return result;
     }
   }
 
@@ -104,15 +163,10 @@ export class LanguageModelClient {
     onDelta: StreamDeltaCallback,
     options?: CompletionOptions,
     signal?: AbortSignal,
-  ): Promise<string> {
+  ): Promise<CompletionResult> {
     const allMessages = conversation.getMessagesWithSystemPrompt();
 
-    const gatewayMessages = allMessages
-      .filter((message) => message.role !== "system")
-      .map((message) => ({
-        role: message.role,
-        content: message.content,
-      }));
+    const gatewayMessages = this.buildGatewayMessages(allMessages);
 
     const systemMessage = allMessages.find((message) => message.role === "system");
     const systemPrompt = options?.systemPrompt ?? systemMessage?.content;
@@ -123,9 +177,12 @@ export class LanguageModelClient {
       temperature: options?.temperature ?? this.defaultTemperature,
       maxTokens: options?.maxTokens ?? this.defaultMaxTokens,
       systemPrompt,
+      tools: this.buildGatewayTools() ?? [],
     });
 
     let fullContent = "";
+    let toolCalls: ToolCallEntry[] = [];
+    let finishReason = "stop";
 
     const iterator = stream[Symbol.asyncIterator]();
     const INACTIVITY_TIMEOUT_MILLISECONDS = 30_000;
@@ -167,14 +224,39 @@ export class LanguageModelClient {
         this.tokenUsage.totalCompletionTokens += chunk.completionTokens;
       }
 
-      if (chunk.done) break;
+      if (chunk.done) {
+        finishReason = chunk.finishReason || "stop";
+        if (chunk.toolCalls && chunk.toolCalls.length > 0) {
+          toolCalls = chunk.toolCalls.map((tc) => ({
+            id: tc.id,
+            type: tc.type,
+            function: {
+              name: tc.function?.name ?? "",
+              arguments: tc.function?.arguments ?? "",
+            },
+          }));
+        }
+        break;
+      }
     }
 
-    conversation.addAssistantMessage(fullContent);
+    if (toolCalls.length > 0) {
+      conversation.addAssistantToolCallMessage(fullContent, toolCalls);
+    } else {
+      conversation.addAssistantMessage(fullContent);
+    }
 
     this.tokenUsage.requestCount += 1;
 
-    return fullContent;
+    return {
+      id: "",
+      model: this.model,
+      content: fullContent,
+      promptTokens: 0,
+      completionTokens: 0,
+      toolCalls,
+      finishReason,
+    };
   }
 
   async singlePrompt(

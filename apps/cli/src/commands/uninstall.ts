@@ -4,6 +4,15 @@ import { homedir } from "node:os";
 import * as p from "@clack/prompts";
 import { KRAKEN_HOME } from "@/constants.ts";
 
+function tryRemove(filePath: string, deferred: string[]): void {
+  if (!existsSync(filePath)) return;
+  try {
+    rmSync(filePath, { force: true });
+  } catch {
+    deferred.push(filePath);
+  }
+}
+
 function removeFromShellConfig(rcFile: string, marker: string): boolean {
   if (!existsSync(rcFile)) return false;
 
@@ -24,7 +33,8 @@ export async function execute(_args: string[]): Promise<void> {
 
   p.log.warn("The following will be removed:");
   p.log.message(`  ${KRAKEN_HOME}  (installation directory)`);
-  p.log.message(`  ~/.bun/bin/kraken  (CLI symlink)`);
+  p.log.message(`  ~/.bun/bin/kraken  (CLI binary)`);
+  p.log.message(`  ~/.bun/install/global/node_modules/kraken  (global link)`);
 
   const shouldContinue = await p.confirm({
     message: "Are you sure you want to uninstall kraken?",
@@ -43,12 +53,23 @@ export async function execute(_args: string[]): Promise<void> {
     rmSync(KRAKEN_HOME, { recursive: true, force: true });
   }
 
-  const bunBinKraken = join(homedir(), ".bun", "bin", "kraken");
-  if (existsSync(bunBinKraken)) {
-    rmSync(bunBinKraken, { force: true });
+  const home = homedir();
+
+  // Collect paths that couldn't be deleted (e.g. locked .exe on Windows)
+  const deferredDeletes: string[] = [];
+
+  const bunBinKraken = join(home, ".bun", "bin", "kraken");
+  tryRemove(bunBinKraken, deferredDeletes);
+
+  const bunBinKrakenExe = join(home, ".bun", "bin", "kraken.exe");
+  tryRemove(bunBinKrakenExe, deferredDeletes);
+
+  // Remove the global node_modules symlink created by `bun link`
+  const bunGlobalLink = join(home, ".bun", "install", "global", "node_modules", "kraken");
+  if (existsSync(bunGlobalLink)) {
+    rmSync(bunGlobalLink, { recursive: true, force: true });
   }
 
-  const home = homedir();
   const pathMarker = ".kraken/bin";
   const shellConfigs = [
     join(home, ".zshrc"),
@@ -61,10 +82,12 @@ export async function execute(_args: string[]): Promise<void> {
     removeFromShellConfig(rcFile, pathMarker);
   }
 
-  try {
-    Bun.spawnSync({ cmd: ["bun", "unlink", "kraken"], stdout: "ignore", stderr: "ignore" });
-  } catch {
-    /* may not exist */
+  // On Windows the running .exe can't delete itself — schedule deletion after exit
+  if (deferredDeletes.length > 0 && process.platform === "win32") {
+    const delArgs = deferredDeletes.map((f) => `"${f}"`).join(" & del /f /q ");
+    Bun.spawn(["cmd", "/c", `ping -n 2 127.0.0.1 >nul & del /f /q ${delArgs}`], {
+      stdio: ["ignore", "ignore", "ignore"],
+    });
   }
 
   spinnerInstance.stop("Kraken removed");

@@ -1,6 +1,6 @@
 import { existsSync, readFileSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
-import { bold, colorize, fail, success, KRAKEN_HOME } from "@/constants.ts";
+import { bold, colorize, fail, success, warn, KRAKEN_HOME } from "@/constants.ts";
 
 function findConfigFile(): string | null {
   const globalConfig = join(KRAKEN_HOME, "kraken.yml");
@@ -161,14 +161,47 @@ export async function execute(args: string[]): Promise<void> {
     return;
   }
 
+  if (subcommand === "set-key" && args[1]) {
+    const envPath = join(KRAKEN_HOME, ".env");
+    const newKey = args[1];
+    const envVarName = args[2] ?? "OPENROUTER_API_KEY";
+
+    let content = "";
+    if (existsSync(envPath)) {
+      content = readFileSync(envPath, "utf-8");
+    }
+
+    const lines = content.split("\n");
+    let found = false;
+    for (let i = 0; i < lines.length; i++) {
+      const trimmed = lines[i]!.trim();
+      if (trimmed.startsWith(`${envVarName}=`) || trimmed.startsWith(`# ${envVarName}=`)) {
+        lines[i] = `${envVarName}=${newKey}`;
+        found = true;
+        break;
+      }
+    }
+
+    if (!found) {
+      lines.push(`${envVarName}=${newKey}`);
+    }
+
+    writeFileSync(envPath, lines.join("\n"));
+    const masked = `${newKey.slice(0, 10)}...${newKey.slice(-4)}`;
+    success(`${envVarName} updated (${masked})`);
+    warn("restart kraken for changes to take effect");
+    return;
+  }
+
   if (subcommand === "path") {
     console.log(configPath);
     return;
   }
 
   console.log(`\n  ${bold("Usage:")}`);
-  console.log(`    ${colorize("kraken config", "cyan")}              show full configuration`);
-  console.log(`    ${colorize("kraken config get", "cyan")} <key>    get a specific value (dot notation)`);
-  console.log(`    ${colorize("kraken config set", "cyan")} <k> <v>  set a specific value`);
-  console.log(`    ${colorize("kraken config path", "cyan")}         show config file path\n`);
+  console.log(`    ${colorize("kraken config", "cyan")}                    show full configuration`);
+  console.log(`    ${colorize("kraken config get", "cyan")} <key>          get a specific value (dot notation)`);
+  console.log(`    ${colorize("kraken config set", "cyan")} <k> <v>        set a specific value in kraken.yml`);
+  console.log(`    ${colorize("kraken config set-key", "cyan")} <key>      set the API key in ~/.kraken/.env`);
+  console.log(`    ${colorize("kraken config path", "cyan")}               show config file path\n`);
 }

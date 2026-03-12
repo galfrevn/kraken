@@ -293,8 +293,6 @@ export function ChatView({ threadManager, focused, onRequestFocus, onRequestBlur
       return;
     }
 
-    if (!focused) return;
-
     if (key.name === "escape" && processing) {
       const now = Date.now();
       if (now - lastEscapeTimestamp.current < DOUBLE_ESCAPE_THRESHOLD_MILLISECONDS) {
@@ -305,7 +303,10 @@ export function ChatView({ threadManager, focused, onRequestFocus, onRequestBlur
       } else {
         lastEscapeTimestamp.current = now;
       }
+      return;
     }
+
+    if (!focused) return;
 
     if (key.name === "up") {
       const textarea = textareaReference.current;

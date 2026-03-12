@@ -2,6 +2,7 @@ package grpcserver
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"log/slog"
 
@@ -36,19 +37,93 @@ func NewGatewayServer(
 	}
 }
 
+func protoToolsToLLM(protoTools []*agentv1.Tool) []llm.Tool {
+	if len(protoTools) == 0 {
+		return nil
+	}
+	tools := make([]llm.Tool, len(protoTools))
+	for i, pt := range protoTools {
+		t := llm.Tool{Type: pt.Type}
+		if pt.Function != nil {
+			t.Function = llm.ToolFunction{
+				Name:        pt.Function.Name,
+				Description: pt.Function.Description,
+			}
+			if pt.Function.Parameters != nil {
+				params := map[string]interface{}{
+					"type":     pt.Function.Parameters.Type,
+					"required": pt.Function.Parameters.Required,
+				}
+				if pt.Function.Parameters.PropertiesJson != "" {
+					var props interface{}
+					if err := json.Unmarshal([]byte(pt.Function.Parameters.PropertiesJson), &props); err == nil {
+						params["properties"] = props
+					}
+				}
+				t.Function.Parameters = params
+			}
+		}
+		tools[i] = t
+	}
+	return tools
+}
+
+func protoMessagesToLLM(protoMsgs []*agentv1.ChatMessage) []llm.ChatMessage {
+	msgs := make([]llm.ChatMessage, len(protoMsgs))
+	for i, msg := range protoMsgs {
+		m := llm.ChatMessage{
+			Role:       msg.Role,
+			Content:    msg.Content,
+			ToolCallID: msg.ToolCallId,
+		}
+		if msg.Name != nil {
+			m.Name = *msg.Name
+		}
+		if len(msg.ToolCalls) > 0 {
+			m.ToolCalls = make([]llm.ToolCallEntry, len(msg.ToolCalls))
+			for j, tc := range msg.ToolCalls {
+				m.ToolCalls[j] = llm.ToolCallEntry{
+					ID:   tc.Id,
+					Type: tc.Type,
+				}
+				if tc.Function != nil {
+					m.ToolCalls[j].Function = llm.ToolCallFunction{
+						Name:      tc.Function.Name,
+						Arguments: tc.Function.Arguments,
+					}
+				}
+			}
+		}
+		msgs[i] = m
+	}
+	return msgs
+}
+
+func llmToolCallsToProto(toolCalls []llm.ToolCallEntry) []*agentv1.ToolCallEntry {
+	if len(toolCalls) == 0 {
+		return nil
+	}
+	result := make([]*agentv1.ToolCallEntry, len(toolCalls))
+	for i, tc := range toolCalls {
+		result[i] = &agentv1.ToolCallEntry{
+			Id:   tc.ID,
+			Type: tc.Type,
+			Function: &agentv1.ToolCallFunction{
+				Name:      tc.Function.Name,
+				Arguments: tc.Function.Arguments,
+			},
+		}
+	}
+	return result
+}
+
 func (s *GatewayServer) Complete(
 	ctx context.Context,
 	req *connect.Request[agentv1.CompleteRequest],
 ) (*connect.Response[agentv1.CompleteResponse], error) {
 	s.logger.Info("complete request", "model", req.Msg.Model, "messages", len(req.Msg.Messages))
 
-	messages := make([]llm.ChatMessage, len(req.Msg.Messages))
-	for i, msg := range req.Msg.Messages {
-		messages[i] = llm.ChatMessage{
-			Role:    msg.Role,
-			Content: msg.Content,
-		}
-	}
+	messages := protoMessagesToLLM(req.Msg.Messages)
 
 	if req.Msg.SystemPrompt != nil {
 		messages = append([]llm.ChatMessage{{
@@ -62,6 +137,7 @@ func (s *GatewayServer) Complete(
 		Messages:    messages,
 		Temperature: req.Msg.Temperature,
 		MaxTokens:   req.Msg.MaxTokens,
+		Tools:       protoToolsToLLM(req.Msg.Tools),
 	}
 
 	result, err := s.llmClient.Complete(ctx, llmReq)
@@ -74,15 +150,19 @@ func (s *GatewayServer) Complete(
 		return nil, connect.NewError(connect.CodeInternal, fmt.Errorf("no choices in response"))
 	}
 
+	choice := result.Choices[0]
+
 	resp := &agentv1.CompleteResponse{
 		Id:    result.ID,
 		Model: result.Model,
 		Message: &agentv1.ChatMessage{
-			Role:    result.Choices[0].Message.Role,
-			Content: result.Choices[0].Message.Content,
+			Role:    choice.Message.Role,
+			Content: choice.Message.Content,
 		},
 		PromptTokens:     result.Usage.PromptTokens,
 		CompletionTokens: result.Usage.CompletionTokens,
+		ToolCalls:        llmToolCallsToProto(choice.Message.ToolCalls),
+		FinishReason:     choice.FinishReason,
 	}
 
 	return connect.NewResponse(resp), nil
@@ -95,13 +175,7 @@ func (s *GatewayServer) StreamComplete(
 ) error {
 	s.logger.Info("stream complete request", "model", req.Msg.Model, "messages", len(req.Msg.Messages))
 
-	messages := make([]llm.ChatMessage, len(req.Msg.Messages))
-	for i, msg := range req.Msg.Messages {
-		messages[i] = llm.ChatMessage{
-			Role:    msg.Role,
-			Content: msg.Content,
-		}
-	}
+	messages := protoMessagesToLLM(req.Msg.Messages)
 
 	if req.Msg.SystemPrompt != nil {
 		messages = append([]llm.ChatMessage{{
@@ -115,9 +189,12 @@ func (s *GatewayServer) StreamComplete(
 		Messages:    messages,
 		Temperature: req.Msg.Temperature,
 		MaxTokens:   req.Msg.MaxTokens,
+		Tools:       protoToolsToLLM(req.Msg.Tools),
 	}
 
 	var streamID string
+	accumulatedToolCalls := make(map[int]*llm.ToolCallEntry)
+	var finishReason string
 
 	err := s.llmClient.StreamComplete(ctx, llmReq, func(chunk llm.StreamChunk) error {
 		if streamID == "" {
@@ -128,9 +205,37 @@ func (s *GatewayServer) StreamComplete(
 		done := false
 
 		if len(chunk.Choices) > 0 {
-			delta = chunk.Choices[0].Delta.Content
-			if chunk.Choices[0].FinishReason != nil {
+			choice := chunk.Choices[0]
+			delta = choice.Delta.Content
+
+			for _, tcDelta := range choice.Delta.ToolCalls {
+				existing, ok := accumulatedToolCalls[tcDelta.Index]
+				if !ok {
+					accumulatedToolCalls[tcDelta.Index] = &llm.ToolCallEntry{
+						ID:   tcDelta.ID,
+						Type: tcDelta.Type,
+						Function: llm.ToolCallFunction{
+							Name:      tcDelta.Function.Name,
+							Arguments: tcDelta.Function.Arguments,
+						},
+					}
+				} else {
+					if tcDelta.ID != "" {
+						existing.ID = tcDelta.ID
+					}
+					if tcDelta.Type != "" {
+						existing.Type = tcDelta.Type
+					}
+					if tcDelta.Function.Name != "" {
+						existing.Function.Name += tcDelta.Function.Name
+					}
+					existing.Function.Arguments += tcDelta.Function.Arguments
+				}
+			}
+
+			if choice.FinishReason != nil {
 				done = true
+				finishReason = *choice.FinishReason
 			}
 		}
 
@@ -143,6 +248,19 @@ func (s *GatewayServer) StreamComplete(
 		if chunk.Usage != nil {
 			resp.PromptTokens = chunk.Usage.PromptTokens
 			resp.CompletionTokens = chunk.Usage.CompletionTokens
+		}
+
+		if done {
+			resp.FinishReason = finishReason
+			if len(accumulatedToolCalls) > 0 {
+				toolCalls := make([]llm.ToolCallEntry, 0, len(accumulatedToolCalls))
+				for i := 0; i < len(accumulatedToolCalls); i++ {
+					if tc, ok := accumulatedToolCalls[i]; ok {
+						toolCalls = append(toolCalls, *tc)
+					}
+				}
+				resp.ToolCalls = llmToolCallsToProto(toolCalls)
+			}
 		}
 
 		return stream.Send(resp)

@@ -3,11 +3,12 @@ import { ConversationHistory } from "@/language/conversation.ts";
 import { TaskQueueManager } from "@/queue/manager.ts";
 import { ToolRegistry } from "@/tools/registry.ts";
 import { buildSystemPrompt, buildTaskPrompt } from "@/agent/prompt.ts";
-import { parseAgentResponse, formatToolResultForConversation } from "@/agent/parser.ts";
+import { toolsToNativeFormat } from "@/tools/schema.ts";
 import type { Task } from "@/queue/schema.ts";
 import type { ToolExecutionContext } from "@/tools/schema.ts";
 import type { AgentDatabase } from "@/storage/database.ts";
 import type { HookDispatcher } from "@/plugins/hooks.ts";
+import type { ToolCallEntry } from "@/language/schema.ts";
 
 const DEFAULT_MAX_ITERATIONS = 40;
 
@@ -60,6 +61,8 @@ export class AgentExecutionLoop {
     const conversation = new ConversationHistory(systemPrompt);
     const taskPrompt = buildTaskPrompt(task);
 
+    this.languageModelClient.setNativeTools(toolsToNativeFormat(this.toolRegistry.listTools()));
+
     const toolExecutionContext: ToolExecutionContext = {
       workingDirectory: this.workingDirectory,
     };
@@ -68,54 +71,43 @@ export class AgentExecutionLoop {
     let totalToolCalls = 0;
 
     try {
-      const completionResult = await this.languageModelClient.completeConversation(
+      let completionResult = await this.languageModelClient.completeConversation(
         conversation,
         taskPrompt,
       );
 
-      let currentResponse = completionResult.content;
-
       while (iterations < this.maxIterations) {
         iterations += 1;
-        const parsed = parseAgentResponse(currentResponse);
 
-        if (parsed.finalResult) {
-          this.taskQueueManager.completeTask(task.id, parsed.finalResult);
+        if (completionResult.finishReason !== "tool_calls" || completionResult.toolCalls.length === 0) {
+          const output = completionResult.content;
+          this.taskQueueManager.completeTask(task.id, output);
           return {
             taskId: task.id,
             success: true,
-            output: parsed.finalResult,
+            output,
             iterations,
             totalToolCalls,
           };
         }
 
-        if (parsed.toolCalls.length === 0) {
-          this.taskQueueManager.completeTask(task.id, currentResponse);
-          return {
-            taskId: task.id,
-            success: true,
-            output: currentResponse,
-            iterations,
-            totalToolCalls,
-          };
-        }
-
-        const toolResultMessages = await this.executeToolCalls(
-          parsed.toolCalls,
+        await this.executeToolCalls(
+          completionResult.toolCalls,
+          conversation,
           toolExecutionContext,
           task,
         );
 
-        totalToolCalls += parsed.toolCalls.length;
-        const combinedToolResults = toolResultMessages.join("\n\n");
+        totalToolCalls += completionResult.toolCalls.length;
 
-        const nextCompletion = await this.languageModelClient.completeConversation(
-          conversation,
-          combinedToolResults,
-        );
+        const messages = conversation.getMessagesWithSystemPrompt();
+        completionResult = await this.languageModelClient.complete(messages);
 
-        currentResponse = nextCompletion.content;
+        if (completionResult.toolCalls.length > 0) {
+          conversation.addAssistantToolCallMessage(completionResult.content, completionResult.toolCalls);
+        } else {
+          conversation.addAssistantMessage(completionResult.content);
+        }
       }
 
       const timeoutMessage = `task reached maximum iterations (${this.maxIterations})`;
@@ -149,38 +141,44 @@ export class AgentExecutionLoop {
   }
 
   private async executeToolCalls(
-    toolCalls: { name: string; parameters: Record<string, unknown> }[],
+    toolCalls: ToolCallEntry[],
+    conversation: ConversationHistory,
     context: ToolExecutionContext,
     task: Task,
-  ): Promise<string[]> {
-    const results: string[] = [];
-
+  ): Promise<void> {
     for (const toolCall of toolCalls) {
-      let parameters = toolCall.parameters;
-
-      if (this.hookDispatcher) {
-        parameters = await this.hookDispatcher.dispatchBeforeToolCall(toolCall.name, parameters);
+      let parameters: Record<string, unknown>;
+      try {
+        parameters = JSON.parse(toolCall.function.arguments);
+      } catch {
+        parameters = {};
       }
 
-      this.database.addTaskLog(task.id, "info", `calling tool: ${toolCall.name}`, {
+      if (this.hookDispatcher) {
+        parameters = await this.hookDispatcher.dispatchBeforeToolCall(toolCall.function.name, parameters);
+      }
+
+      this.database.addTaskLog(task.id, "info", `calling tool: ${toolCall.function.name}`, {
         parameters: JSON.stringify(parameters),
       });
 
-      const toolResult = await this.toolRegistry.executeTool(toolCall.name, parameters, context);
+      const toolResult = await this.toolRegistry.executeTool(toolCall.function.name, parameters, context);
 
       if (this.hookDispatcher) {
-        await this.hookDispatcher.dispatchAfterToolCall(toolCall.name, parameters, toolResult);
+        await this.hookDispatcher.dispatchAfterToolCall(toolCall.function.name, parameters, toolResult);
       }
 
       this.database.addTaskLog(
         task.id,
         toolResult.success ? "info" : "error",
-        `tool ${toolCall.name}: ${toolResult.success ? "success" : toolResult.error}`,
+        `tool ${toolCall.function.name}: ${toolResult.success ? "success" : toolResult.error}`,
       );
 
-      results.push(formatToolResultForConversation(toolCall.name, toolResult));
+      conversation.addToolResultMessage(
+        toolCall.id,
+        toolCall.function.name,
+        toolResult.success ? toolResult.output : (toolResult.error ?? toolResult.output),
+      );
     }
-
-    return results;
   }
 }

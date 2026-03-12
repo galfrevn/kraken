@@ -1,4 +1,4 @@
-import { MESSAGE_ROLE, type ConversationMessage } from "@/language/schema.ts";
+import { MESSAGE_ROLE, type ConversationMessage, type ToolCallEntry } from "@/language/schema.ts";
 
 export class ConversationHistory {
   private messages: ConversationMessage[] = [];
@@ -22,6 +22,19 @@ export class ConversationHistory {
 
   addAssistantMessage(content: string): void {
     this.messages.push({ role: MESSAGE_ROLE.assistant, content });
+  }
+
+  addAssistantToolCallMessage(content: string, toolCalls: ToolCallEntry[]): void {
+    this.messages.push({ role: MESSAGE_ROLE.assistant, content, toolCalls });
+  }
+
+  addToolResultMessage(toolCallId: string, toolName: string, content: string): void {
+    this.messages.push({
+      role: MESSAGE_ROLE.tool,
+      content,
+      toolCallId,
+      name: toolName,
+    });
   }
 
   getMessages(): ConversationMessage[] {

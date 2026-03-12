@@ -1,6 +1,6 @@
-import { resolve } from "node:path";
+import { resolve, dirname } from "node:path";
 import { homedir } from "node:os";
-import { mkdirSync, writeFileSync, existsSync } from "node:fs";
+import { mkdirSync, writeFileSync, existsSync, symlinkSync } from "node:fs";
 
 const KRAKEN_HOME = resolve(homedir(), ".kraken");
 const GITHUB_REPO = "galfrevn/kraken";
@@ -59,7 +59,10 @@ export function isPluginInstalled(pluginName: string): boolean {
 
 function checkCommandAvailable(command: string): boolean {
   try {
-    const result = Bun.spawnSync({ cmd: ["which", command], stdout: "pipe", stderr: "pipe" });
+    const cmd = process.platform === "win32"
+      ? ["cmd", "/c", "where", command]
+      : ["which", command];
+    const result = Bun.spawnSync({ cmd, stdout: "pipe", stderr: "pipe" });
     return result.exitCode === 0;
   } catch {
     return false;
@@ -72,6 +75,74 @@ export interface InstallResult {
   installPath: string;
   warnings: string[];
   error?: string;
+}
+
+export function ensureSdkResolvable(): void {
+  const pluginsDirectory = resolve(KRAKEN_HOME, "plugins");
+  const nodeModulesDir = resolve(pluginsDirectory, "node_modules", "@kraken");
+  const sdkLinkPath = resolve(nodeModulesDir, "sdk");
+
+  if (existsSync(sdkLinkPath)) return;
+
+  // Find the SDK package in the monorepo workspace
+  // Walk up from this file to find packages/sdk
+  let searchDir = dirname(dirname(dirname(dirname(__dirname)))); // apps/core -> project root
+  const candidates = [
+    resolve(searchDir, "packages", "sdk"),
+    resolve(searchDir, "..", "packages", "sdk"),
+  ];
+
+  // Also try resolving via require
+  let sdkSourcePath: string | undefined;
+  try {
+    const sdkIndex = require.resolve("@kraken/sdk");
+    // sdkIndex points to packages/sdk/src/index.ts, go up to packages/sdk
+    sdkSourcePath = dirname(dirname(sdkIndex));
+  } catch {
+    // fallback to candidates
+  }
+
+  if (!sdkSourcePath) {
+    for (const candidate of candidates) {
+      if (existsSync(resolve(candidate, "package.json"))) {
+        sdkSourcePath = candidate;
+        break;
+      }
+    }
+  }
+
+  if (!sdkSourcePath) return;
+
+  mkdirSync(nodeModulesDir, { recursive: true });
+
+  try {
+    // On Windows, directory symlinks may need elevated permissions.
+    // Try symlink first, fall back to junction (works without admin on Windows).
+    try {
+      symlinkSync(sdkSourcePath, sdkLinkPath, "junction");
+    } catch {
+      symlinkSync(sdkSourcePath, sdkLinkPath, "dir");
+    }
+  } catch {
+    // If symlink fails entirely, copy the SDK files instead
+    const srcDir = resolve(sdkSourcePath, "src");
+    if (existsSync(srcDir)) {
+      mkdirSync(sdkLinkPath, { recursive: true });
+      const sdkPkgJson = resolve(sdkSourcePath, "package.json");
+      if (existsSync(sdkPkgJson)) {
+        const { copyFileSync } = require("node:fs") as typeof import("node:fs");
+        copyFileSync(sdkPkgJson, resolve(sdkLinkPath, "package.json"));
+        const sdkSrcDir = resolve(sdkLinkPath, "src");
+        mkdirSync(sdkSrcDir, { recursive: true });
+        for (const file of ["index.ts", "types.ts"]) {
+          const src = resolve(srcDir, file);
+          if (existsSync(src)) {
+            copyFileSync(src, resolve(sdkSrcDir, file));
+          }
+        }
+      }
+    }
+  }
 }
 
 export async function installPluginFromRegistry(pluginName: string): Promise<InstallResult> {
@@ -87,6 +158,8 @@ export async function installPluginFromRegistry(pluginName: string): Promise<Ins
       error: `Plugin "${pluginName}" not found in registry. Available: ${registry.plugins.map((p) => p.name).join(", ")}`,
     };
   }
+
+  ensureSdkResolvable();
 
   const pluginDirectory = resolve(KRAKEN_HOME, "plugins", entry.name);
   const indexPath = resolve(pluginDirectory, "index.ts");

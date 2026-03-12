@@ -40,3 +40,44 @@ export function formatToolDefinitionsForPrompt(tools: Tool[]): string {
     })
     .join("\n\n");
 }
+
+export interface NativeToolParameter {
+  type: string;
+  description: string;
+}
+
+export interface NativeTool {
+  type: "function";
+  function: {
+    name: string;
+    description: string;
+    parameters: {
+      type: "object";
+      properties: Record<string, NativeToolParameter>;
+      required: string[];
+    };
+  };
+}
+
+export function toolsToNativeFormat(tools: Tool[]): NativeTool[] {
+  return tools.map((tool) => ({
+    type: "function" as const,
+    function: {
+      name: tool.definition.name,
+      description: tool.definition.description,
+      parameters: {
+        type: "object" as const,
+        properties: Object.fromEntries(
+          tool.definition.parameters.map((p) => [
+            p.name,
+            {
+              type: p.type,
+              description: p.description,
+            },
+          ]),
+        ),
+        required: tool.definition.parameters.filter((p) => p.required).map((p) => p.name),
+      },
+    },
+  }));
+}

@@ -415,7 +415,7 @@ export async function runCommand(prompt: string): Promise<void> {
   const { LanguageModelClient } = await import("@/language/client.ts");
   const { ConversationHistory } = await import("@/language/conversation.ts");
   const { buildSystemPrompt } = await import("@/agent/prompt.ts");
-  const { parseAgentResponse, formatToolResultForConversation } = await import("@/agent/parser.ts");
+  const { toolsToNativeFormat } = await import("@/tools/schema.ts");
 
   const { AgentDatabase } = await import("@/storage/database.ts");
   const database = new AgentDatabase(configuration.databasePath);
@@ -432,38 +432,37 @@ export async function runCommand(prompt: string): Promise<void> {
   const systemPrompt = buildSystemPrompt(toolRegistry.listTools());
   const conversation = new ConversationHistory(systemPrompt);
 
+  languageModelClient.setNativeTools(toolsToNativeFormat(toolRegistry.listTools()));
+
   const toolContext = { workingDirectory: configuration.repo };
 
   console.log(`\n  prompt: ${prompt}\n`);
 
   try {
-    const completionResult = await languageModelClient.completeConversation(conversation, prompt);
-
-    let currentResponse = completionResult.content;
+    let completionResult = await languageModelClient.completeConversation(conversation, prompt);
     let iterations = 0;
 
     while (iterations < 40) {
       iterations += 1;
-      const parsed = parseAgentResponse(currentResponse);
 
-      if (parsed.finalResult) {
-        console.log(`  result:\n${parsed.finalResult}\n`);
+      if (completionResult.finishReason !== "tool_calls" || completionResult.toolCalls.length === 0) {
+        console.log(`  response:\n${completionResult.content}\n`);
         break;
       }
 
-      if (parsed.toolCalls.length === 0) {
-        console.log(`  response:\n${currentResponse}\n`);
-        break;
-      }
+      for (const toolCall of completionResult.toolCalls) {
+        console.log(`  ⚡ ${toolCall.function.name}`);
 
-      const toolResultMessages: string[] = [];
-
-      for (const toolCall of parsed.toolCalls) {
-        console.log(`  ⚡ ${toolCall.name}`);
+        let parameters: Record<string, unknown>;
+        try {
+          parameters = JSON.parse(toolCall.function.arguments);
+        } catch {
+          parameters = {};
+        }
 
         const toolResult = await toolRegistry.executeTool(
-          toolCall.name,
-          toolCall.parameters,
+          toolCall.function.name,
+          parameters,
           toolContext,
         );
 
@@ -474,12 +473,21 @@ export async function runCommand(prompt: string): Promise<void> {
             : toolResult.output;
         console.log(`    ${icon} ${preview}`);
 
-        toolResultMessages.push(formatToolResultForConversation(toolCall.name, toolResult));
+        conversation.addToolResultMessage(
+          toolCall.id,
+          toolCall.function.name,
+          toolResult.success ? toolResult.output : (toolResult.error ?? toolResult.output),
+        );
       }
 
-      const combined = toolResultMessages.join("\n\n");
-      const next = await languageModelClient.completeConversation(conversation, combined);
-      currentResponse = next.content;
+      const messages = conversation.getMessagesWithSystemPrompt();
+      completionResult = await languageModelClient.complete(messages);
+
+      if (completionResult.toolCalls.length > 0) {
+        conversation.addAssistantToolCallMessage(completionResult.content, completionResult.toolCalls);
+      } else {
+        conversation.addAssistantMessage(completionResult.content);
+      }
     }
 
     const usage = languageModelClient.getTokenUsage();

@@ -2,8 +2,9 @@ import { LanguageModelClient } from "@core/language/client.ts";
 import { ConversationHistory } from "@core/language/conversation.ts";
 import { ToolRegistry } from "@core/tools/registry.ts";
 import { buildSystemPrompt, type PromptOptions } from "@core/agent/prompt.ts";
-import { parseAgentResponse, formatToolResultForConversation } from "@core/agent/parser.ts";
+import { toolsToNativeFormat } from "@core/tools/schema.ts";
 import type { ToolExecutionContext } from "@core/tools/schema.ts";
+import type { CompletionResult, ToolCallEntry } from "@core/language/schema.ts";
 import type { HookDispatcher } from "@core/plugins/hooks.ts";
 import type { PluginContext } from "@kraken/sdk";
 
@@ -34,6 +35,9 @@ export interface SerializedChatMessage {
 export interface SerializedConversationMessage {
   role: string;
   content: string;
+  toolCalls?: ToolCallEntry[];
+  toolCallId?: string;
+  name?: string;
 }
 
 export interface SerializedChatEngine {
@@ -78,6 +82,8 @@ export class ChatEngine {
 
     const systemPrompt = buildSystemPrompt(this.toolRegistry.listTools(), promptOptions);
     this.conversation = new ConversationHistory(systemPrompt);
+
+    this.languageModelClient.setNativeTools(toolsToNativeFormat(this.toolRegistry.listTools()));
   }
 
   setHookDispatcher(dispatcher: HookDispatcher, context: PluginContext): void {
@@ -176,6 +182,9 @@ export class ChatEngine {
       conversationMessages: this.conversation.getMessages().map((message) => ({
         role: message.role,
         content: message.content,
+        toolCalls: message.toolCalls,
+        toolCallId: message.toolCallId,
+        name: message.name,
       })),
     };
   }
@@ -195,7 +204,17 @@ export class ChatEngine {
       if (conversationMessage.role === "user") {
         this.conversation.addUserMessage(conversationMessage.content);
       } else if (conversationMessage.role === "assistant") {
-        this.conversation.addAssistantMessage(conversationMessage.content);
+        if (conversationMessage.toolCalls && conversationMessage.toolCalls.length > 0) {
+          this.conversation.addAssistantToolCallMessage(conversationMessage.content, conversationMessage.toolCalls);
+        } else {
+          this.conversation.addAssistantMessage(conversationMessage.content);
+        }
+      } else if (conversationMessage.role === "tool") {
+        this.conversation.addToolResultMessage(
+          conversationMessage.toolCallId ?? "",
+          conversationMessage.name ?? "",
+          conversationMessage.content,
+        );
       }
     }
 
@@ -241,7 +260,7 @@ export class ChatEngine {
     ]);
   }
 
-  private async getResponse(inputMessage: string): Promise<string> {
+  private async getResponse(inputMessage: string): Promise<CompletionResult> {
     this.checkCancelled();
 
     this.pushMessage({
@@ -252,7 +271,7 @@ export class ChatEngine {
     });
 
     try {
-      const fullContent = await this.languageModelClient.streamConversation(
+      const completionResult = await this.languageModelClient.streamConversation(
         this.conversation,
         inputMessage,
         (delta) => {
@@ -273,62 +292,18 @@ export class ChatEngine {
       this.updateLastMessage((message) => ({
         ...message,
         streaming: false,
-        rawContent: fullContent,
+        rawContent: completionResult.content,
       }));
 
-      if (!fullContent.trim()) {
+      if (!completionResult.content.trim() && completionResult.toolCalls.length === 0) {
         this.removeLastMessage();
       }
 
-      return fullContent;
+      return completionResult;
     } catch (streamError) {
       this.removeLastMessage();
       throw streamError;
     }
-  }
-
-  private async continueResponse(): Promise<string | undefined> {
-    this.checkCancelled();
-
-    try {
-      const continuationContent = await this.languageModelClient.streamConversation(
-        this.conversation,
-        "Your previous response was truncated. Continue exactly from where you stopped — if you were mid-tool_call, complete that tag first.",
-        (delta) => {
-          if (this.abortController?.signal.aborted) return;
-
-          this.updateLastMessage((message) => ({
-            ...message,
-            content: message.content + delta.content,
-            streaming: !delta.done,
-          }));
-        },
-        undefined,
-        this.abortController?.signal,
-      );
-
-      this.updateLastMessage((message) => ({
-        ...message,
-        streaming: false,
-      }));
-
-      return continuationContent;
-    } catch {
-      return undefined;
-    }
-  }
-
-  private cleanAssistantContent(rawContent: string): string {
-    return rawContent
-      .replace(/<tool_call>[\s\S]*?<\/tool_call>/g, "")
-      .replace(/<tool_call>[\s\S]*$/g, "")
-      .replace(/<function_calls>[\s\S]*?<\/function_calls>/g, "")
-      .replace(/<function_calls>[\s\S]*$/g, "")
-      .replace(/<tool_result[\s\S]*?<\/tool_result>/g, "")
-      .replace(/<tool_result[\s\S]*$/g, "")
-      .replace(/<thinking>[\s\S]*?<\/thinking>/g, "")
-      .replace(/<thinking>[\s\S]*$/g, "")
-      .trim();
   }
 
   async sendMessage(userInput: string): Promise<void> {
@@ -357,73 +332,55 @@ export class ChatEngine {
     }
 
     try {
-      let currentResponse = await this.getResponse(userInput);
+      let completionResult = await this.getResponse(userInput);
       let iterations = 0;
 
       while (iterations < MAX_ITERATIONS_PER_MESSAGE) {
         this.checkCancelled();
         iterations += 1;
-        let parsed = parseAgentResponse(currentResponse);
 
-        if (parsed.truncated) {
-          const continued = await this.continueResponse();
-          if (continued) {
-            currentResponse = currentResponse + continued;
-            parsed = parseAgentResponse(currentResponse);
-          }
-        }
-
-        if (parsed.finalResult) {
-          this.updateLastMessage((message) => ({
-            ...message,
-            content: parsed.finalResult ?? message.content,
-            rawContent: currentResponse,
-          }));
+        if (completionResult.finishReason !== "tool_calls" || completionResult.toolCalls.length === 0) {
           break;
         }
 
-        if (parsed.toolCalls.length === 0) {
-          const cleaned = this.cleanAssistantContent(currentResponse);
-          if (cleaned && cleaned !== currentResponse) {
-            this.updateLastMessage((message) => ({
-              ...message,
-              content: cleaned,
-              rawContent: currentResponse,
-            }));
-          }
-          break;
+        // Only remove the assistant message if it has no visible text content
+        const lastMsg = this.messages[this.messages.length - 1];
+        if (lastMsg && lastMsg.role === "assistant" && !lastMsg.content.trim()) {
+          this.removeLastMessage();
         }
 
-        this.removeLastMessage();
-
-        const toolResultMessages: string[] = [];
-
-        for (const toolCall of parsed.toolCalls) {
+        for (const toolCall of completionResult.toolCalls) {
           this.checkCancelled();
 
-          let parameters = toolCall.parameters;
+          let parameters: Record<string, unknown>;
+          try {
+            parameters = JSON.parse(toolCall.function.arguments);
+          } catch {
+            parameters = {};
+          }
+
           if (this.hookDispatcher) {
-            parameters = await this.hookDispatcher.dispatchBeforeToolCall(toolCall.name, parameters);
+            parameters = await this.hookDispatcher.dispatchBeforeToolCall(toolCall.function.name, parameters);
           }
 
           this.pushMessage({
             role: "tool_call",
             content: JSON.stringify(parameters, null, 2),
-            toolName: toolCall.name,
+            toolName: toolCall.function.name,
             timestamp: new Date(),
           });
 
           try {
             const toolResult = await this.raceWithAbort(
               this.toolRegistry.executeTool(
-                toolCall.name,
+                toolCall.function.name,
                 parameters,
                 toolContext,
               ),
             );
 
             if (this.hookDispatcher) {
-              await this.hookDispatcher.dispatchAfterToolCall(toolCall.name, parameters, toolResult);
+              await this.hookDispatcher.dispatchAfterToolCall(toolCall.function.name, parameters, toolResult);
             }
 
             const resultPreview = toolResult.output.length > 500
@@ -433,13 +390,15 @@ export class ChatEngine {
             this.pushMessage({
               role: "tool_result",
               content: resultPreview,
-              toolName: toolCall.name,
+              toolName: toolCall.function.name,
               toolSuccess: toolResult.success,
               timestamp: new Date(),
             });
 
-            toolResultMessages.push(
-              formatToolResultForConversation(toolCall.name, toolResult),
+            this.conversation.addToolResultMessage(
+              toolCall.id,
+              toolCall.function.name,
+              toolResult.success ? toolResult.output : (toolResult.error ?? toolResult.output),
             );
           } catch (toolError) {
             if (toolError instanceof CancelledError) throw toolError;
@@ -451,25 +410,21 @@ export class ChatEngine {
             this.pushMessage({
               role: "tool_result",
               content: toolErrorMessage,
-              toolName: toolCall.name,
+              toolName: toolCall.function.name,
               toolSuccess: false,
               timestamp: new Date(),
             });
 
-            toolResultMessages.push(
-              formatToolResultForConversation(toolCall.name, {
-                success: false,
-                output: "",
-                error: toolErrorMessage,
-              }),
+            this.conversation.addToolResultMessage(
+              toolCall.id,
+              toolCall.function.name,
+              toolErrorMessage,
             );
           }
         }
 
-        const combinedResults = toolResultMessages.join("\n\n");
-
         try {
-          currentResponse = await this.getResponse(combinedResults);
+          completionResult = await this.getResponseContinuation();
         } catch (followUpError) {
           if (followUpError instanceof CancelledError) throw followUpError;
           this.pushMessage({
@@ -528,6 +483,46 @@ export class ChatEngine {
       if (this.messageQueue.length > 0) {
         queueMicrotask(() => this.processNextInQueue());
       }
+    }
+  }
+
+  private async getResponseContinuation(): Promise<CompletionResult> {
+    this.checkCancelled();
+
+    this.pushMessage({
+      role: "assistant",
+      content: "",
+      timestamp: new Date(),
+      streaming: true,
+    });
+
+    try {
+      const messages = this.conversation.getMessagesWithSystemPrompt();
+      const completionResult = await this.languageModelClient.complete(messages);
+
+      this.checkCancelled();
+
+      if (completionResult.toolCalls.length > 0) {
+        this.conversation.addAssistantToolCallMessage(completionResult.content, completionResult.toolCalls);
+      } else {
+        this.conversation.addAssistantMessage(completionResult.content);
+      }
+
+      this.updateLastMessage((message) => ({
+        ...message,
+        content: completionResult.content,
+        streaming: false,
+        rawContent: completionResult.content,
+      }));
+
+      if (!completionResult.content.trim() && completionResult.toolCalls.length === 0) {
+        this.removeLastMessage();
+      }
+
+      return completionResult;
+    } catch (error) {
+      this.removeLastMessage();
+      throw error;
     }
   }
 

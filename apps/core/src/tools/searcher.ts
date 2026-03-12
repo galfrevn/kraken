@@ -2,6 +2,7 @@ import { $ } from "bun";
 import type { Tool, ToolResult, ToolExecutionContext } from "@/tools/schema.ts";
 
 const MAX_RESULT_LINES = 100;
+const IS_WINDOWS = process.platform === "win32";
 
 export const searchFilesTool: Tool = {
   definition: {
@@ -48,7 +49,9 @@ export const searchFilesTool: Tool = {
     const fullCommand = commandParts.join(" ");
 
     try {
-      const result = await $`sh -c ${fullCommand}`.cwd(context.workingDirectory).quiet().nothrow();
+      const result = IS_WINDOWS
+        ? await $`cmd /c ${fullCommand}`.cwd(context.workingDirectory).quiet().nothrow()
+        : await $`sh -c ${fullCommand}`.cwd(context.workingDirectory).quiet().nothrow();
 
       const output = result.stdout.toString().trim();
 

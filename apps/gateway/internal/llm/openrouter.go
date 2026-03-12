@@ -15,9 +15,34 @@ import (
 const defaultBaseURL = "https://openrouter.ai/api/v1"
 const defaultModel = "deepseek/deepseek-v3.2"
 
+type ToolFunction struct {
+	Name        string      `json:"name"`
+	Description string      `json:"description"`
+	Parameters  interface{} `json:"parameters"`
+}
+
+type Tool struct {
+	Type     string       `json:"type"`
+	Function ToolFunction `json:"function"`
+}
+
+type ToolCallFunction struct {
+	Name      string `json:"name"`
+	Arguments string `json:"arguments"`
+}
+
+type ToolCallEntry struct {
+	ID       string           `json:"id"`
+	Type     string           `json:"type"`
+	Function ToolCallFunction `json:"function"`
+}
+
 type ChatMessage struct {
-	Role    string `json:"role"`
-	Content string `json:"content"`
+	Role       string          `json:"role"`
+	Content    string          `json:"content,omitempty"`
+	ToolCalls  []ToolCallEntry `json:"tool_calls,omitempty"`
+	ToolCallID string          `json:"tool_call_id,omitempty"`
+	Name       string          `json:"name,omitempty"`
 }
 
 type CompletionRequest struct {
@@ -26,10 +51,12 @@ type CompletionRequest struct {
 	Temperature *float32      `json:"temperature,omitempty"`
 	MaxTokens   *int32        `json:"max_tokens,omitempty"`
 	Stream      bool          `json:"stream"`
+	Tools       []Tool        `json:"tools,omitempty"`
 }
 
 type CompletionChoice struct {
-	Message ChatMessage `json:"message"`
+	Message      ChatMessage `json:"message"`
+	FinishReason string      `json:"finish_reason"`
 }
 
 type CompletionUsage struct {
@@ -108,8 +135,16 @@ func (c *Client) Complete(ctx context.Context, req CompletionRequest) (*Completi
 	return &completionResp, nil
 }
 
+type StreamToolCallDelta struct {
+	Index    int              `json:"index"`
+	ID       string           `json:"id,omitempty"`
+	Type     string           `json:"type,omitempty"`
+	Function ToolCallFunction `json:"function"`
+}
+
 type StreamDelta struct {
-	Content string `json:"content"`
+	Content   string                `json:"content"`
+	ToolCalls []StreamToolCallDelta `json:"tool_calls,omitempty"`
 }
 
 type StreamChoice struct {
@@ -118,9 +153,9 @@ type StreamChoice struct {
 }
 
 type StreamChunk struct {
-	ID      string         `json:"id"`
-	Model   string         `json:"model"`
-	Choices []StreamChoice `json:"choices"`
+	ID      string           `json:"id"`
+	Model   string           `json:"model"`
+	Choices []StreamChoice   `json:"choices"`
 	Usage   *CompletionUsage `json:"usage,omitempty"`
 }
 

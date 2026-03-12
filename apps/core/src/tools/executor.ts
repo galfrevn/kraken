@@ -9,6 +9,7 @@ import {
 
 const COMMAND_TIMEOUT_MILLISECONDS = 30_000;
 const OUTPUT_MAX_CHARACTERS = 16_000;
+const IS_WINDOWS = process.platform === "win32";
 
 export function createRunCommandTool(policyConfiguration?: CommandPolicyConfiguration): Tool {
   const policy = policyConfiguration ?? DEFAULT_COMMAND_POLICY;
@@ -17,10 +18,10 @@ export function createRunCommandTool(policyConfiguration?: CommandPolicyConfigur
     definition: {
       name: "run_command",
       description:
-        "Execute a shell command in the working directory. " +
-        "Commands are evaluated against a security policy: destructive operations (rm -rf /, sudo, " +
-        "system shutdown, etc.) are blocked. Prefer specific tools (read_file, edit_file, git_status) " +
-        "when available instead of raw shell commands. Has a 30 second timeout.",
+        "Execute a command in the working directory. " +
+        "Uses cmd on Windows and sh on Unix. " +
+        "Commands are evaluated against a security policy: destructive operations are blocked. " +
+        "Prefer specific tools (read_file, edit_file, git_status) when available. Has a 30 second timeout.",
       parameters: [
         {
           name: "command",
@@ -55,7 +56,9 @@ export function createRunCommandTool(policyConfiguration?: CommandPolicyConfigur
         policyResult.riskLevel === "dangerous" ? `⚠ risk: ${policyResult.reason}\n---\n` : "";
 
       try {
-        const commandPromise = $`sh -c ${command}`.cwd(context.workingDirectory).quiet().nothrow();
+        const commandPromise = IS_WINDOWS
+          ? $`cmd /c ${command}`.cwd(context.workingDirectory).quiet().nothrow()
+          : $`sh -c ${command}`.cwd(context.workingDirectory).quiet().nothrow();
 
         const timeoutPromise = new Promise<never>((_, reject) =>
           setTimeout(

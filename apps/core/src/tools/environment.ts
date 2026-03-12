@@ -1,6 +1,9 @@
 import { $ } from "bun";
 import { cpus, totalmem, freemem, hostname, homedir } from "node:os";
+import { delimiter } from "node:path";
 import type { Tool, ToolResult, ToolExecutionContext } from "@/tools/schema.ts";
+
+const IS_WINDOWS = process.platform === "win32";
 
 export const environmentTool: Tool = {
   definition: {
@@ -41,7 +44,7 @@ export const environmentTool: Tool = {
       { name: "rust", command: "rustc --version" },
       { name: "python", command: "python3 --version" },
       { name: "ruby", command: "ruby --version" },
-      { name: "java", command: "java --version 2>&1 | head -1" },
+      { name: "java", command: IS_WINDOWS ? "java --version 2>&1" : "java --version 2>&1 | head -1" },
     ];
 
     for (const check of runtimeChecks) {
@@ -66,7 +69,7 @@ export const environmentTool: Tool = {
       const value = process.env[varName];
       if (value) {
         const displayValue =
-          varName === "PATH" ? value.split(":").slice(0, 5).join(":") + " ..." : value;
+          varName === "PATH" ? value.split(delimiter).slice(0, 5).join(delimiter) + " ..." : value;
         sections.push(`  ${varName}: ${displayValue}`);
       }
     }
@@ -77,7 +80,9 @@ export const environmentTool: Tool = {
 
 async function safeCommand(command: string): Promise<string | null> {
   try {
-    const result = await $`sh -c ${command}`.quiet().nothrow();
+    const result = IS_WINDOWS
+      ? await $`cmd /c ${command}`.quiet().nothrow()
+      : await $`sh -c ${command}`.quiet().nothrow();
     if (result.exitCode !== 0) return null;
     const output = result.stdout.toString().trim();
     return output || null;

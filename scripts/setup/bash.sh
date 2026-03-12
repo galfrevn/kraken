@@ -105,9 +105,13 @@ cd "$PROJECT_ROOT"
 # -------------------------------------------------------------------
 step "setting up environment"
 
-if [ ! -f .env ]; then
-  cp "$PROJECT_ROOT/apps/cli/templates/env.example" .env
-  success "created .env from template"
+KRAKEN_HOME="$HOME/.kraken"
+mkdir -p "$KRAKEN_HOME"
+
+ENV_FILE="$KRAKEN_HOME/.env"
+if [ ! -f "$ENV_FILE" ]; then
+  cp "$PROJECT_ROOT/apps/cli/templates/env.example" "$ENV_FILE"
+  success "created ~/.kraken/.env from template"
 
   echo ""
   echo -e "   ${YELLOW}enter your OpenRouter API key (https://openrouter.ai/keys):${RESET}"
@@ -115,33 +119,34 @@ if [ ! -f .env ]; then
 
   if [ -n "$API_KEY" ]; then
     if [[ "$OSTYPE" == "darwin"* ]]; then
-      sed -i '' "s|^OPENROUTER_API_KEY=.*|OPENROUTER_API_KEY=$API_KEY|" .env
+      sed -i '' "s|^OPENROUTER_API_KEY=.*|OPENROUTER_API_KEY=$API_KEY|" "$ENV_FILE"
     else
-      sed -i "s|^OPENROUTER_API_KEY=.*|OPENROUTER_API_KEY=$API_KEY|" .env
+      sed -i "s|^OPENROUTER_API_KEY=.*|OPENROUTER_API_KEY=$API_KEY|" "$ENV_FILE"
     fi
-    success "API key saved to .env"
+    success "API key saved to ~/.kraken/.env"
   else
-    warn "no API key provided — edit .env manually before running kraken"
+    warn "no API key provided — edit ~/.kraken/.env manually before running kraken"
   fi
 else
-  success ".env already exists, skipping"
+  success "~/.kraken/.env already exists, skipping"
 fi
 
-if [ ! -f kraken.yml ]; then
-  cp "$PROJECT_ROOT/apps/cli/templates/kraken.example.yml" kraken.yml
+CONFIG_FILE="$KRAKEN_HOME/kraken.yml"
+if [ ! -f "$CONFIG_FILE" ]; then
+  cp "$PROJECT_ROOT/apps/cli/templates/kraken.example.yml" "$CONFIG_FILE"
 
   if [ -n "${API_KEY:-}" ]; then
     if [[ "$OSTYPE" == "darwin"* ]]; then
       sed -i '' "/^languageModel:/a\\
-\\  apiKey: $API_KEY" kraken.yml
+\\  apiKey: $API_KEY" "$CONFIG_FILE"
     else
-      sed -i "/^languageModel:/a\\  apiKey: $API_KEY" kraken.yml
+      sed -i "/^languageModel:/a\\  apiKey: $API_KEY" "$CONFIG_FILE"
     fi
   fi
 
-  success "created kraken.yml from template"
+  success "created ~/.kraken/kraken.yml from template"
 else
-  success "kraken.yml already exists, skipping"
+  success "~/.kraken/kraken.yml already exists, skipping"
 fi
 
 # -------------------------------------------------------------------

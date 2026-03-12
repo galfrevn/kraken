@@ -2,12 +2,16 @@ import { $ } from "bun";
 import type { Tool, ToolResult, ToolExecutionContext } from "@/tools/schema.ts";
 
 const GIT_TIMEOUT_MILLISECONDS = 15_000;
+const IS_WINDOWS = process.platform === "win32";
 
 async function runGitCommand(
   args: string,
   workingDirectory: string,
 ): Promise<{ stdout: string; stderr: string; exitCode: number }> {
-  const commandPromise = $`sh -c ${"git " + args}`.cwd(workingDirectory).quiet().nothrow();
+  const fullCommand = "git " + args;
+  const commandPromise = IS_WINDOWS
+    ? $`cmd /c ${fullCommand}`.cwd(workingDirectory).quiet().nothrow()
+    : $`sh -c ${fullCommand}`.cwd(workingDirectory).quiet().nothrow();
 
   const timeoutPromise = new Promise<never>((_, reject) =>
     setTimeout(() => reject(new Error("git command timed out")), GIT_TIMEOUT_MILLISECONDS),
@@ -147,11 +151,13 @@ export const gitCommitTool: Tool = {
         return { success: false, output: "", error: `git add failed: ${addResult.stderr}` };
       }
 
-      const escapedMessage = message.replace(/'/g, "'\\''");
-      const commitResult = await runGitCommand(
-        `commit -m '${escapedMessage}'`,
-        context.workingDirectory,
-      );
+      const escapedMessage = IS_WINDOWS
+        ? message.replace(/"/g, '\\"')
+        : message.replace(/'/g, "'\\''");
+      const quotedMessage = IS_WINDOWS
+        ? `commit -m "${escapedMessage}"`
+        : `commit -m '${escapedMessage}'`;
+      const commitResult = await runGitCommand(quotedMessage, context.workingDirectory);
 
       if (commitResult.exitCode !== 0) {
         return { success: false, output: "", error: commitResult.stderr || "git commit failed" };

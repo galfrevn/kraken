@@ -1,5 +1,6 @@
 export { ToolRegistry } from "@/tools/registry.ts";
-export { formatToolDefinitionsForPrompt } from "@/tools/schema.ts";
+export { formatToolDefinitionsForPrompt, toolsToNativeFormat } from "@/tools/schema.ts";
+export type { NativeTool } from "@/tools/schema.ts";
 
 export { readFileTool } from "@/tools/reader.ts";
 export { writeFileTool } from "@/tools/writer.ts";

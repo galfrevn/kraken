@@ -4,19 +4,19 @@ import { resolve } from "node:path";
 import { homedir } from "node:os";
 
 const KRAKEN_HOME = resolve(homedir(), ".kraken");
+const IS_WINDOWS = process.platform === "win32";
 
 let agentBrowserAvailable = false;
 
 async function runAgentBrowser(args: string[]): Promise<ToolResult> {
   try {
-    const process = Bun.spawn(["agent-browser", ...args], {
-      stdout: "pipe",
-      stderr: "pipe",
-    });
+    const spawnedProcess = IS_WINDOWS
+      ? Bun.spawn(["cmd", "/c", "agent-browser", ...args], { stdout: "pipe", stderr: "pipe" })
+      : Bun.spawn(["agent-browser", ...args], { stdout: "pipe", stderr: "pipe" });
 
-    const exitCode = await process.exited;
-    const stdout = await new Response(process.stdout).text();
-    const stderr = await new Response(process.stderr).text();
+    const exitCode = await spawnedProcess.exited;
+    const stdout = await new Response(spawnedProcess.stdout).text();
+    const stderr = await new Response(spawnedProcess.stderr).text();
 
     if (exitCode !== 0) {
       const errorOutput = stderr.trim() || stdout.trim() || `agent-browser exited with code ${exitCode}`;
@@ -26,7 +26,7 @@ async function runAgentBrowser(args: string[]): Promise<ToolResult> {
     return { success: true, output: stdout.trim() };
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
-    if (message.includes("ENOENT") || message.includes("not found")) {
+    if (message.includes("ENOENT") || message.includes("not found") || message.includes("program not foun")) {
       return {
         success: false,
         output: "agent-browser is not installed. Install it with: npm install -g agent-browser",
@@ -172,9 +172,72 @@ const browserCloseTool: Tool = {
   },
 };
 
+const browserSetupTool: Tool = {
+  definition: {
+    name: "browser_setup",
+    description:
+      "Install and set up agent-browser. Run this ONCE before using any other browser tools. " +
+      "Installs agent-browser globally via bun and runs the initial setup (downloads Chromium).",
+    parameters: [],
+  },
+  async execute(): Promise<ToolResult> {
+    const steps: string[] = [];
+
+    // Step 1: Install agent-browser globally
+    try {
+      const installCmd = IS_WINDOWS
+        ? ["cmd", "/c", "bun", "i", "-g", "agent-browser"]
+        : ["bun", "i", "-g", "agent-browser"];
+      const installProcess = Bun.spawn(installCmd, { stdout: "pipe", stderr: "pipe" });
+      const installExit = await installProcess.exited;
+      const installStdout = await new Response(installProcess.stdout).text();
+      const installStderr = await new Response(installProcess.stderr).text();
+
+      if (installExit !== 0) {
+        return {
+          success: false,
+          output: `Failed to install agent-browser: ${installStderr.trim() || installStdout.trim()}`,
+        };
+      }
+      steps.push("installed agent-browser globally");
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      return { success: false, output: `Failed to install agent-browser: ${message}` };
+    }
+
+    // Step 2: Run agent-browser install (downloads Chromium)
+    try {
+      const setupCmd = IS_WINDOWS
+        ? ["cmd", "/c", "agent-browser", "install"]
+        : ["agent-browser", "install"];
+      const setupProcess = Bun.spawn(setupCmd, { stdout: "pipe", stderr: "pipe" });
+      const setupExit = await setupProcess.exited;
+      const setupStdout = await new Response(setupProcess.stdout).text();
+      const setupStderr = await new Response(setupProcess.stderr).text();
+
+      if (setupExit !== 0) {
+        return {
+          success: false,
+          output: `agent-browser installed but setup failed: ${setupStderr.trim() || setupStdout.trim()}`,
+        };
+      }
+      steps.push("browser setup complete (Chromium downloaded)");
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      return { success: false, output: `agent-browser installed but setup failed: ${message}` };
+    }
+
+    agentBrowserAvailable = true;
+    return { success: true, output: steps.join("\n") };
+  },
+};
+
 function checkAgentBrowserInstalled(): boolean {
   try {
-    const result = Bun.spawnSync({ cmd: ["agent-browser", "--version"], stdout: "pipe", stderr: "pipe" });
+    const cmd = IS_WINDOWS
+      ? ["cmd", "/c", "agent-browser", "--version"]
+      : ["agent-browser", "--version"];
+    const result = Bun.spawnSync({ cmd, stdout: "pipe", stderr: "pipe" });
     return result.exitCode === 0;
   } catch {
     return false;
@@ -188,6 +251,7 @@ export default definePlugin({
   author: "kraken",
 
   toolDisplayNames: {
+    browser_setup: "Setup Browser",
     browser_open: "Open Browser",
     browser_snapshot: "Page Snapshot",
     browser_click: "Click Element",
@@ -198,6 +262,7 @@ export default definePlugin({
   },
 
   tools: [
+    browserSetupTool,
     browserOpenTool,
     browserSnapshotTool,
     browserClickTool,
@@ -209,12 +274,15 @@ export default definePlugin({
 
   promptExtension:
     "You have browser automation tools from the 'browser' plugin (powered by agent-browser). " +
+    "FIRST TIME SETUP: If browser tools fail with 'not installed' or 'program not found', call browser_setup first. " +
+    "It installs agent-browser and downloads Chromium. You only need to do this once.\n" +
     "Workflow: 1) browser_open to navigate to a URL. 2) browser_snapshot to get the page's accessibility tree with element refs like @e1, @e2. " +
     "3) Use browser_click, browser_type, or browser_fill with those refs to interact. 4) browser_snapshot again to verify the result. " +
     "5) browser_screenshot to capture the page. 6) browser_close when done.\n" +
     "IMPORTANT: Always call browser_snapshot before interacting with elements to get fresh refs. " +
     "Refs change after page navigation or dynamic content updates. " +
-    "Use browser_fill to replace input content, browser_type to append text.",
+    "Use browser_fill to replace input content, browser_type to append text.\n" +
+    "Documentation & troubleshooting: https://agent-browser.dev/",
 
   activate: async () => {
     agentBrowserAvailable = checkAgentBrowserInstalled();
