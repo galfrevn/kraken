@@ -176,6 +176,83 @@ export async function execute(_args: string[]): Promise<void> {
   p.log.success(`~/.kraken/.env`);
   p.log.success(`~/.kraken/plugins/`);
 
+  // --- Plugin installation step ---
+  let registryPlugins: { name: string; version: string; description: string; tools: string[]; requires: string[] }[] = [];
+
+  const pluginSpinner = p.spinner();
+  pluginSpinner.start("Fetching plugin registry...");
+
+  try {
+    const registryUrl = "https://raw.githubusercontent.com/galfrevn/kraken/main/packages/plugins/registry.json";
+    const response = await fetch(registryUrl, { signal: AbortSignal.timeout(10_000) });
+    if (response.ok) {
+      const registry = (await response.json()) as { plugins: typeof registryPlugins };
+      registryPlugins = registry.plugins;
+      pluginSpinner.stop(`Found ${registryPlugins.length} plugins`);
+    } else {
+      pluginSpinner.stop("Could not fetch plugin registry (skipping)");
+    }
+  } catch {
+    pluginSpinner.stop("Could not fetch plugin registry (skipping)");
+  }
+
+  if (registryPlugins.length > 0) {
+    const pluginChoices = registryPlugins.map((plugin) => ({
+      value: plugin.name,
+      label: plugin.name,
+      hint: plugin.description,
+    }));
+
+    const selectedPlugins = ensureCancel(await p.multiselect({
+      message: "Select plugins to install",
+      options: pluginChoices,
+      required: false,
+    }));
+
+    if (selectedPlugins.length > 0) {
+      const installSpinner = p.spinner();
+      installSpinner.start(`Installing ${selectedPlugins.length} plugin(s)...`);
+
+      const installed: string[] = [];
+      const failed: string[] = [];
+
+      for (const pluginName of selectedPlugins) {
+        const plugin = registryPlugins.find((pl) => pl.name === pluginName);
+        if (!plugin) continue;
+
+        try {
+          const sourceUrl = `https://raw.githubusercontent.com/galfrevn/kraken/main/packages/plugins/${pluginName}/index.ts`;
+          const sourceResponse = await fetch(sourceUrl, { signal: AbortSignal.timeout(15_000) });
+
+          if (sourceResponse.ok) {
+            const sourceCode = await sourceResponse.text();
+            const pluginDir = join(pluginsPath, pluginName);
+            mkdirSync(pluginDir, { recursive: true });
+            writeFileSync(join(pluginDir, "index.ts"), sourceCode, "utf-8");
+            installed.push(pluginName);
+          } else {
+            failed.push(pluginName);
+          }
+        } catch {
+          failed.push(pluginName);
+        }
+      }
+
+      installSpinner.stop("Plugins installed");
+
+      for (const name of installed) {
+        const plugin = registryPlugins.find((pl) => pl.name === name);
+        p.log.success(`${name} — ${plugin?.tools.length ?? 0} tools`);
+        if (plugin?.requires.length) {
+          p.log.warn(`  requires: ${plugin.requires.join(", ")}`);
+        }
+      }
+      for (const name of failed) {
+        p.log.error(`${name} — failed to download`);
+      }
+    }
+  }
+
   p.note(
     `Global config: ~/.kraken/kraken.yml\nPlugins:       ~/.kraken/plugins/\nDatabase:      ~/.kraken/agent.db\n\nKraken will use this config from any directory.`,
     "Global configuration",
