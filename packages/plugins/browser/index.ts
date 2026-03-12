@@ -246,7 +246,7 @@ function checkAgentBrowserInstalled(): boolean {
 
 export default definePlugin({
   name: "browser",
-  version: "0.1.0",
+  version: "0.2.0",
   description: "Browser automation using Vercel's agent-browser CLI. Open pages, take snapshots, click, type, fill forms, and take screenshots.",
   author: "kraken",
 
