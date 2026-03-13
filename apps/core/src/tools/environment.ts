@@ -8,10 +8,7 @@ const IS_WINDOWS = process.platform === "win32";
 export const environmentTool: Tool = {
   definition: {
     name: "environment",
-    description:
-      "Get information about the current system environment: OS, architecture, runtime versions, " +
-      "git user, available memory, disk space, and working directory. " +
-      "Useful for understanding the development environment and debugging platform-specific issues.",
+    description: "Get system environment info: OS, runtime versions, memory, disk.",
     parameters: [],
   },
 

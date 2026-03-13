@@ -14,9 +14,7 @@ function formatFileSize(bytes: number): string {
 export const globFilesTool: Tool = {
   definition: {
     name: "glob_files",
-    description:
-      "Find files matching a glob pattern. Useful for discovering project structure, finding files by extension, " +
-      "or locating specific files. Examples: '**/*.ts', 'src/**/*.test.ts', '**/package.json', '**/*.{ts,tsx}'.",
+    description: "Find files matching a glob pattern.",
     parameters: [
       {
         name: "pattern",

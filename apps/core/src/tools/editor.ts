@@ -4,11 +4,7 @@ import type { Tool, ToolResult, ToolExecutionContext } from "@/tools/schema.ts";
 export const editFileTool: Tool = {
   definition: {
     name: "edit_file",
-    description:
-      "Edit a file by replacing a specific string with new content. The old_string must match exactly " +
-      "(including whitespace and indentation). Use this instead of write_file when modifying existing files. " +
-      "To insert at the beginning, use an empty old_string with the first line as context. " +
-      "To delete content, provide the old_string and leave new_string empty.",
+    description: "Replace an exact string in a file. old_string must be unique.",
     parameters: [
       {
         name: "path",

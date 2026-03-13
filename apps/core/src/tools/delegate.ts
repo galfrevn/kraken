@@ -11,12 +11,7 @@ export function createDelegateTool(
   return {
     definition: {
       name: "delegate",
-      description:
-        "Delegate a task to a subagent with a clean context. " +
-        "The subagent gets its own conversation history and can use all tools. " +
-        "Use this for self-contained tasks that don't need the current conversation context, " +
-        "repetitive multi-file operations, or research tasks. " +
-        "Optionally specify a faster model for simple tasks.",
+      description: "Delegate a task to a subagent with a clean context.",
       parameters: [
         {
           name: "task",

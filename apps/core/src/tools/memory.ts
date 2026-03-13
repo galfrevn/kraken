@@ -30,15 +30,7 @@ export function createRememberTool(database: AgentDatabase): Tool {
   return {
     definition: {
       name: "remember",
-      description:
-        "Store a fact in persistent memory. Use this to remember important information " +
-        "about the project, user preferences, architectural decisions, conventions, or " +
-        "patterns discovered during conversations. Facts persist across sessions and " +
-        "can be recalled later with the recall tool. " +
-        "Categories: architecture (system design, structure), convention (coding style, naming), " +
-        "preference (user preferences, tool choices), dependency (libraries, versions), " +
-        "pattern (recurring patterns, idioms), decision (why something was done), " +
-        "context (project context, domain knowledge).",
+      description: "Store a fact in persistent memory. Persists across sessions.",
       parameters: [
         {
           name: "category",
@@ -121,11 +113,7 @@ export function createRecallTool(database: AgentDatabase): Tool {
   return {
     definition: {
       name: "recall",
-      description:
-        "Search persistent memory for previously stored facts about the project. " +
-        "Use this BEFORE making assumptions about the project's architecture, conventions, " +
-        "dependencies, or user preferences. Returns matching facts ranked by relevance. " +
-        "Call with an empty query and a category to browse all facts in that category.",
+      description: "Search persistent memory for stored facts.",
       parameters: [
         {
           name: "query",
@@ -206,11 +194,7 @@ export function createIndexProjectTool(database: AgentDatabase): Tool {
   return {
     definition: {
       name: "index_project",
-      description:
-        "Scan the project directory and store structural information in persistent memory. " +
-        "This analyzes the file tree, reads package manifests (package.json, Cargo.toml, go.mod), " +
-        "extracts key exports from source files, and stores everything as searchable facts. " +
-        "Run this when first working with a project or when the project structure has changed significantly.",
+      description: "Scan project structure and store in persistent memory.",
       parameters: [],
     },
 

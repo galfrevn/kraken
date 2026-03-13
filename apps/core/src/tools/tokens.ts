@@ -6,10 +6,7 @@ const MAX_INPUT_LENGTH = 500_000;
 export const countTokensTool: Tool = {
   definition: {
     name: "count_tokens",
-    description:
-      "Estimate the number of tokens in a text string. Uses a character-based approximation " +
-      "(~4 characters per token for English text). Useful for checking if content fits within " +
-      "context window limits before sending to the LLM.",
+    description: "Estimate token count in a text string (~4 chars/token).",
     parameters: [
       { name: "text", type: "string", description: "The text to count tokens for", required: true },
     ],

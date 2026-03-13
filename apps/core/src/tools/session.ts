@@ -14,21 +14,11 @@ export interface SessionCommandExecutor {
 
 export function createSessionCommandTool(executor: SessionCommandExecutor): Tool {
   const commandList = executor.listCommands();
-  const commandDescriptions = commandList
-    .map((cmd) => {
-      const destructiveTag = cmd.destructive ? " [destructive]" : "";
-      const argsTag = cmd.requiresArgs ? " <args>" : "";
-      return `  - ${cmd.name}${argsTag}: ${cmd.description}${destructiveTag}`;
-    })
-    .join("\n");
 
   return {
     definition: {
       name: "session_command",
-      description:
-        "Execute a session management command. Available commands:\n" +
-        commandDescriptions +
-        "\n\nDestructive commands require user confirmation via an approval panel.",
+      description: "Execute a session command. Commands: new, clear, delete, purge, rename, threads.",
       requiresConfirmation: true,
       parameters: [
         {

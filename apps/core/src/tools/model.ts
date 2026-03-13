@@ -144,10 +144,7 @@ export function createModelListTool(): Tool {
   return {
     definition: {
       name: "list_models",
-      description:
-        "List available models from OpenRouter. Optionally filter by a search query " +
-        "(e.g. 'deepseek', 'claude', 'gpt', 'gemini', 'llama'). " +
-        "Returns model IDs, context window size, and pricing.",
+      description: "List available models from OpenRouter.",
       parameters: [
         {
           name: "query",
@@ -181,11 +178,7 @@ export function createCurrentModelTool(languageModelClient: LanguageModelClient)
   return {
     definition: {
       name: "current_model",
-      description:
-        "Returns the model currently being used for inference. " +
-        "Also reads the kraken.yml config to show if there is a mismatch. " +
-        "Use this tool when the user asks what model you are using. " +
-        "This tool is read-only and will never change the model.",
+      description: "Get the current active LLM model. Read-only.",
       parameters: [],
     },
 
@@ -220,12 +213,7 @@ export function createModelSwitchTool(languageModelClient: LanguageModelClient):
   return {
     definition: {
       name: "switch_model",
-      description:
-        "Switch the active LLM model and persist the change to kraken.yml. " +
-        "ONLY use this when the user explicitly asks to change or switch models. " +
-        "To check the current model, use current_model instead. " +
-        "Model names follow the OpenRouter format: provider/model-name (e.g. deepseek/deepseek-v3.2, " +
-        "anthropic/claude-sonnet-4, openai/gpt-4o, google/gemini-2.5-pro).",
+      description: "Switch the active LLM model and persist to kraken.yml.",
       parameters: [
         {
           name: "model",

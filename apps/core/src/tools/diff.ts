@@ -6,10 +6,7 @@ const MAX_DIFF_LINES = 500;
 export const diffFilesTool: Tool = {
   definition: {
     name: "diff_files",
-    description:
-      "Compare two files and show the differences line by line. " +
-      "Produces unified diff-style output showing added (+), removed (-), and context lines. " +
-      "Useful for reviewing changes between versions of a file or comparing similar files.",
+    description: "Compare two files and show unified diff output.",
     parameters: [
       {
         name: "file_a",

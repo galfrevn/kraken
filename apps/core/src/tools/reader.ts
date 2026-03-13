@@ -6,8 +6,7 @@ const MAX_READ_CHARACTERS = 32_000;
 export const readFileTool: Tool = {
   definition: {
     name: "read_file",
-    description:
-      "Read the contents of a file at the given path, relative to the working directory.",
+    description: "Read file contents relative to working directory.",
     parameters: [
       {
         name: "path",

@@ -29,10 +29,7 @@ export function createAskQuestionTool(onQuestion: QuestionHandler): Tool {
   return {
     definition: {
       name: "ask_question",
-      description:
-        "Ask the user one or more questions with predefined options. Use this when you need clarification, choices, or preferences from the user. " +
-        "Send ALL related questions in a single call. Each question has a short title (for tab navigation), the question text, and options. " +
-        "The user can also type a free-text answer for any question. The user can dismiss with Esc (unanswered questions return '(no answer)').",
+      description: "Ask the user questions with predefined options.",
       parameters: [
         {
           name: "questions",

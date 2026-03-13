@@ -13,11 +13,7 @@ export function createScheduleCronTool(schedulerClient: SchedulerClient): Tool {
   return {
     definition: {
       name: "schedule_cron",
-      description:
-        "Schedule a recurring cron job. Uses standard cron expressions (e.g. '0 9 * * *' for daily at 9am, " +
-        "'*/30 * * * *' for every 30 minutes, '0 0 * * 1' for every Monday at midnight). " +
-        "The task_template defines what action runs when the cron triggers. " +
-        "For one-time events, use schedule_once instead.",
+      description: "Schedule a recurring cron job.",
       parameters: [
         {
           name: "name",
@@ -81,9 +77,7 @@ export function createListSchedulesTool(schedulerClient: SchedulerClient): Tool 
   return {
     definition: {
       name: "list_schedules",
-      description:
-        "List all scheduled recurring cron jobs. Shows their ID, name, cron expression, task, next run time, and enabled status. " +
-        "For one-time timers, use list_timers instead.",
+      description: "List all scheduled cron jobs.",
       parameters: [],
     },
 
@@ -123,9 +117,7 @@ export function createDeleteScheduleTool(schedulerClient: SchedulerClient): Tool
   return {
     definition: {
       name: "delete_schedule",
-      description:
-        "Delete a scheduled recurring cron job by its ID. Use list_schedules first to find the cron ID. " +
-        "For one-time timers, use cancel_timer instead.",
+      description: "Delete a scheduled cron job by ID.",
       parameters: [
         {
           name: "cron_id",
@@ -158,9 +150,7 @@ export function createScheduleWatcherTool(schedulerClient: SchedulerClient): Too
   return {
     definition: {
       name: "schedule_watcher",
-      description:
-        "Register a file watcher that triggers events when files change in specified directories. " +
-        "Common ignore patterns (node_modules, .git, dist) are included by default.",
+      description: "Register a file watcher on directories.",
       parameters: [
         {
           name: "name",
@@ -229,7 +219,7 @@ export function createDeleteWatcherTool(schedulerClient: SchedulerClient): Tool 
   return {
     definition: {
       name: "delete_watcher",
-      description: "Delete a registered file watcher by its ID.",
+      description: "Delete a file watcher by ID.",
       parameters: [
         {
           name: "watcher_id",

@@ -15,8 +15,7 @@ const SUPPORTED_FORMATS = new Set([
 export const viewImageTool: Tool = {
   definition: {
     name: "view_image",
-    description:
-      "View and analyze an image file. Returns the image metadata (dimensions, format, size) and base64-encoded data. Use this to inspect screenshots, diagrams, or any visual content the user shares.",
+    description: "View and analyze an image file. Returns metadata and encoded data.",
     parameters: [
       {
         name: "path",

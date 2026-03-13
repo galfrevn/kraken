@@ -63,10 +63,7 @@ function collectEntries(
 export const listDirectoryTool: Tool = {
   definition: {
     name: "list_directory",
-    description:
-      "List files and directories at the given path. Shows type (file/dir), relative path, and size. " +
-      "Use the depth parameter to list subdirectories recursively (default: 1, max: 5). " +
-      "Common directories like node_modules, .git, dist are excluded from recursive listing.",
+    description: "List files and directories. Supports recursive depth 1-5.",
     parameters: [
       {
         name: "path",

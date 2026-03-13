@@ -29,9 +29,7 @@ async function runGitCommand(
 export const gitStatusTool: Tool = {
   definition: {
     name: "git_status",
-    description:
-      "Show the current git repository status: branch name, staged/unstaged changes, untracked files. " +
-      "Use this before committing to see what has changed.",
+    description: "Show branch, staged/unstaged changes, and untracked files.",
     parameters: [],
   },
 
@@ -61,9 +59,7 @@ export const gitStatusTool: Tool = {
 export const gitDiffTool: Tool = {
   definition: {
     name: "git_diff",
-    description:
-      "Show git diff of changes. By default shows unstaged changes. " +
-      "Use staged=true to see staged changes. Optionally filter by file path.",
+    description: "Show git diff. Defaults to unstaged changes.",
     parameters: [
       {
         name: "path",
@@ -120,9 +116,7 @@ export const gitDiffTool: Tool = {
 export const gitCommitTool: Tool = {
   definition: {
     name: "git_commit",
-    description:
-      "Stage files and create a git commit. If no files are specified, stages all changes. " +
-      "Always run git_status first to review changes before committing.",
+    description: "Stage files and create a git commit.",
     parameters: [
       { name: "message", type: "string", description: "Commit message", required: true },
       {
@@ -174,7 +168,7 @@ export const gitCommitTool: Tool = {
 export const gitLogTool: Tool = {
   definition: {
     name: "git_log",
-    description: "Show recent git commit history. Returns commit hash, author, date, and message.",
+    description: "Show recent git commit history.",
     parameters: [
       {
         name: "count",

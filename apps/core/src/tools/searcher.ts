@@ -7,8 +7,7 @@ const IS_WINDOWS = process.platform === "win32";
 export const searchFilesTool: Tool = {
   definition: {
     name: "search_files",
-    description:
-      "Search for a text pattern in files using ripgrep. Returns matching lines with file paths and line numbers.",
+    description: "Search for a text pattern in files using ripgrep.",
     parameters: [
       {
         name: "pattern",

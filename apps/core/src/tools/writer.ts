@@ -7,8 +7,7 @@ import type { Tool, ToolResult, ToolExecutionContext } from "@/tools/schema.ts";
 export const writeFileTool: Tool = {
   definition: {
     name: "write_file",
-    description:
-      "Write content to a file at the given path, relative to the working directory. Creates parent directories if needed.",
+    description: "Write content to a file. Creates parent directories if needed.",
     parameters: [
       {
         name: "path",

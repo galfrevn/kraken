@@ -5,9 +5,7 @@ export function createTaskListTool(taskQueueManager: TaskQueueManager): Tool {
   return {
     definition: {
       name: "task_list",
-      description:
-        "List tasks in the agent's internal queue. Can filter by status: pending, running, completed, failed, cancelled. " +
-        "Shows task ID, title, status, priority, description, and creation time.",
+      description: "List tasks in the agent queue. Filterable by status.",
       parameters: [
         {
           name: "status",
@@ -105,11 +103,7 @@ export function createTaskSubmitTool(taskQueueManager: TaskQueueManager): Tool {
   return {
     definition: {
       name: "task_submit",
-      description:
-        "Submit a new task to the agent's internal queue for later execution. " +
-        "Use this to queue work that should be done separately, such as follow-up actions, " +
-        "background processing, or deferred operations. The 'prompt' field is critical — " +
-        "it contains the full instructions the agent will follow when executing the task.",
+      description: "Submit a new task to the agent queue for later execution.",
       parameters: [
         {
           name: "title",

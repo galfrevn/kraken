@@ -15,10 +15,7 @@ const BLOCKED_HOSTS = new Set([
 export const httpRequestTool: Tool = {
   definition: {
     name: "http_request",
-    description:
-      "Make an HTTP request to an external API or service. Supports GET, POST, PUT, PATCH, DELETE methods. " +
-      "Useful for interacting with REST APIs, checking service health, or sending data. " +
-      "Blocks requests to localhost and cloud metadata endpoints for security.",
+    description: "Make an HTTP request to an external API.",
     parameters: [
       {
         name: "url",

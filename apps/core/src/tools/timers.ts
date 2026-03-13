@@ -8,11 +8,7 @@ export function createScheduleOnceTool(timerManager: TimerManager): Tool {
   return {
     definition: {
       name: "schedule_once",
-      description:
-        "Schedule a one-time task to run at a specific time or after a delay. " +
-        "Use 'delay' for relative time (e.g. '5m', '2h', '30s') or 'at' for an absolute ISO datetime. " +
-        "When the timer fires, the task is automatically submitted to the task queue and the agent will execute the prompt. " +
-        "Maximum delay is 7 days. For recurring tasks, use schedule_cron instead.",
+      description: "Schedule a one-time task after a delay or at a specific time.",
       parameters: [
         {
           name: "title",
@@ -157,9 +153,7 @@ export function createListTimersTool(timerManager: TimerManager): Tool {
   return {
     definition: {
       name: "list_timers",
-      description:
-        "List all pending one-time timers. Shows their ID, title, description, scheduled time, and remaining time. " +
-        "For recurring cron jobs, use list_schedules instead.",
+      description: "List all pending one-time timers.",
       parameters: [],
     },
 
@@ -198,9 +192,7 @@ export function createCancelTimerTool(timerManager: TimerManager): Tool {
   return {
     definition: {
       name: "cancel_timer",
-      description:
-        "Cancel a pending one-time timer by its ID. Use list_timers first to find the timer ID. " +
-        "For recurring cron jobs, use delete_schedule instead.",
+      description: "Cancel a pending timer by ID.",
       parameters: [
         {
           name: "timer_id",

@@ -24,10 +24,7 @@ const EXTRACTORS: Record<string, (lines: string[]) => SymbolEntry[]> = {
 export const codeOutlineTool: Tool = {
   definition: {
     name: "code_outline",
-    description:
-      "Extract the structural outline of a source file: functions, classes, interfaces, types, and exports. " +
-      "Supports TypeScript, JavaScript, Python, Go, Rust, and Ruby. " +
-      "Useful for understanding file organization without reading the entire content.",
+    description: "Extract structural outline (functions, classes, types) from a source file.",
     parameters: [
       {
         name: "path",

@@ -5,9 +5,7 @@ import type { Tool, ToolResult, ToolExecutionContext } from "@/tools/schema.ts";
 export const deleteFileTool: Tool = {
   definition: {
     name: "delete_file",
-    description:
-      "Delete a file or empty directory. For safety, does not delete non-empty directories " +
-      "unless recursive is set to true. Cannot delete paths outside the working directory.",
+    description: "Delete a file or directory.",
     requiresConfirmation: true,
     parameters: [
       {
@@ -66,9 +64,7 @@ export const deleteFileTool: Tool = {
 export const moveFileTool: Tool = {
   definition: {
     name: "move_file",
-    description:
-      "Move or rename a file or directory. Creates parent directories for the destination if needed. " +
-      "Cannot move paths outside the working directory.",
+    description: "Move or rename a file or directory.",
     requiresConfirmation: true,
     parameters: [
       {
@@ -123,9 +119,7 @@ export const moveFileTool: Tool = {
 export const readLinesTool: Tool = {
   definition: {
     name: "read_lines",
-    description:
-      "Read a specific range of lines from a file. Useful for large files where reading " +
-      "the entire content would be too much. Line numbers are 1-based.",
+    description: "Read a specific line range from a file (1-based).",
     parameters: [
       { name: "path", type: "string", description: "Relative path to the file", required: true },
       {
@@ -183,10 +177,7 @@ export const readLinesTool: Tool = {
 export const replaceInFilesTool: Tool = {
   definition: {
     name: "replace_in_files",
-    description:
-      "Search and replace a string across multiple files matching a glob pattern. " +
-      "Shows a preview of changes before applying. Useful for renaming variables, " +
-      "updating imports, or batch text replacements.",
+    description: "Search and replace across files matching a glob pattern.",
     requiresConfirmation: true,
     parameters: [
       {

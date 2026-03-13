@@ -151,10 +151,7 @@ function formatSearchResults(results: SearchResult[], query: string): string {
 export const webSearchTool: Tool = {
   definition: {
     name: "web_search",
-    description:
-      "Search the web for information. Uses Brave Search API if BRAVE_SEARCH_API_KEY is configured, " +
-      "otherwise falls back to DuckDuckGo. Useful for looking up documentation, error messages, " +
-      "library APIs, current best practices, or any external information.",
+    description: "Search the web for information.",
     parameters: [
       {
         name: "query",
@@ -204,9 +201,7 @@ export const webSearchTool: Tool = {
 export const fetchUrlTool: Tool = {
   definition: {
     name: "fetch_url",
-    description:
-      "Fetch the content of a URL and extract readable text. Useful for reading documentation pages, " +
-      "blog posts, API references, or any web page content after finding it with web_search.",
+    description: "Fetch a URL and extract readable text.",
     parameters: [
       {
         name: "url",
