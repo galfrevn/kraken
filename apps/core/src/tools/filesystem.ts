@@ -1,4 +1,4 @@
-import { join, dirname, basename } from "node:path";
+import { join, resolve, dirname, basename } from "node:path";
 import { mkdirSync, rmSync, renameSync, statSync } from "node:fs";
 import type { Tool, ToolResult, ToolExecutionContext } from "@/tools/schema.ts";
 
@@ -8,6 +8,7 @@ export const deleteFileTool: Tool = {
     description:
       "Delete a file or empty directory. For safety, does not delete non-empty directories " +
       "unless recursive is set to true. Cannot delete paths outside the working directory.",
+    requiresConfirmation: true,
     parameters: [
       {
         name: "path",
@@ -30,9 +31,10 @@ export const deleteFileTool: Tool = {
   ): Promise<ToolResult> {
     const filePath = parameters["path"] as string;
     const recursive = parameters["recursive"] === true || parameters["recursive"] === "true";
-    const absolutePath = join(context.workingDirectory, filePath);
+    const normalizedWorkDir = resolve(context.workingDirectory);
+    const absolutePath = resolve(context.workingDirectory, filePath);
 
-    if (!absolutePath.startsWith(context.workingDirectory)) {
+    if (!absolutePath.startsWith(normalizedWorkDir)) {
       return { success: false, output: "", error: "cannot delete outside working directory" };
     }
 
@@ -67,6 +69,7 @@ export const moveFileTool: Tool = {
     description:
       "Move or rename a file or directory. Creates parent directories for the destination if needed. " +
       "Cannot move paths outside the working directory.",
+    requiresConfirmation: true,
     parameters: [
       {
         name: "source",
@@ -89,13 +92,14 @@ export const moveFileTool: Tool = {
   ): Promise<ToolResult> {
     const source = parameters["source"] as string;
     const destination = parameters["destination"] as string;
-    const absoluteSource = join(context.workingDirectory, source);
-    const absoluteDestination = join(context.workingDirectory, destination);
+    const normalizedWorkDir = resolve(context.workingDirectory);
+    const absoluteSource = resolve(context.workingDirectory, source);
+    const absoluteDestination = resolve(context.workingDirectory, destination);
 
-    if (!absoluteSource.startsWith(context.workingDirectory)) {
+    if (!absoluteSource.startsWith(normalizedWorkDir)) {
       return { success: false, output: "", error: "source path is outside working directory" };
     }
-    if (!absoluteDestination.startsWith(context.workingDirectory)) {
+    if (!absoluteDestination.startsWith(normalizedWorkDir)) {
       return { success: false, output: "", error: "destination path is outside working directory" };
     }
 
@@ -183,6 +187,7 @@ export const replaceInFilesTool: Tool = {
       "Search and replace a string across multiple files matching a glob pattern. " +
       "Shows a preview of changes before applying. Useful for renaming variables, " +
       "updating imports, or batch text replacements.",
+    requiresConfirmation: true,
     parameters: [
       {
         name: "pattern",
