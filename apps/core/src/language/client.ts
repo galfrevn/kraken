@@ -88,7 +88,7 @@ export class LanguageModelClient {
       temperature: options?.temperature ?? this.defaultTemperature,
       maxTokens: options?.maxTokens ?? this.defaultMaxTokens,
       systemPrompt,
-      tools: this.buildGatewayTools() ?? [],
+      tools: options?.noTools ? [] : (this.buildGatewayTools() ?? []),
     });
 
     this.tokenUsage.totalPromptTokens += response.promptTokens;
@@ -186,7 +186,7 @@ export class LanguageModelClient {
     let finishReason = "stop";
 
     const iterator = stream[Symbol.asyncIterator]();
-    const INACTIVITY_TIMEOUT_MILLISECONDS = 30_000;
+    const timeoutMs = options?.streamTimeoutMs ?? 60_000;
 
     let inactivityTimer: ReturnType<typeof setTimeout> | null = null;
     let inactivityReject: ((reason: Error) => void) | null = null;
@@ -195,7 +195,7 @@ export class LanguageModelClient {
       if (inactivityTimer !== null) clearTimeout(inactivityTimer);
       inactivityTimer = setTimeout(() => {
         if (inactivityReject) inactivityReject(new Error("stream inactivity timeout"));
-      }, INACTIVITY_TIMEOUT_MILLISECONDS);
+      }, timeoutMs);
     }
 
     if (signal) {
@@ -289,6 +289,7 @@ export class LanguageModelClient {
     const result = await this.complete(messages, {
       ...options,
       systemPrompt,
+      noTools: true,
     });
 
     return result.content;

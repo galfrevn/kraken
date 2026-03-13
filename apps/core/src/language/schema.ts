@@ -26,6 +26,8 @@ export interface CompletionOptions {
   temperature?: number;
   maxTokens?: number;
   systemPrompt?: string;
+  noTools?: boolean;
+  streamTimeoutMs?: number;
 }
 
 export interface CompletionResult {
