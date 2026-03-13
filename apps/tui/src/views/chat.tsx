@@ -1996,16 +1996,27 @@ function parseToolCallParams(content: string): Record<string, unknown> | null {
   }
 }
 
+// OpenTUI only bundles tree-sitter parsers for: javascript, typescript, markdown, zig.
+// Map other filetypes to the closest compatible parser for syntax highlighting.
 function detectFileType(filePath: string): string | undefined {
   const ext = filePath.split(".").pop()?.toLowerCase();
   const map: Record<string, string> = {
+    // Native parsers
     ts: "typescript", tsx: "typescript", js: "javascript", jsx: "javascript",
-    go: "go", rs: "rust", py: "python", rb: "ruby", java: "java",
-    json: "json", yaml: "yaml", yml: "yaml", toml: "toml",
-    md: "markdown", html: "html", css: "css", scss: "scss",
-    sql: "sql", sh: "bash", bash: "bash", zsh: "bash",
-    c: "c", cpp: "cpp", h: "c", hpp: "cpp",
-    proto: "protobuf", xml: "xml", dockerfile: "dockerfile",
+    md: "markdown", zig: "zig",
+    // JSON → javascript (compatible: strings, numbers, booleans, brackets)
+    json: "javascript",
+    // C-family → javascript (reasonable keyword/brace highlighting)
+    go: "javascript", rs: "javascript", java: "javascript",
+    c: "javascript", cpp: "javascript", h: "javascript", hpp: "javascript",
+    css: "javascript", scss: "javascript",
+    // Scripting → javascript
+    py: "javascript", rb: "javascript",
+    sh: "javascript", bash: "javascript", zsh: "javascript",
+    // Config/data → javascript (better than nothing)
+    yaml: "javascript", yml: "javascript", toml: "javascript",
+    sql: "javascript", html: "javascript", xml: "javascript",
+    proto: "javascript",
   };
   return ext ? map[ext] : undefined;
 }
