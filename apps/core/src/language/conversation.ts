@@ -1,11 +1,18 @@
 import { MESSAGE_ROLE, type ConversationMessage, type ToolCallEntry } from "@/language/schema.ts";
 
+export interface ConversationHistoryOptions {
+  maxMessages?: number;
+}
+
 export class ConversationHistory {
   private messages: ConversationMessage[] = [];
   private systemPrompt: string | undefined;
+  private options: ConversationHistoryOptions;
+  private summaryPrefix: string | undefined;
 
-  constructor(systemPrompt?: string) {
+  constructor(systemPrompt?: string, options?: ConversationHistoryOptions) {
     this.systemPrompt = systemPrompt;
+    this.options = options ?? {};
   }
 
   setSystemPrompt(prompt: string): void {
@@ -42,8 +49,22 @@ export class ConversationHistory {
   }
 
   getMessagesWithSystemPrompt(): ConversationMessage[] {
-    if (!this.systemPrompt) return this.getMessages();
-    return [{ role: MESSAGE_ROLE.system, content: this.systemPrompt }, ...this.messages];
+    const result: ConversationMessage[] = [];
+    if (this.systemPrompt) {
+      result.push({ role: MESSAGE_ROLE.system, content: this.systemPrompt });
+    }
+    if (this.summaryPrefix) {
+      result.push({
+        role: MESSAGE_ROLE.user,
+        content: `[Earlier conversation summary]\n${this.summaryPrefix}`,
+      });
+      result.push({
+        role: MESSAGE_ROLE.assistant,
+        content: "Understood, I have context from the earlier conversation.",
+      });
+    }
+    result.push(...this.messages);
+    return result;
   }
 
   getLastMessage(): ConversationMessage | undefined {
@@ -58,6 +79,27 @@ export class ConversationHistory {
     if (this.messages.length > count) {
       this.messages = this.messages.slice(-count);
     }
+  }
+
+  compactIfNeeded(): { didCompact: boolean; removedCount: number } {
+    const limit = this.options.maxMessages ?? 40;
+    if (this.messages.length <= limit) return { didCompact: false, removedCount: 0 };
+
+    const cutIndex = Math.floor(this.messages.length / 2);
+    const oldMessages = this.messages.slice(0, cutIndex);
+    this.messages = this.messages.slice(cutIndex);
+
+    const summaryLines: string[] = [];
+    for (const msg of oldMessages) {
+      if (msg.role === "user") {
+        summaryLines.push(`User: ${msg.content.slice(0, 200)}`);
+      } else if (msg.role === "assistant") {
+        summaryLines.push(`Assistant: ${msg.content.slice(0, 200)}`);
+      }
+    }
+
+    this.summaryPrefix = summaryLines.join("\n");
+    return { didCompact: true, removedCount: oldMessages.length };
   }
 
   clear(): void {
