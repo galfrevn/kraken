@@ -159,6 +159,7 @@ export class ChatEngine {
   private promptOptions: PromptOptions;
   private tokenUsage: TokenUsageSummary = { totalPromptTokens: 0, totalCompletionTokens: 0, requestCount: 0 };
   private debugLog: DebugLogEntry[] = [];
+  private logPersister?: (level: string, source: string, message: string) => void;
 
   constructor(
     languageModelClient: LanguageModelClient,
@@ -185,10 +186,15 @@ export class ChatEngine {
     if (this.debugLog.length > 500) {
       this.debugLog = this.debugLog.slice(-400);
     }
+    this.logPersister?.(level, source, message);
   }
 
   getDebugLog(): readonly DebugLogEntry[] {
     return this.debugLog;
+  }
+
+  setLogPersister(persister: (level: string, source: string, message: string) => void): void {
+    this.logPersister = persister;
   }
 
   setHookDispatcher(dispatcher: HookDispatcher, context: PluginContext): void {

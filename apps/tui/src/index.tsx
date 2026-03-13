@@ -147,6 +147,9 @@ export async function main(): Promise<void> {
     database,
   );
 
+  threadManager.setLogPersister((level, source, message) => {
+    database.addEngineLog(level, source, message);
+  });
   threadManager.setPluginPromptExtensions(() => pluginRegistry.getPromptExtensions());
   threadManager.setPluginHooks(hookDispatcher, { ...basePluginContext, config: {} });
 

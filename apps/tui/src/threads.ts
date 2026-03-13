@@ -67,6 +67,7 @@ export class ThreadManager {
   private promptExtensionsGetter: (() => string[]) | null = null;
   private hookDispatcher?: HookDispatcher;
   private pluginContext?: PluginContext;
+  private logPersister?: (level: string, source: string, message: string) => void;
   constructor(
     languageModelClient: LanguageModelClient,
     toolRegistry: ToolRegistry,
@@ -98,6 +99,10 @@ export class ThreadManager {
     for (const engine of this.threads.values()) {
       engine.setHookDispatcher(dispatcher, context);
     }
+  }
+
+  setLogPersister(persister: (level: string, source: string, message: string) => void): void {
+    this.logPersister = persister;
   }
 
   initialize(): void {
@@ -172,6 +177,10 @@ export class ThreadManager {
 
     if (this.hookDispatcher && this.pluginContext) {
       engine.setHookDispatcher(this.hookDispatcher, this.pluginContext);
+    }
+
+    if (this.logPersister) {
+      engine.setLogPersister(this.logPersister);
     }
 
     engine.addEventListener(() => {
@@ -586,6 +595,10 @@ export class ThreadManager {
 
         if (this.hookDispatcher && this.pluginContext) {
           engine.setHookDispatcher(this.hookDispatcher, this.pluginContext);
+        }
+
+        if (this.logPersister) {
+          engine.setLogPersister(this.logPersister);
         }
 
         const messageRows = this.database.getThreadMessages(row.id);
