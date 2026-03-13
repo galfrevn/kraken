@@ -11,6 +11,7 @@ import { COLORS } from "@/theme.ts";
 
 import type { ChatMessage, Plan, FileAttachment } from "@/engine.ts";
 import type { PendingQuestions, QuestionAnswer } from "@core/tools/question.ts";
+import type { PendingConfirmation, ConfirmationDecision } from "@core/tools/confirmation.ts";
 import type { ThreadManager } from "@/threads.ts";
 import type { PluginRegistry, LoadedPlugin } from "@core/plugins/registry.ts";
 import {
@@ -323,17 +324,18 @@ export function ChatView({ threadManager, focused, onRequestFocus, onRequestBlur
   const [currentPlan, setCurrentPlan] = useState<Plan | null>(null);
   const [inPlanMode, setInPlanMode] = useState(false);
   const [pendingQuestions, setPendingQuestions] = useState<PendingQuestions | null>(null);
+  const [pendingConfirmation, setPendingConfirmation] = useState<PendingConfirmation | null>(null);
 
   useEffect(() => {
-    onQuestionStateChange?.(pendingQuestions !== null);
-  }, [pendingQuestions, onQuestionStateChange]);
+    onQuestionStateChange?.(pendingQuestions !== null || pendingConfirmation !== null);
+  }, [pendingQuestions, pendingConfirmation, onQuestionStateChange]);
 
   const scrollboxRef = useRef<any>(null);
 
   useEffect(() => {
     const sb = scrollboxRef.current;
-    if (sb) sb.focusable = !pendingQuestions;
-  }, [pendingQuestions]);
+    if (sb) sb.focusable = !pendingQuestions && !pendingConfirmation;
+  }, [pendingQuestions, pendingConfirmation]);
 
   const lastEscapeTimestamp = useRef(0);
   const textareaReference = useRef<TextareaRenderable>(null);
@@ -415,6 +417,7 @@ export function ChatView({ threadManager, focused, onRequestFocus, onRequestBlur
     if (result.switchedThread) {
       setThreadTitle(threadManager.getActiveThreadTitle());
       setThreadCount(threadManager.getThreadCount());
+      setActiveThreadId(threadManager.getActiveThreadIdentifier());
       const newEngine = threadManager.getActiveEngine();
       setMessages([...newEngine.getMessages()]);
     }
@@ -521,6 +524,7 @@ export function ChatView({ threadManager, focused, onRequestFocus, onRequestBlur
   useKeyboard((key) => {
     if (dialogIsOpen) return;
     if (pendingQuestions) return;
+    if (pendingConfirmation) return;
 
     if (key.name === "c" && !focused) {
       const selection = renderer.getSelection();
@@ -655,6 +659,7 @@ export function ChatView({ threadManager, focused, onRequestFocus, onRequestBlur
     let currentEngineListener: ((messages: ChatMessage[]) => void) | null = null;
     let currentPlanListener: ((plan: Plan | null) => void) | null = null;
     let currentQuestionListener: ((q: PendingQuestions | null) => void) | null = null;
+    let currentConfirmationListener: ((c: PendingConfirmation | null) => void) | null = null;
     let currentEngine: ReturnType<typeof threadManager.getActiveEngine> | null = null;
     let previousMessageCount = 0;
     let streamingUpdateTimer: ReturnType<typeof setTimeout> | null = null;
@@ -751,9 +756,14 @@ export function ChatView({ threadManager, focused, onRequestFocus, onRequestBlur
         setPendingQuestions(q);
       };
 
+      currentConfirmationListener = (c: PendingConfirmation | null) => {
+        setPendingConfirmation(c);
+      };
+
       currentEngine.addEventListener(currentEngineListener);
       currentEngine.addPlanListener(currentPlanListener);
       currentEngine.addQuestionListener(currentQuestionListener);
+      currentEngine.addConfirmationListener(currentConfirmationListener);
       setMessages([...currentEngine.getMessages()]);
       setProcessing(currentEngine.isProcessing());
       setCurrentPlan(currentEngine.getPlan());
@@ -781,6 +791,9 @@ export function ChatView({ threadManager, focused, onRequestFocus, onRequestBlur
       }
       if (currentEngine && currentQuestionListener) {
         currentEngine.removeQuestionListener(currentQuestionListener);
+      }
+      if (currentEngine && currentConfirmationListener) {
+        currentEngine.removeConfirmationListener(currentConfirmationListener);
       }
       threadManager.offThreadChange(threadChangeListener);
     };
@@ -943,7 +956,15 @@ export function ChatView({ threadManager, focused, onRequestFocus, onRequestBlur
             ))}
           </box>
         ) : null}
-        {pendingQuestions ? (
+        {pendingConfirmation ? (
+          <ConfirmationPanel
+            confirmation={pendingConfirmation}
+            onResolve={(decision) => {
+              const eng = threadManager.getActiveEngine();
+              eng.resolveConfirmation(decision);
+            }}
+          />
+        ) : pendingQuestions ? (
           <QuestionPanel
             questions={pendingQuestions}
             onResolve={(answers) => {
@@ -1625,8 +1646,8 @@ function QuestionPanel({
                 ref={customInputRef}
                 initialValue={customTexts[activeStep] ?? ""}
                 placeholder="type your answer..."
-                fg={COLORS.text}
-                bg={COLORS.backgroundDeep}
+                textColor={COLORS.text}
+                backgroundColor={COLORS.backgroundDeep}
               />
             </box>
           ) : null}
@@ -1640,6 +1661,108 @@ function QuestionPanel({
           </text>
         </box>
       ) : null}
+    </box>
+  );
+}
+
+function ConfirmationPanel({
+  confirmation,
+  onResolve,
+}: {
+  confirmation: PendingConfirmation;
+  onResolve: (decision: ConfirmationDecision) => void;
+}) {
+  const [showReason, setShowReason] = useState(false);
+  const reasonRef = useRef<TextareaRenderable>(null);
+
+  useEffect(() => {
+    if (showReason) {
+      setTimeout(() => reasonRef.current?.focus(), 0);
+    }
+  }, [showReason]);
+
+  const approve = useCallback(() => {
+    onResolve({ approved: true });
+  }, [onResolve]);
+
+  const reject = useCallback((reason?: string) => {
+    onResolve({ approved: false, reason: reason || undefined });
+  }, [onResolve]);
+
+  useKeyboard((key) => {
+    if (showReason) {
+      if (key.name === "escape") {
+        setShowReason(false);
+      } else if (key.name === "return") {
+        const text = reasonRef.current?.plainText?.trim() ?? "";
+        reject(text);
+      }
+      return;
+    }
+
+    if (key.name === "y" || key.name === "return") {
+      approve();
+    } else if (key.name === "n") {
+      reject();
+    } else if (key.name === "r") {
+      setShowReason(true);
+    } else if (key.name === "escape") {
+      reject();
+    }
+  });
+
+  const paramEntries = Object.entries(confirmation.parameters);
+
+  return (
+    <box flexDirection="column" width="100%" flexShrink={0} backgroundColor={COLORS.inputBackground} padding={1}>
+      <box flexDirection="row" width="100%" paddingBottom={1}>
+        <text fg={COLORS.yellow}>{"⚠ "}</text>
+        <text fg={COLORS.text}><b>{"Tool requires confirmation"}</b></text>
+      </box>
+
+      <box flexDirection="row" width="100%" paddingBottom={1}>
+        <text fg={COLORS.textMuted}>{"tool: "}</text>
+        <text fg={COLORS.purple}><b>{confirmation.toolName}</b></text>
+      </box>
+
+      {paramEntries.length > 0 ? (
+        <box flexDirection="column" width="100%" paddingBottom={1}>
+          <text fg={COLORS.textMuted}>{"parameters:"}</text>
+          {paramEntries.map(([key, value], idx) => {
+            const valueStr = typeof value === "string" ? value : JSON.stringify(value);
+            const display = valueStr.length > 80 ? valueStr.slice(0, 77) + "..." : valueStr;
+            return (
+              <box key={idx} flexDirection="row" width="100%" paddingLeft={2}>
+                <text fg={COLORS.textSecondary}>{key + ": "}</text>
+                <text fg={COLORS.text}>{display}</text>
+              </box>
+            );
+          })}
+        </box>
+      ) : null}
+
+      {showReason ? (
+        <box flexDirection="column" width="100%" paddingTop={1}>
+          <text fg={COLORS.textMuted}>{"rejection reason:"}</text>
+          <box width="100%" height={2} paddingTop={1}>
+            <textarea
+              ref={reasonRef}
+              initialValue=""
+              placeholder="type reason (optional)..."
+              textColor={COLORS.text}
+              backgroundColor={COLORS.backgroundDeep}
+            />
+          </box>
+          <text>{""}</text>
+          <text fg={COLORS.textMuted}>{"enter reject with reason  esc cancel"}</text>
+        </box>
+      ) : (
+        <box flexDirection="row" width="100%" paddingTop={1} gap={2}>
+          <text fg={COLORS.green}><b>{"y/enter"}</b>{" approve"}</text>
+          <text fg={COLORS.red}><b>{"n/esc"}</b>{" reject"}</text>
+          <text fg={COLORS.textMuted}><b>{"r"}</b>{" reject with reason"}</text>
+        </box>
+      )}
     </box>
   );
 }
@@ -1917,6 +2040,22 @@ function ToolExpandedContent({ call, result, toolName }: { call: ChatMessage; re
   const params = parseToolCallParams(call.content);
   const resultContent = hasResult ? (result.rawContent ?? result.content) : "";
 
+  // Failed tool → always show error in red
+  if (!succeeded && hasResult && resultContent) {
+    return (
+      <box flexDirection="column" paddingLeft={2} width="100%">
+        {resultContent.split("\n").slice(0, 30).map((line, lineIndex) => (
+          <box key={lineIndex} width="100%">
+            <text fg={COLORS.red}>{line}</text>
+          </box>
+        ))}
+        {resultContent.split("\n").length > 30 ? (
+          <text fg={COLORS.red}>{"..."}</text>
+        ) : null}
+      </box>
+    );
+  }
+
   // edit_file → show diff
   if (toolName === "edit_file" && params) {
     const oldStr = params.old_string as string | undefined;
@@ -2059,7 +2198,7 @@ function ToolAccordion({ call, result }: { call: ChatMessage; result?: ChatMessa
   const isInProgress = !hasResult;
   const statusIcon = hasResult ? (succeeded ? "✓" : "✗") : "";
   const statusColor = hasResult ? (succeeded ? COLORS.green : COLORS.red) : COLORS.textMuted;
-  const [expanded, setExpanded] = useState(toolName === "edit_file");
+  const [expanded, setExpanded] = useState(toolName === "edit_file" || !succeeded);
   const summary = buildToolSummary(call);
 
   const imageResult = hasResult && succeeded ? parseImageResult(result.content) : null;

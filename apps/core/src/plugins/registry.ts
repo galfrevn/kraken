@@ -1,8 +1,20 @@
-import type { KrakenPlugin, Tool, PluginContext } from "@kraken/sdk";
+import type { KrakenPlugin, Tool, PluginContext, PluginConfigField } from "@kraken/sdk";
 import { resolvePluginPaths, type PluginEntry } from "@/plugins/resolver.ts";
 import { loadPlugin, PluginLoadError } from "@/plugins/loader.ts";
 import { ensureSdkResolvable } from "@/plugins/installer.ts";
 import { HookDispatcher } from "@/plugins/hooks.ts";
+
+export interface MissingConfigField {
+  fieldName: string;
+  field: PluginConfigField;
+}
+
+interface DeferredPlugin {
+  plugin: KrakenPlugin;
+  resolvedEntry: { entry: string; source: "local" | "npm"; config: Record<string, unknown> };
+  missing: MissingConfigField[];
+  baseContext: Omit<PluginContext, "config">;
+}
 
 export interface LoadedPlugin {
   plugin: KrakenPlugin;
@@ -16,14 +28,33 @@ export class PluginRegistry {
   private plugins: LoadedPlugin[] = [];
   private hookDispatcher = new HookDispatcher();
   private activated = false;
+  private deferredPlugins: DeferredPlugin[] = [];
+
+  static getMissingRequiredConfig(
+    plugin: KrakenPlugin,
+    config: Record<string, unknown>,
+  ): MissingConfigField[] {
+    if (!plugin.configSchema) return [];
+    const missing: MissingConfigField[] = [];
+    for (const [fieldName, field] of Object.entries(plugin.configSchema)) {
+      if (!field.required) continue;
+      const hasConfig = config[fieldName] !== undefined && config[fieldName] !== "";
+      const hasEnv = field.envVar ? !!process.env[field.envVar] : false;
+      if (!hasConfig && !hasEnv) {
+        missing.push({ fieldName, field });
+      }
+    }
+    return missing;
+  }
 
   async loadAll(
     entries: PluginEntry[],
     workingDirectory: string,
     baseContext: Omit<PluginContext, "config">,
-  ): Promise<{ loaded: string[]; failed: Array<{ entry: string; error: string }> }> {
+    deferActivation?: boolean,
+  ): Promise<{ loaded: string[]; failed: Array<{ entry: string; error: string }>; deferred: Array<{ name: string; missing: MissingConfigField[] }> }> {
     if (entries.length === 0) {
-      return { loaded: [], failed: [] };
+      return { loaded: [], failed: [], deferred: [] };
     }
 
     ensureSdkResolvable();
@@ -54,6 +85,18 @@ export class PluginRegistry {
           config: resolvedPlugin.config,
         };
 
+        const missingConfig = PluginRegistry.getMissingRequiredConfig(plugin, resolvedPlugin.config);
+
+        if (missingConfig.length > 0 && deferActivation) {
+          this.deferredPlugins.push({
+            plugin,
+            resolvedEntry: { entry: resolvedPlugin.entry, source: resolvedPlugin.source, config: resolvedPlugin.config },
+            missing: missingConfig,
+            baseContext,
+          });
+          continue;
+        }
+
         if (plugin.activate) {
           await plugin.activate(perPluginContext);
         }
@@ -80,6 +123,52 @@ export class PluginRegistry {
     }
 
     this.activated = true;
+    const deferred = this.deferredPlugins.map((d) => ({ name: d.plugin.name, missing: d.missing }));
+    return { loaded, failed, deferred };
+  }
+
+  getDeferredPlugins(): Array<{ name: string; missing: MissingConfigField[] }> {
+    return this.deferredPlugins.map((d) => ({ name: d.plugin.name, missing: d.missing }));
+  }
+
+  async activateDeferred(): Promise<{ loaded: string[]; failed: Array<{ name: string; error: string }> }> {
+    const loaded: string[] = [];
+    const failed: Array<{ name: string; error: string }> = [];
+
+    for (const deferred of this.deferredPlugins) {
+      try {
+        const perPluginContext: PluginContext = {
+          ...deferred.baseContext,
+          config: deferred.resolvedEntry.config,
+        };
+
+        // Re-check env vars for missing fields and merge into config
+        for (const { fieldName, field } of deferred.missing) {
+          if (field.envVar && process.env[field.envVar]) {
+            perPluginContext.config[fieldName] = process.env[field.envVar];
+          }
+        }
+
+        if (deferred.plugin.activate) {
+          await deferred.plugin.activate(perPluginContext);
+        }
+
+        this.hookDispatcher.register(deferred.plugin);
+        this.plugins.push({
+          plugin: deferred.plugin,
+          source: deferred.resolvedEntry.source,
+          entry: deferred.resolvedEntry.entry,
+          enabled: true,
+          pluginContext: perPluginContext,
+        });
+        loaded.push(deferred.plugin.name);
+      } catch (error) {
+        const message = error instanceof Error ? error.message : String(error);
+        failed.push({ name: deferred.plugin.name, error: message });
+      }
+    }
+
+    this.deferredPlugins = [];
     return { loaded, failed };
   }
 

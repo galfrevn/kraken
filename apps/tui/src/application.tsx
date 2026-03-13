@@ -12,6 +12,7 @@ import { TasksView } from "@/views/tasks.tsx";
 import { ReviewsView } from "@/views/reviews.tsx";
 import { LogsView } from "@/views/logs.tsx";
 import { ThreadSidebar } from "@/views/sidebar.tsx";
+import { SetupPanel, type SetupField } from "@/views/setup.tsx";
 
 const SIDEBAR_MIN_TERMINAL_WIDTH = 100;
 const SIDEBAR_WIDTH = 28;
@@ -45,12 +46,15 @@ interface ApplicationProps {
   threadManager: ThreadManager;
   pluginRegistry: PluginRegistry;
   pluginFailures?: PluginLoadFailure[];
+  pendingSetup?: SetupField[];
+  onSetupComplete?: () => void;
 }
 
-export function Application({ store, threadManager, pluginRegistry, pluginFailures }: ApplicationProps) {
+export function Application({ store, threadManager, pluginRegistry, pluginFailures, pendingSetup, onSetupComplete }: ApplicationProps) {
   const [activeView, setActiveView] = useState<ViewName>("chat");
   const [chatInputFocused, setChatInputFocused] = useState(true);
   const [hasQuestions, setHasQuestions] = useState(false);
+  const [setupDone, setSetupDone] = useState(!pendingSetup || pendingSetup.length === 0);
   const { width, height } = useTerminalDimensions();
 
   useEffect(() => {
@@ -155,6 +159,16 @@ export function Application({ store, threadManager, pluginRegistry, pluginFailur
         height={height}
         backgroundColor={COLORS.background}
       >
+        {!setupDone && pendingSetup && pendingSetup.length > 0 ? (
+          <SetupPanel
+            fields={pendingSetup}
+            onComplete={() => {
+              setSetupDone(true);
+              onSetupComplete?.();
+            }}
+          />
+        ) : (
+        <>
         <Header activeView={activeView} chatInputFocused={chatInputFocused} />
 
         <box flexGrow={1} padding={1} gap={1} flexDirection="row">
@@ -183,12 +197,14 @@ export function Application({ store, threadManager, pluginRegistry, pluginFailur
               <ReviewsView store={store} focused={activeView === "reviews"} />
             )}
             {activeView === "logs" && (
-              <LogsView store={store} focused={activeView === "logs"} />
+              <LogsView store={store} threadManager={threadManager} focused={activeView === "logs"} />
             )}
           </box>
         </box>
 
         <Footer activeView={activeView} chatInputFocused={chatInputFocused} />
+        </>
+        )}
       </box>
     </DialogProvider>
   );

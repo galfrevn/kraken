@@ -4,10 +4,11 @@ import { ToolRegistry } from "@core/tools/registry.ts";
 import { buildSystemPrompt, type PromptOptions } from "@core/agent/prompt.ts";
 import { toolsToNativeFormat } from "@core/tools/schema.ts";
 import type { ToolExecutionContext } from "@core/tools/schema.ts";
-import type { CompletionResult, ToolCallEntry } from "@core/language/schema.ts";
+import type { CompletionResult, ToolCallEntry, TokenUsageSummary } from "@core/language/schema.ts";
 import type { HookDispatcher } from "@core/plugins/hooks.ts";
 import type { PluginContext } from "@kraken/sdk";
 import type { PendingQuestions } from "@core/tools/question.ts";
+import type { ConfirmationDecision, PendingConfirmation } from "@core/tools/confirmation.ts";
 
 const MAX_ITERATIONS_PER_MESSAGE = 40;
 const CONTINUE_PROMPT = "Continue from where you left off. Complete any remaining steps without repeating what was already done.";
@@ -29,6 +30,13 @@ export interface ChatMessage {
   toolSuccess?: boolean;
   streaming?: boolean;
   attachments?: FileAttachment[];
+}
+
+export interface DebugLogEntry {
+  timestamp: Date;
+  level: "info" | "warn" | "error";
+  source: string;
+  message: string;
 }
 
 export interface PlanStep {
@@ -69,6 +77,12 @@ export interface SerializedPendingQuestions {
   items: import("@core/tools/question.ts").QuestionItem[];
 }
 
+export interface SerializedPendingConfirmation {
+  id: string;
+  toolName: string;
+  parameters: Record<string, unknown>;
+}
+
 export interface SerializedPlan {
   goal: string;
   steps: PlanStep[];
@@ -80,6 +94,7 @@ export interface SerializedChatEngine {
   messages: SerializedChatMessage[];
   conversationMessages: SerializedConversationMessage[];
   pendingQuestions?: SerializedPendingQuestions;
+  pendingConfirmation?: SerializedPendingConfirmation;
   plan?: SerializedPlan;
   planMode?: boolean;
 }
@@ -128,7 +143,11 @@ export class ChatEngine {
   private planListeners: Set<PlanListener> = new Set();
   private pendingQuestions: PendingQuestions | null = null;
   private questionListeners: Set<(q: PendingQuestions | null) => void> = new Set();
+  private pendingConfirmation: PendingConfirmation | null = null;
+  private confirmationListeners: Set<(c: PendingConfirmation | null) => void> = new Set();
   private promptOptions: PromptOptions;
+  private tokenUsage: TokenUsageSummary = { totalPromptTokens: 0, totalCompletionTokens: 0, requestCount: 0 };
+  private debugLog: DebugLogEntry[] = [];
 
   constructor(
     languageModelClient: LanguageModelClient,
@@ -145,6 +164,17 @@ export class ChatEngine {
     this.conversation = new ConversationHistory(systemPrompt);
 
     this.languageModelClient.setNativeTools(toolsToNativeFormat(this.toolRegistry.listTools()));
+  }
+
+  private log(level: DebugLogEntry["level"], source: string, message: string): void {
+    this.debugLog.push({ timestamp: new Date(), level, source, message });
+    if (this.debugLog.length > 500) {
+      this.debugLog = this.debugLog.slice(-400);
+    }
+  }
+
+  getDebugLog(): readonly DebugLogEntry[] {
+    return this.debugLog;
   }
 
   setHookDispatcher(dispatcher: HookDispatcher, context: PluginContext): void {
@@ -241,6 +271,97 @@ export class ChatEngine {
   resolveQuestions(answers: import("@core/tools/question.ts").QuestionAnswer[]): void {
     if (!this.pendingQuestions) return;
     this.pendingQuestions.resolve(answers);
+  }
+
+  getPendingConfirmation(): PendingConfirmation | null {
+    return this.pendingConfirmation;
+  }
+
+  addConfirmationListener(listener: (c: PendingConfirmation | null) => void): void {
+    this.confirmationListeners.add(listener);
+  }
+
+  removeConfirmationListener(listener: (c: PendingConfirmation | null) => void): void {
+    this.confirmationListeners.delete(listener);
+  }
+
+  private notifyConfirmationListeners(): void {
+    for (const listener of this.confirmationListeners) {
+      listener(this.pendingConfirmation);
+    }
+  }
+
+  resolveConfirmation(decision: ConfirmationDecision): void {
+    if (!this.pendingConfirmation) return;
+    this.pendingConfirmation.resolve(decision);
+  }
+
+  private requestConfirmation(toolName: string, parameters: Record<string, unknown>): Promise<ConfirmationDecision> {
+    return new Promise<ConfirmationDecision>((resolve, reject) => {
+      const id = Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
+
+      const onAbort = () => {
+        this.pendingConfirmation = null;
+        this.notifyConfirmationListeners();
+        reject(new CancelledError());
+      };
+
+      if (this.abortController?.signal.aborted) {
+        reject(new CancelledError());
+        return;
+      }
+
+      this.abortController?.signal.addEventListener("abort", onAbort, { once: true });
+
+      this.pendingConfirmation = {
+        id,
+        toolName,
+        parameters,
+        resolve: (decision) => {
+          this.abortController?.signal.removeEventListener("abort", onAbort);
+          this.pendingConfirmation = null;
+          this.notifyConfirmationListeners();
+          resolve(decision);
+        },
+      };
+      this.notifyConfirmationListeners();
+    });
+  }
+
+  private async executeToolWithConfirmation(
+    toolCall: ToolCallEntry,
+    parameters: Record<string, unknown>,
+    toolContext: ToolExecutionContext,
+  ): Promise<{ toolCall: ToolCallEntry; parameters: Record<string, unknown>; toolResult: import("@core/tools/schema.ts").ToolResult | null; error: string | null }> {
+    const tool = this.toolRegistry.getTool(toolCall.function.name);
+    if (tool?.definition.requiresConfirmation) {
+      const decision = await this.requestConfirmation(toolCall.function.name, parameters);
+      if (!decision.approved) {
+        const reason = decision.reason ? `: ${decision.reason}` : "";
+        return {
+          toolCall,
+          parameters,
+          toolResult: { success: false, output: "", error: `rejected by user${reason}` },
+          error: null,
+        };
+      }
+    }
+
+    try {
+      const toolResult = await this.raceWithAbort(
+        this.toolRegistry.executeTool(toolCall.function.name, parameters, toolContext),
+      );
+
+      if (this.hookDispatcher) {
+        await this.hookDispatcher.dispatchAfterToolCall(toolCall.function.name, parameters, toolResult);
+      }
+
+      return { toolCall, parameters, toolResult, error: null };
+    } catch (toolError) {
+      if (toolError instanceof CancelledError) throw toolError;
+      const toolErrorMessage = toolError instanceof Error ? toolError.message : String(toolError);
+      return { toolCall, parameters, toolResult: null, error: toolErrorMessage };
+    }
   }
 
   private notifyPlanListeners(): void {
@@ -380,35 +501,24 @@ export class ChatEngine {
       this.checkCancelled();
 
       const results = await Promise.all(
-        preparedCalls.map(async ({ toolCall, parameters }) => {
-          try {
-            const toolResult = await this.raceWithAbort(
-              this.toolRegistry.executeTool(toolCall.function.name, parameters, toolContext),
-            );
-
-            if (this.hookDispatcher) {
-              await this.hookDispatcher.dispatchAfterToolCall(toolCall.function.name, parameters, toolResult);
-            }
-
-            return { toolCall, parameters, toolResult, error: null };
-          } catch (toolError) {
-            if (toolError instanceof CancelledError) throw toolError;
-            const toolErrorMessage = toolError instanceof Error ? toolError.message : String(toolError);
-            return { toolCall, parameters, toolResult: null, error: toolErrorMessage };
-          }
-        }),
+        preparedCalls.map(({ toolCall, parameters }) =>
+          this.executeToolWithConfirmation(toolCall, parameters, toolContext),
+        ),
       );
 
       for (const { toolCall, toolResult, error } of results) {
         if (toolResult) {
-          const resultPreview = toolResult.output.length > 3000
-            ? toolResult.output.slice(0, 3000) + "..."
-            : toolResult.output;
+          const resultText = toolResult.success
+            ? toolResult.output
+            : (toolResult.error ?? toolResult.output);
+          const resultPreview = resultText.length > 3000
+            ? resultText.slice(0, 3000) + "..."
+            : resultText;
 
           this.pushMessage({
             role: "tool_result",
             content: resultPreview,
-            rawContent: toolResult.output,
+            rawContent: resultText,
             toolName: toolCall.function.name,
             toolSuccess: toolResult.success,
             timestamp: new Date(),
@@ -417,7 +527,7 @@ export class ChatEngine {
           this.conversation.addToolResultMessage(
             toolCall.id,
             toolCall.function.name,
-            toolResult.success ? toolResult.output : (toolResult.error ?? toolResult.output),
+            resultText,
           );
         } else {
           this.pushMessage({
@@ -520,6 +630,9 @@ export class ChatEngine {
       pendingQuestions: this.pendingQuestions
         ? { id: this.pendingQuestions.id, items: this.pendingQuestions.items }
         : undefined,
+      pendingConfirmation: this.pendingConfirmation
+        ? { id: this.pendingConfirmation.id, toolName: this.pendingConfirmation.toolName, parameters: this.pendingConfirmation.parameters }
+        : undefined,
       plan: this.currentPlan
         ? { goal: this.currentPlan.goal, steps: this.currentPlan.steps, status: this.currentPlan.status, feedback: this.currentPlan.feedback }
         : undefined,
@@ -582,6 +695,31 @@ export class ChatEngine {
         },
       };
       this.notifyQuestionListeners();
+    }
+
+    if (state.pendingConfirmation) {
+      const sc = state.pendingConfirmation;
+      this.pendingConfirmation = {
+        id: sc.id,
+        toolName: sc.toolName,
+        parameters: sc.parameters,
+        resolve: (decision) => {
+          const resultText = decision.approved
+            ? "approved by user"
+            : `rejected by user${decision.reason ? `: ${decision.reason}` : ""}`;
+          this.pendingConfirmation = null;
+          this.notifyConfirmationListeners();
+          this.pushMessage({
+            role: "tool_result",
+            content: resultText,
+            toolName: sc.toolName,
+            toolSuccess: decision.approved,
+            timestamp: new Date(),
+          });
+          this.conversation.addUserMessage(resultText);
+        },
+      };
+      this.notifyConfirmationListeners();
     }
 
     if (state.plan) {
@@ -698,6 +836,8 @@ export class ChatEngine {
         rawContent: reasoningPrefix + completionResult.content,
       }));
 
+      this.trackTokenUsage(completionResult);
+
       if (!completionResult.content.trim() && completionResult.toolCalls.length === 0) {
         this.removeLastMessage();
       }
@@ -732,7 +872,9 @@ export class ChatEngine {
     };
 
     if (this.hookDispatcher && this.pluginContext) {
-      await this.hookDispatcher.dispatchConversationStart(this.pluginContext).catch(() => {});
+      await this.hookDispatcher.dispatchConversationStart(this.pluginContext).catch((e: unknown) => {
+        this.log("warn", "hook", `conversationStart failed: ${e instanceof Error ? e.message : String(e)}`);
+      });
     }
 
     try {
@@ -798,44 +940,27 @@ export class ChatEngine {
 
         this.checkCancelled();
 
-        // Execute all tools in parallel
+        // Execute all tools in parallel (with confirmation checks)
         const results = await Promise.all(
-          preparedCalls.map(async ({ toolCall, parameters }) => {
-            try {
-              const toolResult = await this.raceWithAbort(
-                this.toolRegistry.executeTool(
-                  toolCall.function.name,
-                  parameters,
-                  toolContext,
-                ),
-              );
-
-              if (this.hookDispatcher) {
-                await this.hookDispatcher.dispatchAfterToolCall(toolCall.function.name, parameters, toolResult);
-              }
-
-              return { toolCall, parameters, toolResult, error: null };
-            } catch (toolError) {
-              if (toolError instanceof CancelledError) throw toolError;
-              const toolErrorMessage = toolError instanceof Error
-                ? toolError.message
-                : String(toolError);
-              return { toolCall, parameters, toolResult: null, error: toolErrorMessage };
-            }
-          }),
+          preparedCalls.map(({ toolCall, parameters }) =>
+            this.executeToolWithConfirmation(toolCall, parameters, toolContext),
+          ),
         );
 
         // Push results in order and add to conversation history
         for (const { toolCall, toolResult, error } of results) {
           if (toolResult) {
-            const resultPreview = toolResult.output.length > 3000
-              ? toolResult.output.slice(0, 3000) + "..."
-              : toolResult.output;
+            const resultText = toolResult.success
+              ? toolResult.output
+              : (toolResult.error ?? toolResult.output);
+            const resultPreview = resultText.length > 3000
+              ? resultText.slice(0, 3000) + "..."
+              : resultText;
 
             this.pushMessage({
               role: "tool_result",
               content: resultPreview,
-              rawContent: toolResult.output,
+              rawContent: resultText,
               toolName: toolCall.function.name,
               toolSuccess: toolResult.success,
               timestamp: new Date(),
@@ -844,8 +969,12 @@ export class ChatEngine {
             this.conversation.addToolResultMessage(
               toolCall.id,
               toolCall.function.name,
-              toolResult.success ? toolResult.output : (toolResult.error ?? toolResult.output),
+              resultText,
             );
+
+            if (!toolResult.success) {
+              this.log("error", "tool", `${toolCall.function.name}: ${resultText}`);
+            }
           } else {
             this.pushMessage({
               role: "tool_result",
@@ -855,6 +984,8 @@ export class ChatEngine {
               toolSuccess: false,
               timestamp: new Date(),
             });
+
+            this.log("error", "tool", `${toolCall.function.name} execution failed: ${error}`);
 
             this.conversation.addToolResultMessage(
               toolCall.id,
@@ -868,11 +999,13 @@ export class ChatEngine {
           completionResult = await this.getResponseContinuation();
         } catch (followUpError) {
           if (followUpError instanceof CancelledError) throw followUpError;
+          const errorDetail = followUpError instanceof Error ? followUpError.message : String(followUpError);
           this.pushMessage({
-            role: "status",
-            content: "could not get follow-up response",
+            role: "error",
+            content: `follow-up response failed: ${errorDetail}`,
             timestamp: new Date(),
           });
+          this.log("error", "llm", `follow-up response failed: ${errorDetail}`);
           break;
         }
       }
@@ -938,10 +1071,13 @@ export class ChatEngine {
           content: errorMessage,
           timestamp: new Date(),
         });
+        this.log("error", "engine", errorMessage);
       }
     } finally {
       if (this.hookDispatcher && this.pluginContext) {
-        await this.hookDispatcher.dispatchConversationEnd(this.pluginContext).catch(() => {});
+        await this.hookDispatcher.dispatchConversationEnd(this.pluginContext).catch((e: unknown) => {
+          this.log("warn", "hook", `conversationEnd failed: ${e instanceof Error ? e.message : String(e)}`);
+        });
       }
 
       this.processing = false;
@@ -968,6 +1104,7 @@ export class ChatEngine {
       this.conversation.compactIfNeeded();
       const messages = this.conversation.getMessagesWithSystemPrompt();
       const completionResult = await this.languageModelClient.complete(messages);
+      this.trackTokenUsage(completionResult);
 
       this.checkCancelled();
 
@@ -1017,7 +1154,13 @@ export class ChatEngine {
     this.emitImmediate();
   }
 
-  getTokenUsage() {
-    return this.languageModelClient.getTokenUsage();
+  private trackTokenUsage(result: CompletionResult): void {
+    this.tokenUsage.totalPromptTokens += result.promptTokens;
+    this.tokenUsage.totalCompletionTokens += result.completionTokens;
+    this.tokenUsage.requestCount += 1;
+  }
+
+  getTokenUsage(): TokenUsageSummary {
+    return { ...this.tokenUsage };
   }
 }

@@ -118,3 +118,37 @@ export async function loadConfiguration(_workingDirectory?: string): Promise<Age
 
   return validationResult.data;
 }
+
+export async function appendToGlobalEnvFile(key: string, value: string): Promise<void> {
+  const globalEnvPath = join(GLOBAL_KRAKEN_HOME, ".env");
+  let content = "";
+  if (await Bun.file(globalEnvPath).exists()) {
+    content = await Bun.file(globalEnvPath).text();
+  }
+
+  const lines = content.split("\n");
+  let found = false;
+  for (let i = 0; i < lines.length; i++) {
+    const trimmed = lines[i]!.trim();
+    if (!trimmed || trimmed.startsWith("#")) continue;
+    const equalsIndex = trimmed.indexOf("=");
+    if (equalsIndex === -1) continue;
+    const lineKey = trimmed.slice(0, equalsIndex).trim();
+    if (lineKey === key) {
+      lines[i] = `${key}=${value}`;
+      found = true;
+      break;
+    }
+  }
+
+  if (!found) {
+    if (content.length > 0 && !content.endsWith("\n")) {
+      lines.push(`${key}=${value}`);
+    } else {
+      lines.push(`${key}=${value}`);
+    }
+  }
+
+  await Bun.write(globalEnvPath, lines.join("\n"));
+  process.env[key] = value;
+}

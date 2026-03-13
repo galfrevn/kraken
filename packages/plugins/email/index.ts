@@ -18,7 +18,8 @@ const emailSendTool: Tool = {
   definition: {
     name: "email_send",
     description:
-      "Send an email via Resend. Without confirmed=true, shows a preview instead of sending. Always preview first, then confirm.",
+      "Send an email via Resend. The user will be prompted to confirm before sending.",
+    requiresConfirmation: true,
     parameters: [
       {
         name: "to",
@@ -44,13 +45,6 @@ const emailSendTool: Tool = {
         description: "Sender address. Overrides the default from_address.",
         required: false,
       },
-      {
-        name: "confirmed",
-        type: "boolean",
-        description:
-          "Set to true to actually send the email. Without this, a preview is shown.",
-        required: false,
-      },
     ],
   },
 
@@ -59,7 +53,6 @@ const emailSendTool: Tool = {
     const subject = parameters["subject"] as string;
     const body = parameters["body"] as string;
     const from = (parameters["from"] as string) || defaultFrom;
-    const confirmed = parameters["confirmed"] as boolean;
 
     if (!to) return { success: false, output: "to is required" };
     if (!subject) return { success: false, output: "subject is required" };
@@ -83,23 +76,6 @@ const emailSendTool: Tool = {
 
     const recipients = to.split(",").map((r) => r.trim());
 
-    // Preview mode
-    if (!confirmed) {
-      const preview = [
-        "--- Email Preview ---",
-        `From: ${from}`,
-        `To: ${recipients.join(", ")}`,
-        `Subject: ${subject}`,
-        "",
-        body,
-        "---",
-        "",
-        "Call email_send again with confirmed=true to send this email.",
-      ].join("\n");
-      return { success: true, output: preview };
-    }
-
-    // Send
     try {
       const response = await fetch(`${RESEND_API}/emails`, {
         method: "POST",
@@ -219,13 +195,15 @@ export default definePlugin({
   configSchema: {
     api_key: {
       type: "string",
-      description: "Resend API key.",
-      required: false,
+      description: "Resend API key",
+      required: true,
+      envVar: "RESEND_API_KEY",
     },
     from_address: {
       type: "string",
-      description: "Default sender email address.",
+      description: "Sender email address",
       required: false,
+      envVar: "RESEND_FROM_ADDRESS",
     },
   },
 
@@ -233,9 +211,8 @@ export default definePlugin({
 
   promptExtension:
     "You have email tools from the 'email' plugin (powered by Resend):\n" +
-    "- email_send: Send an email. ALWAYS preview first (omit confirmed), then send with confirmed=true after user approval.\n" +
-    "- email_list: List recently sent emails.\n" +
-    "Never send an email without previewing it first.",
+    "- email_send: Send an email. The user will see a confirmation panel before sending.\n" +
+    "- email_list: List recently sent emails.",
 
   activate: async (context: PluginContext) => {
     apiKey =

@@ -28,9 +28,8 @@ export function createSessionCommandTool(executor: SessionCommandExecutor): Tool
       description:
         "Execute a session management command. Available commands:\n" +
         commandDescriptions +
-        "\n\nCommands marked [destructive] require confirmed=true. " +
-        "For destructive commands, ALWAYS ask the user for confirmation first, " +
-        "then call again with confirmed=true only after they agree.",
+        "\n\nDestructive commands require user confirmation via an approval panel.",
+      requiresConfirmation: true,
       parameters: [
         {
           name: "command",
@@ -46,20 +45,12 @@ export function createSessionCommandTool(executor: SessionCommandExecutor): Tool
             "Arguments for the command (e.g. thread number for /delete, title for /rename).",
           required: false,
         },
-        {
-          name: "confirmed",
-          type: "boolean" as const,
-          description:
-            "Set to true to confirm a destructive command. Required for: purge, delete, clear.",
-          required: false,
-        },
       ],
     },
 
     async execute(parameters: Record<string, unknown>): Promise<ToolResult> {
       const commandName = ((parameters["command"] as string) ?? "").toLowerCase().trim();
       const args = (parameters["args"] as string) ?? "";
-      const confirmed = (parameters["confirmed"] as boolean) ?? false;
 
       if (!commandName) {
         return {
@@ -76,16 +67,6 @@ export function createSessionCommandTool(executor: SessionCommandExecutor): Tool
           success: false,
           output: "",
           error: `unknown command "${commandName}". Available: ${commandList.map((c) => c.name).join(", ")}`,
-        };
-      }
-
-      if (commandDefinition.destructive && !confirmed) {
-        return {
-          success: false,
-          output: "",
-          error:
-            `"${commandName}" is a destructive command. ` +
-            "Ask the user for confirmation first, then call again with confirmed=true.",
         };
       }
 

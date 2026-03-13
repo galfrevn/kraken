@@ -9,6 +9,7 @@ export interface ToolDefinition {
   name: string;
   description: string;
   parameters: ToolParameterDefinition[];
+  requiresConfirmation?: boolean;
 }
 
 export interface ToolExecutionContext {
@@ -51,6 +52,7 @@ export interface PluginConfigField {
   description: string;
   required?: boolean;
   default?: unknown;
+  envVar?: string;
 }
 
 export interface KrakenPlugin {

@@ -79,6 +79,7 @@ const notifySendTool: Tool = {
     name: "notify_send",
     description:
       "Send a notification message to configured platforms (Slack, Discord, Telegram). Sends in parallel to all configured platforms unless filtered.",
+    requiresConfirmation: true,
     parameters: [
       {
         name: "message",
@@ -179,23 +180,27 @@ export default definePlugin({
   configSchema: {
     slack_webhook_url: {
       type: "string",
-      description: "Slack incoming webhook URL.",
+      description: "Slack webhook URL",
       required: false,
+      envVar: "SLACK_WEBHOOK_URL",
     },
     discord_webhook_url: {
       type: "string",
-      description: "Discord webhook URL.",
+      description: "Discord webhook URL",
       required: false,
+      envVar: "DISCORD_WEBHOOK_URL",
     },
     telegram_bot_token: {
       type: "string",
-      description: "Telegram bot token from @BotFather.",
+      description: "Telegram bot token",
       required: false,
+      envVar: "TELEGRAM_BOT_TOKEN",
     },
     telegram_chat_id: {
       type: "string",
-      description: "Telegram chat or group ID.",
+      description: "Telegram chat ID",
       required: false,
+      envVar: "TELEGRAM_CHAT_ID",
     },
   },
 

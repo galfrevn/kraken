@@ -87,7 +87,7 @@ function buildWorkflowSection(): string {
 
 ### Sessions
 - Manage threads via session_command (create, delete, rename, clear, purge).
-- For destructive commands: first call WITHOUT confirmed=true, explain to user, then call WITH confirmed=true after they confirm.
+- Some tools require user confirmation before executing. The user will see an approval panel automatically.
 
 ### Plugins
 - Use plugin_manager to browse (store), list, inspect, install_from_store, uninstall, disable/enable, or remove plugins.

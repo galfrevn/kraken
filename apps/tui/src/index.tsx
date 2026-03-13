@@ -15,6 +15,7 @@ import { TaskRunnerDaemon } from "@core/agent/daemon.ts";
 import { TimerManager } from "@core/scheduling/timers.ts";
 import { ProjectIndexer } from "@core/memory/indexer.ts";
 import { PluginRegistry, type PluginEntry } from "@core/plugins/index.ts";
+import type { SetupField } from "@/views/setup.tsx";
 import { TuiStore } from "@/store.ts";
 import { ThreadManager } from "@/threads.ts";
 import { createSessionExecutor } from "@/executor.ts";
@@ -92,6 +93,7 @@ export async function main(): Promise<void> {
     allPluginEntries,
     configuration.repo,
     basePluginContext,
+    true,
   );
 
   if (pluginResult.loaded.length > 0) {
@@ -100,6 +102,10 @@ export async function main(): Promise<void> {
   for (const failure of pluginResult.failed) {
     console.error(`[plugins] failed to load "${failure.entry}": ${failure.error}`);
   }
+
+  const pendingSetupFields: SetupField[] = pluginResult.deferred.flatMap((d) =>
+    d.missing.map((m) => ({ pluginName: d.name, fieldName: m.fieldName, field: m.field })),
+  );
 
   registerPluginsCommand(pluginRegistry);
   registerToolDisplayNames(pluginRegistry.getToolDisplayNames());
@@ -180,12 +186,31 @@ export async function main(): Promise<void> {
   process.on("SIGINT", () => { shutdown(); });
   process.on("SIGTERM", () => { shutdown(); });
 
+  const handleSetupComplete = async () => {
+    const deferredResult = await pluginRegistry.activateDeferred();
+    if (deferredResult.loaded.length > 0) {
+      console.log(`[plugins] activated after setup: ${deferredResult.loaded.join(", ")}`);
+    }
+    for (const failure of deferredResult.failed) {
+      console.error(`[plugins] deferred activation failed "${failure.name}": ${failure.error}`);
+    }
+    // Register newly activated plugin tools (skip already-registered ones)
+    for (const tool of pluginRegistry.getTools()) {
+      if (!toolRegistry.getTool(tool.definition.name)) {
+        toolRegistry.register(tool);
+      }
+    }
+    registerToolDisplayNames(pluginRegistry.getToolDisplayNames());
+  };
+
   createRoot(renderer).render(
     <Application
       store={store}
       threadManager={threadManager}
       pluginRegistry={pluginRegistry}
       pluginFailures={pluginResult.failed}
+      pendingSetup={pendingSetupFields.length > 0 ? pendingSetupFields : undefined}
+      onSetupComplete={handleSetupComplete}
     />,
   );
 }

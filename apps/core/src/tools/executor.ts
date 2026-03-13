@@ -22,6 +22,7 @@ export function createRunCommandTool(policyConfiguration?: CommandPolicyConfigur
         "Uses cmd on Windows and sh on Unix. " +
         "Commands are evaluated against a security policy: destructive operations are blocked. " +
         "Prefer specific tools (read_file, edit_file, git_status) when available. Has a 30 second timeout.",
+      requiresConfirmation: true,
       parameters: [
         {
           name: "command",

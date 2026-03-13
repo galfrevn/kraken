@@ -9,6 +9,7 @@ export interface ToolDefinition {
   name: string;
   description: string;
   parameters: ToolParameterDefinition[];
+  requiresConfirmation?: boolean;
 }
 
 export interface ToolExecutionContext {
