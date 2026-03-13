@@ -46,6 +46,8 @@ export {
 export { createSessionCommandTool } from "@/tools/session.ts";
 export type { SessionCommandExecutor, SessionCommandDefinition } from "@/tools/session.ts";
 export { createPluginManagerTool, type PluginManagerDependencies } from "@/tools/plugins.ts";
+export { createAskQuestionTool, type PendingQuestions, type QuestionItem, type QuestionOption, type QuestionAnswer, type QuestionHandler } from "@/tools/question.ts";
+export { viewImageTool } from "@/tools/vision.ts";
 
 export type {
   Tool,
@@ -96,6 +98,7 @@ import {
 } from "@/tools/timers.ts";
 import { createDelegateTool } from "@/tools/delegate.ts";
 import { createRememberTool, createRecallTool, createIndexProjectTool } from "@/tools/memory.ts";
+import { viewImageTool } from "@/tools/vision.ts";
 import type { LanguageModelClient } from "@/language/client.ts";
 import type { SchedulerClient } from "@/clients/scheduler.ts";
 import type { TaskQueueManager } from "@/queue/manager.ts";
@@ -140,6 +143,7 @@ export function createDefaultToolRegistry(options?: ToolRegistryOptions): ToolRe
   registry.register(httpRequestTool);
   registry.register(environmentTool);
   registry.register(countTokensTool);
+  registry.register(viewImageTool);
   registry.register(createModelListTool());
 
   if (options?.languageModelClient) {

@@ -9,7 +9,7 @@ import { loadConfiguration } from "@core/configuration/loader.ts";
 import { createSchedulerClient } from "@core/clients/scheduler.ts";
 import { createGatewayClient } from "@core/clients/gateway.ts";
 import { LanguageModelClient } from "@core/language/client.ts";
-import { createDefaultToolRegistry, createSessionCommandTool, createPluginManagerTool } from "@core/tools/index.ts";
+import { createDefaultToolRegistry, createSessionCommandTool, createPluginManagerTool, createAskQuestionTool } from "@core/tools/index.ts";
 import { AgentExecutionLoop } from "@core/agent/loop.ts";
 import { TaskRunnerDaemon } from "@core/agent/daemon.ts";
 import { TimerManager } from "@core/scheduling/timers.ts";
@@ -151,6 +151,9 @@ export async function main(): Promise<void> {
     workingDirectory: configuration.repo,
     baseContext: basePluginContext,
     onToolDisplayNamesChanged: (names) => registerToolDisplayNames(names),
+  }));
+  toolRegistry.register(createAskQuestionTool((pending) => {
+    threadManager.getActiveEngine().handleQuestionsAsked(pending);
   }));
 
   threadManager.initialize();

@@ -81,6 +81,15 @@
       "tools": ["ssh_exec", "ssh_upload", "ssh_download", "ssh_tunnel", "ssh_tunnel_close", "ssh_config_list"],
       "requires": ["ssh"],
       "directory": "ssh"
+    },
+    {
+      "name": "cryptofinance",
+      "version": "0.1.0",
+      "description": "Cryptocurrency prices and exchange rates using free public APIs without authentication. Supports 170+ fiat currencies and 1000+ cryptocurrencies.",
+      "author": "kraken",
+      "tools": ["crypto_list", "crypto_price", "exchange_rate", "exchange_convert"],
+      "requires": [],
+      "directory": "cryptofinance"
     }
   ]
 }

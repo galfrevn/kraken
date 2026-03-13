@@ -1,0 +1,14 @@
+{
+  "name": "@kraken/plugin-cryptofinance",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "exports": {
+    ".": "./index.ts"
+  },
+  "devDependencies": {
+    "@kraken/sdk": "workspace:*",
+    "@types/bun": "latest",
+    "typescript": "^5"
+  }
+}

@@ -50,6 +50,7 @@ interface ApplicationProps {
 export function Application({ store, threadManager, pluginRegistry, pluginFailures }: ApplicationProps) {
   const [activeView, setActiveView] = useState<ViewName>("chat");
   const [chatInputFocused, setChatInputFocused] = useState(true);
+  const [hasQuestions, setHasQuestions] = useState(false);
   const { width, height } = useTerminalDimensions();
 
   useEffect(() => {
@@ -78,6 +79,11 @@ export function Application({ store, threadManager, pluginRegistry, pluginFailur
       process.exit(0);
     }
 
+    // When question panel is active, block all navigation — QuestionPanel handles its own keys
+    if (hasQuestions && activeView === "chat") {
+      return;
+    }
+
     if (key.name === "tab") {
       if (activeView === "chat") {
         setChatInputFocused((previous) => !previous);
@@ -90,7 +96,7 @@ export function Application({ store, threadManager, pluginRegistry, pluginFailur
       return;
     }
 
-    if (activeView === "chat" && chatInputFocused) {
+    if (activeView === "chat" && (chatInputFocused || hasQuestions)) {
       return;
     }
 
@@ -166,6 +172,7 @@ export function Application({ store, threadManager, pluginRegistry, pluginFailur
                 focused={chatInputFocused}
                 onRequestFocus={requestChatFocus}
                 onRequestBlur={requestChatBlur}
+                onQuestionStateChange={setHasQuestions}
               />
             )}
             {activeView === "dashboard" && <DashboardView store={store} pluginRegistry={pluginRegistry} />}
