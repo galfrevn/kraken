@@ -15,7 +15,7 @@ import (
 )
 
 type GatewayServer struct {
-	llmClient    *llm.Client
+	llmClient    llm.LLMClient
 	webhookStore *webhooks.Store
 	eventChannel webhooks.EventChannel
 	logger       *slog.Logger
@@ -24,7 +24,7 @@ type GatewayServer struct {
 var _ agentv1connect.GatewayServiceHandler = (*GatewayServer)(nil)
 
 func NewGatewayServer(
-	llmClient *llm.Client,
+	llmClient llm.LLMClient,
 	webhookStore *webhooks.Store,
 	eventChannel webhooks.EventChannel,
 	logger *slog.Logger,

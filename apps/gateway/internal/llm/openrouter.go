@@ -9,12 +9,10 @@ import (
 	"io"
 	"net"
 	"net/http"
-	"os"
 	"strings"
 	"time"
 )
 
-const defaultBaseURL = "https://openrouter.ai/api/v1"
 const defaultModel = "deepseek/deepseek-v3.2"
 
 type ToolFunction struct {
@@ -81,17 +79,23 @@ type CompletionResponse struct {
 	Error   *CompletionError   `json:"error,omitempty"`
 }
 
-type Client struct {
+type OpenAICompatibleClient struct {
 	apiKey     string
 	baseURL    string
 	httpClient *http.Client
+	provider   string // "openrouter", "openai", "ollama"
 }
 
-func NewClient() *Client {
-	apiKey := os.Getenv("OPENROUTER_API_KEY")
-	baseURL := os.Getenv("OPENROUTER_BASE_URL")
+func NewOpenAICompatibleClient(provider, apiKey, baseURL string) *OpenAICompatibleClient {
 	if baseURL == "" {
-		baseURL = defaultBaseURL
+		switch provider {
+		case "openai":
+			baseURL = "https://api.openai.com/v1"
+		case "ollama":
+			baseURL = "http://localhost:11434/v1"
+		default: // openrouter
+			baseURL = "https://openrouter.ai/api/v1"
+		}
 	}
 
 	transport := &http.Transport{
@@ -105,22 +109,25 @@ func NewClient() *Client {
 		DisableCompression: false,
 	}
 
-	return &Client{
+	return &OpenAICompatibleClient{
 		apiKey:     apiKey,
 		baseURL:    baseURL,
 		httpClient: &http.Client{
 			Transport: transport,
-			Timeout:   120 * time.Second,
+			Timeout:   5 * time.Minute,
 		},
+		provider: provider,
 	}
 }
 
-func (c *Client) Complete(ctx context.Context, req CompletionRequest) (*CompletionResponse, error) {
+func (c *OpenAICompatibleClient) Complete(ctx context.Context, req CompletionRequest) (*CompletionResponse, error) {
 	if req.Model == "" {
 		req.Model = defaultModel
 	}
 	req.Stream = false
-	req.IncludeReasoning = true
+	if c.provider == "openrouter" {
+		req.IncludeReasoning = true
+	}
 
 	body, err := json.Marshal(req)
 	if err != nil {
@@ -198,14 +205,14 @@ type StreamChunk struct {
 	Usage   *CompletionUsage `json:"usage,omitempty"`
 }
 
-type StreamCallback func(chunk StreamChunk) error
-
-func (c *Client) StreamComplete(ctx context.Context, req CompletionRequest, callback StreamCallback) error {
+func (c *OpenAICompatibleClient) StreamComplete(ctx context.Context, req CompletionRequest, callback StreamCallback) error {
 	if req.Model == "" {
 		req.Model = defaultModel
 	}
 	req.Stream = true
-	req.IncludeReasoning = true
+	if c.provider == "openrouter" {
+		req.IncludeReasoning = true
+	}
 
 	body, err := json.Marshal(req)
 	if err != nil {
