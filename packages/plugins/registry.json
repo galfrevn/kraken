@@ -84,8 +84,8 @@
     },
     {
       "name": "cryptofinance",
-      "version": "0.1.0",
-      "description": "Cryptocurrency prices and exchange rates using free public APIs without authentication. Supports 170+ fiat currencies and 1000+ cryptocurrencies.",
+      "version": "0.2.0",
+      "description": "Cryptocurrency prices and exchange rates using free public APIs. No API keys needed.",
       "author": "kraken",
       "tools": ["crypto_list", "crypto_price", "exchange_rate", "exchange_convert"],
       "requires": [],
