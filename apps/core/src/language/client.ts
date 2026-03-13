@@ -12,6 +12,8 @@ import type {
 } from "@/language/schema.ts";
 import type { NativeTool } from "@/tools/schema.ts";
 
+export type ClientLogCallback = (level: "info" | "warn" | "error", message: string) => void;
+
 export class LanguageModelClient {
   private gatewayClient: GatewayClient;
   private model: string;
@@ -19,6 +21,7 @@ export class LanguageModelClient {
   private defaultMaxTokens: number;
   private tokenUsage: TokenUsageSummary;
   private nativeTools: NativeTool[] = [];
+  private logCallback?: ClientLogCallback;
 
   constructor(gatewayUrl: string, languageModelConfiguration: LanguageModelConfiguration) {
     this.gatewayClient = createGatewayClient(gatewayUrl);
@@ -30,6 +33,16 @@ export class LanguageModelClient {
       totalCompletionTokens: 0,
       requestCount: 0,
     };
+  }
+
+  setLogCallback(callback: ClientLogCallback): void {
+    this.logCallback = callback;
+  }
+
+  private clientLog(level: "info" | "warn" | "error", message: string): void {
+    if (this.logCallback) {
+      this.logCallback(level, message);
+    }
   }
 
   setNativeTools(tools: NativeTool[]): void {
@@ -77,10 +90,40 @@ export class LanguageModelClient {
     messages: ConversationMessage[],
     options?: CompletionOptions,
   ): Promise<CompletionResult> {
+    const maxRetries = 2;
+
+    for (let attempt = 0; attempt <= maxRetries; attempt++) {
+      try {
+        const result = await this.executeComplete(messages, options);
+        return result;
+      } catch (error) {
+        const errorMsg = error instanceof Error ? error.message : String(error);
+        const isRetryable = errorMsg.includes("empty response") || errorMsg.includes("no choices");
+
+        if (isRetryable && attempt < maxRetries) {
+          const delayMs = (attempt + 1) * 2000;
+          this.clientLog("warn", `retryable error (attempt ${attempt + 1}/${maxRetries + 1}): ${errorMsg}, retrying in ${delayMs}ms`);
+          await new Promise((resolve) => setTimeout(resolve, delayMs));
+          continue;
+        }
+
+        throw error;
+      }
+    }
+
+    throw new Error("unreachable");
+  }
+
+  private async executeComplete(
+    messages: ConversationMessage[],
+    options?: CompletionOptions,
+  ): Promise<CompletionResult> {
     const gatewayMessages = this.buildGatewayMessages(messages);
 
     const systemMessage = messages.find((message) => message.role === "system");
     const systemPrompt = options?.systemPrompt ?? systemMessage?.content;
+
+    this.clientLog("info", `complete: model=${options?.model ?? this.model}, messages=${gatewayMessages.length}`);
 
     const response = await this.gatewayClient.complete({
       model: options?.model ?? this.model,
@@ -104,6 +147,9 @@ export class LanguageModelClient {
       },
     }));
 
+    const finishReason = response.finishReason || "stop";
+    this.clientLog("info", `complete finished: finishReason=${finishReason}, toolCalls=${toolCalls.length}, contentLength=${(response.message?.content ?? "").length}, promptTokens=${response.promptTokens}, completionTokens=${response.completionTokens}`);
+
     return {
       id: response.id,
       model: response.model,
@@ -111,7 +157,7 @@ export class LanguageModelClient {
       promptTokens: response.promptTokens,
       completionTokens: response.completionTokens,
       toolCalls,
-      finishReason: response.finishReason ?? "stop",
+      finishReason,
     };
   }
 
@@ -146,15 +192,23 @@ export class LanguageModelClient {
       return await this.executeStreamConversation(conversation, onDelta, options, signal);
     } catch (streamError) {
       if (signal?.aborted) throw streamError;
-      const messages = conversation.getMessagesWithSystemPrompt();
-      const result = await this.complete(messages, options);
-      if (result.toolCalls.length > 0) {
-        conversation.addAssistantToolCallMessage(result.content, result.toolCalls);
-      } else {
-        conversation.addAssistantMessage(result.content);
+      const streamErrorMsg = streamError instanceof Error ? streamError.message : String(streamError);
+      this.clientLog("warn", `streaming failed, falling back to non-streaming: ${streamErrorMsg}`);
+      try {
+        const messages = conversation.getMessagesWithSystemPrompt();
+        const result = await this.complete(messages, options);
+        if (result.toolCalls.length > 0) {
+          conversation.addAssistantToolCallMessage(result.content, result.toolCalls);
+        } else {
+          conversation.addAssistantMessage(result.content);
+        }
+        onDelta({ content: result.content, done: true, toolCalls: result.toolCalls, finishReason: result.finishReason });
+        return result;
+      } catch (fallbackError) {
+        const fallbackMsg = fallbackError instanceof Error ? fallbackError.message : String(fallbackError);
+        this.clientLog("error", `non-streaming fallback also failed: ${fallbackMsg}`);
+        throw new Error(`streaming failed (${streamErrorMsg}), non-streaming fallback also failed: ${fallbackMsg}`);
       }
-      onDelta({ content: result.content, done: true, toolCalls: result.toolCalls, finishReason: result.finishReason });
-      return result;
     }
   }
 
@@ -167,6 +221,7 @@ export class LanguageModelClient {
     const allMessages = conversation.getMessagesWithSystemPrompt();
 
     const gatewayMessages = this.buildGatewayMessages(allMessages);
+    this.clientLog("info", `stream: model=${this.model}, messages=${gatewayMessages.length}`);
 
     const systemMessage = allMessages.find((message) => message.role === "system");
     const systemPrompt = options?.systemPrompt ?? systemMessage?.content;
@@ -184,6 +239,8 @@ export class LanguageModelClient {
     let fullReasoning = "";
     let toolCalls: ToolCallEntry[] = [];
     let finishReason = "stop";
+    let streamPromptTokens = 0;
+    let streamCompletionTokens = 0;
 
     const iterator = stream[Symbol.asyncIterator]();
     const timeoutMs = options?.streamTimeoutMs ?? 60_000;
@@ -219,6 +276,7 @@ export class LanguageModelClient {
       } catch (raceError) {
         if (signal?.aborted) break;
         if (raceError instanceof Error && raceError.message === "stream inactivity timeout") {
+          this.clientLog("error", `stream inactivity timeout after ${timeoutMs}ms — ending stream with partial content (${fullContent.length} chars)`);
           onDelta({ content: "", done: true });
           break;
         }
@@ -236,9 +294,11 @@ export class LanguageModelClient {
 
       if (chunk.promptTokens > 0) {
         this.tokenUsage.totalPromptTokens += chunk.promptTokens;
+        streamPromptTokens += chunk.promptTokens;
       }
       if (chunk.completionTokens > 0) {
         this.tokenUsage.totalCompletionTokens += chunk.completionTokens;
+        streamCompletionTokens += chunk.completionTokens;
       }
 
       if (chunk.done) {
@@ -272,8 +332,8 @@ export class LanguageModelClient {
       model: this.model,
       content: fullContent,
       reasoning: fullReasoning || undefined,
-      promptTokens: 0,
-      completionTokens: 0,
+      promptTokens: streamPromptTokens,
+      completionTokens: streamCompletionTokens,
       toolCalls,
       finishReason,
     };
