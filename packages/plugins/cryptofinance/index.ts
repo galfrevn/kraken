@@ -289,6 +289,204 @@ const exchangeConvertTool: Tool = {
 };
 
 // ---------------------------------------------------------------------------
+// OHLCV Chart
+// ---------------------------------------------------------------------------
+
+interface OHLCVData {
+  time_open: string;
+  open: number;
+  high: number;
+  low: number;
+  close: number;
+  volume: number;
+}
+
+const PERIOD_CONFIG: Record<string, { days: number; defaultInterval: string }> = {
+  "7d": { days: 7, defaultInterval: "4h" },
+  "30d": { days: 30, defaultInterval: "1d" },
+  "90d": { days: 90, defaultInterval: "1d" },
+  "1y": { days: 365, defaultInterval: "1w" },
+};
+
+function aggregateCandles(data: OHLCVData[], interval: string): OHLCVData[] {
+  if (interval === "1d" || data.length === 0) return data;
+
+  let groupSize: number;
+  if (interval === "1w") groupSize = 7;
+  else if (interval === "4h") return data; // API returns daily; can't subdivide
+  else return data;
+
+  const result: OHLCVData[] = [];
+  for (let i = 0; i < data.length; i += groupSize) {
+    const group = data.slice(i, i + groupSize);
+    const first = group[0]!;
+    const last = group[group.length - 1]!;
+    result.push({
+      time_open: first.time_open,
+      open: first.open,
+      high: Math.max(...group.map((g) => g.high)),
+      low: Math.min(...group.map((g) => g.low)),
+      close: last.close,
+      volume: group.reduce((s, g) => s + g.volume, 0),
+    });
+  }
+  return result;
+}
+
+function sampleUniform(data: OHLCVData[], maxCandles: number): OHLCVData[] {
+  if (data.length <= maxCandles) return data;
+  const step = data.length / maxCandles;
+  const result: OHLCVData[] = [];
+  for (let i = 0; i < maxCandles; i++) {
+    result.push(data[Math.floor(i * step)]!);
+  }
+  return result;
+}
+
+function renderCandlestickChart(data: OHLCVData[], symbol: string, period: string, interval: string): string {
+  const CHART_HEIGHT = 18;
+  const MAX_CANDLES = 60;
+
+  const candles = sampleUniform(data, MAX_CANDLES);
+  if (candles.length === 0) return "No data available.";
+
+  const globalHigh = Math.max(...candles.map((c) => c.high));
+  const globalLow = Math.min(...candles.map((c) => c.low));
+  const range = globalHigh - globalLow || 1;
+
+  const mapToRow = (price: number): number =>
+    Math.round(((price - globalLow) / range) * (CHART_HEIGHT - 1));
+
+  // Build grid
+  const grid: string[][] = Array.from({ length: CHART_HEIGHT }, () =>
+    Array(candles.length).fill(" "),
+  );
+
+  for (let col = 0; col < candles.length; col++) {
+    const c = candles[col]!;
+    const highRow = mapToRow(c.high);
+    const lowRow = mapToRow(c.low);
+    const openRow = mapToRow(c.open);
+    const closeRow = mapToRow(c.close);
+    const bodyTop = Math.max(openRow, closeRow);
+    const bodyBot = Math.min(openRow, closeRow);
+    const isBull = c.close >= c.open;
+
+    for (let row = lowRow; row <= highRow; row++) {
+      if (row >= bodyBot && row <= bodyTop) {
+        grid[row]![col] = isBull ? "\u2588" : "\u2592";
+      } else {
+        grid[row]![col] = "\u2502";
+      }
+    }
+  }
+
+  // Y-axis labels (6 ticks)
+  const TICK_COUNT = 6;
+  const tickRows = Array.from({ length: TICK_COUNT }, (_, i) =>
+    Math.round((i / (TICK_COUNT - 1)) * (CHART_HEIGHT - 1)),
+  );
+  const tickPrices = tickRows.map((r) => globalLow + (r / (CHART_HEIGHT - 1)) * range);
+
+  const maxLabelLen = Math.max(...tickPrices.map((p) => fmtPrice(p).length));
+
+  const lines: string[] = [];
+  lines.push(`${symbol.toUpperCase()}/USD \u2014 ${period} (${interval})\n`);
+
+  for (let row = CHART_HEIGHT - 1; row >= 0; row--) {
+    const tickIdx = tickRows.indexOf(row);
+    const label = tickIdx !== -1
+      ? fmtPrice(tickPrices[tickIdx]!).padStart(maxLabelLen)
+      : " ".repeat(maxLabelLen);
+    lines.push(`${label} \u2502${grid[row]!.join("")}`);
+  }
+
+  lines.push(`${" ".repeat(maxLabelLen)} \u2514${"─".repeat(candles.length)}`);
+
+  // Date footer
+  const firstCandle = candles[0]!;
+  const lastCandle = candles[candles.length - 1]!;
+  const firstDate = new Date(firstCandle.time_open).toLocaleDateString("en-US", { month: "short", day: "numeric" });
+  const lastDate = new Date(lastCandle.time_open).toLocaleDateString("en-US", { month: "short", day: "numeric" });
+  const dateLinePad = " ".repeat(maxLabelLen + 2);
+  lines.push(`${dateLinePad}${firstDate}${" ".repeat(Math.max(1, candles.length - firstDate.length - lastDate.length))}${lastDate}`);
+
+  // Summary
+  const changePct = ((lastCandle.close - firstCandle.open) / firstCandle.open) * 100;
+
+  lines.push("");
+  lines.push(` Open: ${fmtPrice(firstCandle.open)}  Close: ${fmtPrice(lastCandle.close)}  High: ${fmtPrice(globalHigh)}  Low: ${fmtPrice(globalLow)}`);
+  lines.push(` Change: ${fmtPct(changePct)}`);
+
+  return lines.join("\n");
+}
+
+const cryptoChartTool: Tool = {
+  definition: {
+    name: "crypto_chart",
+    description: "Display an ASCII candlestick chart for a cryptocurrency's historical price. Shows OHLCV data as a visual chart in the terminal.",
+    parameters: [
+      {
+        name: "symbol",
+        type: "string",
+        description: "Cryptocurrency symbol (e.g., BTC, ETH, SOL).",
+        required: true,
+      },
+      {
+        name: "period",
+        type: "string",
+        description: "Time period: 7d, 30d, 90d, or 1y. Default: 30d.",
+        required: false,
+      },
+      {
+        name: "interval",
+        type: "string",
+        description: "Candle interval: 4h, 1d, or 1w. Auto-calculated from period if omitted.",
+        required: false,
+      },
+    ],
+  },
+  async execute(parameters): Promise<ToolResult> {
+    const symbol = (parameters["symbol"] as string)?.toUpperCase();
+    if (!symbol) return { success: false, output: "symbol is required" };
+
+    const period = (parameters["period"] as string) || "30d";
+    const config = PERIOD_CONFIG[period];
+    if (!config) return { success: false, output: `Invalid period '${period}'. Use: 7d, 30d, 90d, 1y.` };
+
+    const interval = (parameters["interval"] as string) || config.defaultInterval;
+
+    try {
+      const coins = await getCoinList();
+      const coin = coins.find((c) => c.symbol === symbol);
+      if (!coin) {
+        return { success: false, output: `'${symbol}' not found. Use crypto_list to see available coins.` };
+      }
+
+      const end = new Date();
+      const start = new Date();
+      start.setDate(start.getDate() - config.days);
+
+      const url = `${COINPAPRIKA_API}/coins/${coin.id}/ohlcv/historical?start=${start.toISOString().split("T")[0]}&end=${end.toISOString().split("T")[0]}`;
+      const response = await fetch(url);
+      if (!response.ok) return { success: false, output: `Failed to fetch OHLCV data: ${response.status}` };
+
+      const raw = (await response.json()) as OHLCVData[];
+      if (!Array.isArray(raw) || raw.length === 0) {
+        return { success: false, output: `No historical data available for ${symbol}.` };
+      }
+
+      const aggregated = aggregateCandles(raw, interval);
+      const chart = renderCandlestickChart(aggregated, symbol, period, interval);
+
+      return { success: true, output: chart };
+    } catch (error) {
+      return { success: false, output: `Failed to generate chart: ${error instanceof Error ? error.message : error}` };
+    }
+  },
+};
+
+// ---------------------------------------------------------------------------
 // Plugin
 // ---------------------------------------------------------------------------
 
@@ -301,16 +499,18 @@ export default definePlugin({
   toolDisplayNames: {
     crypto_list: "List Cryptocurrencies",
     crypto_price: "Get Crypto Price",
+    crypto_chart: "Crypto Chart",
     exchange_rate: "Get Exchange Rates",
     exchange_convert: "Convert Currency",
   },
 
-  tools: [cryptoListTool, cryptoPriceTool, exchangeRateTool, exchangeConvertTool],
+  tools: [cryptoListTool, cryptoPriceTool, cryptoChartTool, exchangeRateTool, exchangeConvertTool],
 
   promptExtension:
     "You have cryptocurrency and currency tools from the 'cryptofinance' plugin:\n" +
     "- crypto_list: Top cryptocurrencies by rank\n" +
     "- crypto_price: Current price + market data for any coin (use symbol: BTC, ETH, SOL, etc.)\n" +
+    "- crypto_chart: ASCII candlestick chart for historical prices (supports period: 7d, 30d, 90d, 1y)\n" +
     "- exchange_rate: Exchange rates for a base currency (supports targets filter)\n" +
     "- exchange_convert: Convert amounts between currencies\n" +
     "All use free APIs, no keys required. Use 3-letter ISO 4217 codes for fiat currencies.",
