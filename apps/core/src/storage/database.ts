@@ -70,6 +70,14 @@ const MIGRATIONS = [
   `DROP TRIGGER IF EXISTS memory_facts_ad`,
   `DROP TRIGGER IF EXISTS memory_facts_au`,
   `DROP TABLE IF EXISTS memory_facts_fts`,
+  `CREATE TABLE IF NOT EXISTS engine_logs (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    level TEXT NOT NULL DEFAULT 'info',
+    source TEXT NOT NULL,
+    message TEXT NOT NULL,
+    created_at TEXT NOT NULL DEFAULT (datetime('now'))
+  )`,
+  `CREATE INDEX IF NOT EXISTS idx_engine_logs_created_at ON engine_logs(created_at)`,
 ];
 
 export interface TaskRow {
@@ -94,6 +102,14 @@ export interface TaskLogRow {
   level: string;
   message: string;
   metadata: string;
+  created_at: string;
+}
+
+export interface EngineLogRow {
+  id: number;
+  level: string;
+  source: string;
+  message: string;
   created_at: string;
 }
 
@@ -264,6 +280,26 @@ export class AgentDatabase {
       "SELECT * FROM task_logs WHERE task_id = ? ORDER BY created_at ASC",
     );
     return statement.all(taskId) as TaskLogRow[];
+  }
+
+  addEngineLog(level: string, source: string, message: string): void {
+    this.database
+      .prepare("INSERT INTO engine_logs (level, source, message) VALUES (?, ?, ?)")
+      .run(level, source, message);
+  }
+
+  listRecentEngineLogs(limit: number = 200): EngineLogRow[] {
+    return this.database
+      .prepare("SELECT * FROM engine_logs ORDER BY id DESC LIMIT ?")
+      .all(limit) as EngineLogRow[];
+  }
+
+  pruneEngineLogs(keepCount: number = 5000): void {
+    this.database
+      .prepare(
+        "DELETE FROM engine_logs WHERE id NOT IN (SELECT id FROM engine_logs ORDER BY id DESC LIMIT ?)",
+      )
+      .run(keepCount);
   }
 
   listRecentLogs(limit: number = 100): TaskLogRow[] {
