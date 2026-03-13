@@ -9,6 +9,15 @@ import type { HookDispatcher } from "@core/plugins/hooks.ts";
 import type { PluginContext } from "@kraken/sdk";
 import type { PendingQuestions } from "@core/tools/question.ts";
 import type { ConfirmationDecision, PendingConfirmation } from "@core/tools/confirmation.ts";
+import type { SetupField } from "@/views/setup.tsx";
+
+export interface PendingSetup {
+  id: string;
+  fields: SetupField[];
+  resolve: () => void;
+}
+
+export type SetupHandler = (pending: PendingSetup) => void;
 
 const MAX_ITERATIONS_PER_MESSAGE = 40;
 const CONTINUE_PROMPT = "Continue from where you left off. Complete any remaining steps without repeating what was already done.";
@@ -145,6 +154,8 @@ export class ChatEngine {
   private questionListeners: Set<(q: PendingQuestions | null) => void> = new Set();
   private pendingConfirmation: PendingConfirmation | null = null;
   private confirmationListeners: Set<(c: PendingConfirmation | null) => void> = new Set();
+  private pendingSetup: PendingSetup | null = null;
+  private setupListeners: Set<(s: PendingSetup | null) => void> = new Set();
   private promptOptions: PromptOptions;
   private tokenUsage: TokenUsageSummary = { totalPromptTokens: 0, totalCompletionTokens: 0, requestCount: 0 };
   private debugLog: DebugLogEntry[] = [];
@@ -326,6 +337,42 @@ export class ChatEngine {
       };
       this.notifyConfirmationListeners();
     });
+  }
+
+  getPendingSetup(): PendingSetup | null {
+    return this.pendingSetup;
+  }
+
+  addSetupListener(listener: (s: PendingSetup | null) => void): void {
+    this.setupListeners.add(listener);
+  }
+
+  removeSetupListener(listener: (s: PendingSetup | null) => void): void {
+    this.setupListeners.delete(listener);
+  }
+
+  private notifySetupListeners(): void {
+    for (const listener of this.setupListeners) {
+      listener(this.pendingSetup);
+    }
+  }
+
+  handleSetupRequired(pending: PendingSetup): void {
+    const originalResolve = pending.resolve;
+    this.pendingSetup = {
+      ...pending,
+      resolve: () => {
+        this.pendingSetup = null;
+        this.notifySetupListeners();
+        originalResolve();
+      },
+    };
+    this.notifySetupListeners();
+  }
+
+  resolveSetup(): void {
+    if (!this.pendingSetup) return;
+    this.pendingSetup.resolve();
   }
 
   private async executeToolWithConfirmation(

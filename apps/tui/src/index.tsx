@@ -157,6 +157,16 @@ export async function main(): Promise<void> {
     workingDirectory: configuration.repo,
     baseContext: basePluginContext,
     onToolDisplayNamesChanged: (names) => registerToolDisplayNames(names),
+    onSetupRequired: (fields) => {
+      return new Promise<void>((resolve) => {
+        const engine = threadManager.getActiveEngine();
+        engine.handleSetupRequired({
+          id: Date.now().toString(36) + Math.random().toString(36).slice(2, 6),
+          fields: fields.map((f) => ({ pluginName: f.pluginName, fieldName: f.fieldName, field: f.field })),
+          resolve,
+        });
+      });
+    },
   }));
   toolRegistry.register(createAskQuestionTool((pending) => {
     threadManager.getActiveEngine().handleQuestionsAsked(pending);

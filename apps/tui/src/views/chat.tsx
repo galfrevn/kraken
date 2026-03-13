@@ -9,7 +9,7 @@ import { useKeyboard, useRenderer } from "@opentui/react";
 
 import { COLORS } from "@/theme.ts";
 
-import type { ChatMessage, Plan, FileAttachment } from "@/engine.ts";
+import type { ChatMessage, Plan, FileAttachment, PendingSetup } from "@/engine.ts";
 import type { PendingQuestions, QuestionAnswer } from "@core/tools/question.ts";
 import type { PendingConfirmation, ConfirmationDecision } from "@core/tools/confirmation.ts";
 import type { ThreadManager } from "@/threads.ts";
@@ -23,6 +23,7 @@ import { handleSlashCommand, ALL_COMMANDS, commandRequiresArguments, type SlashC
 import { fetchOpenRouterModelIds } from "@core/tools/model.ts";
 import { Avatar, type AvatarState } from "@/avatar.tsx";
 import { loadImagePreview, generatePreviewRows } from "@/images.ts";
+import { SetupPanel } from "@/views/setup.tsx";
 import { existsSync } from "node:fs";
 import { basename, isAbsolute } from "node:path";
 
@@ -325,17 +326,18 @@ export function ChatView({ threadManager, focused, onRequestFocus, onRequestBlur
   const [inPlanMode, setInPlanMode] = useState(false);
   const [pendingQuestions, setPendingQuestions] = useState<PendingQuestions | null>(null);
   const [pendingConfirmation, setPendingConfirmation] = useState<PendingConfirmation | null>(null);
+  const [pendingSetup, setPendingSetup] = useState<PendingSetup | null>(null);
 
   useEffect(() => {
-    onQuestionStateChange?.(pendingQuestions !== null || pendingConfirmation !== null);
-  }, [pendingQuestions, pendingConfirmation, onQuestionStateChange]);
+    onQuestionStateChange?.(pendingQuestions !== null || pendingConfirmation !== null || pendingSetup !== null);
+  }, [pendingQuestions, pendingConfirmation, pendingSetup, onQuestionStateChange]);
 
   const scrollboxRef = useRef<any>(null);
 
   useEffect(() => {
     const sb = scrollboxRef.current;
-    if (sb) sb.focusable = !pendingQuestions && !pendingConfirmation;
-  }, [pendingQuestions, pendingConfirmation]);
+    if (sb) sb.focusable = !pendingQuestions && !pendingConfirmation && !pendingSetup;
+  }, [pendingQuestions, pendingConfirmation, pendingSetup]);
 
   const lastEscapeTimestamp = useRef(0);
   const textareaReference = useRef<TextareaRenderable>(null);
@@ -523,6 +525,7 @@ export function ChatView({ threadManager, focused, onRequestFocus, onRequestBlur
 
   useKeyboard((key) => {
     if (dialogIsOpen) return;
+    if (pendingSetup) return;
     if (pendingQuestions) return;
     if (pendingConfirmation) return;
 
@@ -660,6 +663,7 @@ export function ChatView({ threadManager, focused, onRequestFocus, onRequestBlur
     let currentPlanListener: ((plan: Plan | null) => void) | null = null;
     let currentQuestionListener: ((q: PendingQuestions | null) => void) | null = null;
     let currentConfirmationListener: ((c: PendingConfirmation | null) => void) | null = null;
+    let currentSetupListener: ((s: PendingSetup | null) => void) | null = null;
     let currentEngine: ReturnType<typeof threadManager.getActiveEngine> | null = null;
     let previousMessageCount = 0;
     let streamingUpdateTimer: ReturnType<typeof setTimeout> | null = null;
@@ -760,10 +764,15 @@ export function ChatView({ threadManager, focused, onRequestFocus, onRequestBlur
         setPendingConfirmation(c);
       };
 
+      currentSetupListener = (s: PendingSetup | null) => {
+        setPendingSetup(s);
+      };
+
       currentEngine.addEventListener(currentEngineListener);
       currentEngine.addPlanListener(currentPlanListener);
       currentEngine.addQuestionListener(currentQuestionListener);
       currentEngine.addConfirmationListener(currentConfirmationListener);
+      currentEngine.addSetupListener(currentSetupListener);
       setMessages([...currentEngine.getMessages()]);
       setProcessing(currentEngine.isProcessing());
       setCurrentPlan(currentEngine.getPlan());
@@ -794,6 +803,9 @@ export function ChatView({ threadManager, focused, onRequestFocus, onRequestBlur
       }
       if (currentEngine && currentConfirmationListener) {
         currentEngine.removeConfirmationListener(currentConfirmationListener);
+      }
+      if (currentEngine && currentSetupListener) {
+        currentEngine.removeSetupListener(currentSetupListener);
       }
       threadManager.offThreadChange(threadChangeListener);
     };
@@ -956,7 +968,15 @@ export function ChatView({ threadManager, focused, onRequestFocus, onRequestBlur
             ))}
           </box>
         ) : null}
-        {pendingConfirmation ? (
+        {pendingSetup ? (
+          <SetupPanel
+            fields={pendingSetup.fields}
+            onComplete={() => {
+              const eng = threadManager.getActiveEngine();
+              eng.resolveSetup();
+            }}
+          />
+        ) : pendingConfirmation ? (
           <ConfirmationPanel
             confirmation={pendingConfirmation}
             onResolve={(decision) => {

@@ -3,9 +3,15 @@ import { homedir } from "node:os";
 import { rmSync, existsSync } from "node:fs";
 import type { Tool, ToolResult } from "@/tools/schema.ts";
 import type { ToolRegistry } from "@/tools/registry.ts";
-import type { PluginRegistry } from "@/plugins/registry.ts";
-import type { PluginContext } from "@kraken/sdk";
+import { PluginRegistry, type MissingConfigField } from "@/plugins/registry.ts";
+import type { PluginContext, PluginConfigField } from "@kraken/sdk";
 import { fetchRegistry, installPluginFromRegistry, isPluginInstalled } from "@/plugins/installer.ts";
+
+export interface SetupFieldForPrompt {
+  pluginName: string;
+  fieldName: string;
+  field: PluginConfigField;
+}
 
 export interface PluginManagerDependencies {
   pluginRegistry: PluginRegistry;
@@ -13,10 +19,11 @@ export interface PluginManagerDependencies {
   workingDirectory: string;
   baseContext: Omit<PluginContext, "config">;
   onToolDisplayNamesChanged?: (names: Record<string, string>) => void;
+  onSetupRequired?: (fields: SetupFieldForPrompt[]) => Promise<void>;
 }
 
 export function createPluginManagerTool(dependencies: PluginManagerDependencies): Tool {
-  const { pluginRegistry, toolRegistry, workingDirectory, baseContext, onToolDisplayNamesChanged } =
+  const { pluginRegistry, toolRegistry, workingDirectory, baseContext, onToolDisplayNamesChanged, onSetupRequired } =
     dependencies;
 
   return {
@@ -92,6 +99,7 @@ export function createPluginManagerTool(dependencies: PluginManagerDependencies)
             workingDirectory,
             baseContext,
             onToolDisplayNamesChanged,
+            onSetupRequired,
           );
         case "install":
           return handleInstall(
@@ -101,6 +109,7 @@ export function createPluginManagerTool(dependencies: PluginManagerDependencies)
             workingDirectory,
             baseContext,
             onToolDisplayNamesChanged,
+            onSetupRequired,
           );
         case "uninstall":
           return handleUninstall(pluginRegistry, pluginName, confirmed);
@@ -210,6 +219,45 @@ function handleInspect(registry: PluginRegistry, name: string): ToolResult {
   return { success: true, output: sections.join("\n") };
 }
 
+async function promptAndActivateDeferred(
+  registry: PluginRegistry,
+  toolReg: ToolRegistry,
+  pluginName: string,
+  missingConfig: MissingConfigField[],
+  onToolDisplayNamesChanged?: (names: Record<string, string>) => void,
+  onSetupRequired?: (fields: SetupFieldForPrompt[]) => Promise<void>,
+): Promise<string> {
+  const setupFields: SetupFieldForPrompt[] = missingConfig.map((m) => ({
+    pluginName,
+    fieldName: m.fieldName,
+    field: m.field,
+  }));
+
+  if (onSetupRequired) {
+    await onSetupRequired(setupFields);
+  }
+
+  const activateResult = await registry.activateDeferred();
+
+  if (activateResult.loaded.length > 0) {
+    for (const tool of registry.getTools()) {
+      if (!toolReg.getTool(tool.definition.name)) {
+        try {
+          toolReg.register(tool);
+        } catch { /* skip */ }
+      }
+    }
+    if (onToolDisplayNamesChanged) {
+      onToolDisplayNamesChanged(registry.getToolDisplayNames());
+    }
+  }
+
+  if (activateResult.failed.length > 0) {
+    return `Configuration saved but activation failed: ${activateResult.failed.map((f) => f.error).join(", ")}`;
+  }
+  return "";
+}
+
 async function handleInstall(
   registry: PluginRegistry,
   toolReg: ToolRegistry,
@@ -217,18 +265,35 @@ async function handleInstall(
   workingDirectory: string,
   baseContext: Omit<PluginContext, "config">,
   onToolDisplayNamesChanged?: (names: Record<string, string>) => void,
+  onSetupRequired?: (fields: SetupFieldForPrompt[]) => Promise<void>,
 ): Promise<ToolResult> {
   if (!pluginPath) {
     return { success: false, output: "", error: "plugin_name (path) is required for install" };
   }
 
-  const result = await registry.installPlugin(pluginPath, workingDirectory, baseContext);
+  const result = await registry.installPlugin(pluginPath, workingDirectory, baseContext, {}, true);
 
   if (!result.success) {
     return { success: false, output: "", error: result.error };
   }
 
   const plugin = result.plugin;
+
+  if (result.missingConfig && result.missingConfig.length > 0) {
+    const setupError = await promptAndActivateDeferred(
+      registry, toolReg, plugin.name, result.missingConfig,
+      onToolDisplayNamesChanged, onSetupRequired,
+    );
+    const toolNames = plugin.tools?.map((t) => t.definition.name).join(", ") ?? "none";
+    return {
+      success: !setupError,
+      output:
+        `plugin "${plugin.name}" v${plugin.version} installed.\n` +
+        `tools: ${toolNames}\n` +
+        (setupError || "Configuration saved and plugin activated."),
+    };
+  }
+
   if (plugin.tools) {
     for (const tool of plugin.tools) {
       try {
@@ -380,6 +445,7 @@ async function handleInstallFromStore(
   workingDirectory: string,
   baseContext: Omit<PluginContext, "config">,
   onToolDisplayNamesChanged?: (names: Record<string, string>) => void,
+  onSetupRequired?: (fields: SetupFieldForPrompt[]) => Promise<void>,
 ): Promise<ToolResult> {
   if (!pluginName) {
     return { success: false, output: "", error: "plugin_name is required for install_from_store" };
@@ -399,6 +465,8 @@ async function handleInstallFromStore(
     installResult.installPath,
     workingDirectory,
     baseContext,
+    {},
+    true,
   );
 
   if (!loadResult.success) {
@@ -410,6 +478,27 @@ async function handleInstallFromStore(
   }
 
   const plugin = loadResult.plugin;
+  const warningLines = installResult.warnings.length > 0
+    ? "\n\nWarnings:\n" + installResult.warnings.map((w) => `  - ${w}`).join("\n")
+    : "";
+
+  if (loadResult.missingConfig && loadResult.missingConfig.length > 0) {
+    const setupError = await promptAndActivateDeferred(
+      registry, toolReg, plugin.name, loadResult.missingConfig,
+      onToolDisplayNamesChanged, onSetupRequired,
+    );
+    const toolNames = plugin.tools?.map((t) => t.definition.name).join(", ") ?? "none";
+    return {
+      success: !setupError,
+      output:
+        `Plugin "${plugin.name}" v${plugin.version} downloaded and installed.\n` +
+        `Tools: ${toolNames}\n` +
+        `Installed to: ${installResult.installPath}\n` +
+        (setupError || "Configuration saved and plugin activated.") +
+        warningLines,
+    };
+  }
+
   if (plugin.tools) {
     for (const tool of plugin.tools) {
       try {
@@ -425,9 +514,6 @@ async function handleInstallFromStore(
   }
 
   const toolNames = plugin.tools?.map((t) => t.definition.name).join(", ") ?? "none";
-  const warningLines = installResult.warnings.length > 0
-    ? "\n\nWarnings:\n" + installResult.warnings.map((w) => `  - ${w}`).join("\n")
-    : "";
 
   return {
     success: true,

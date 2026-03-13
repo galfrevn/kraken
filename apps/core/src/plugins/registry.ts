@@ -177,7 +177,8 @@ export class PluginRegistry {
     workingDirectory: string,
     baseContext: Omit<PluginContext, "config">,
     config: Record<string, unknown> = {},
-  ): Promise<{ success: true; plugin: KrakenPlugin } | { success: false; error: string }> {
+    deferIfMissingConfig?: boolean,
+  ): Promise<{ success: true; plugin: KrakenPlugin; missingConfig?: MissingConfigField[] } | { success: false; error: string }> {
     ensureSdkResolvable();
 
     const { resolved, failed } = resolvePluginPaths(
@@ -197,6 +198,18 @@ export class PluginRegistry {
       const duplicate = this.plugins.find((p) => p.plugin.name === plugin.name);
       if (duplicate) {
         return { success: false, error: `plugin "${plugin.name}" is already loaded` };
+      }
+
+      const missingConfig = PluginRegistry.getMissingRequiredConfig(plugin, resolvedPlugin.config);
+
+      if (missingConfig.length > 0 && deferIfMissingConfig) {
+        this.deferredPlugins.push({
+          plugin,
+          resolvedEntry: { entry: resolvedPlugin.entry, source: resolvedPlugin.source, config: resolvedPlugin.config },
+          missing: missingConfig,
+          baseContext,
+        });
+        return { success: true, plugin, missingConfig };
       }
 
       const perPluginContext: PluginContext = {
