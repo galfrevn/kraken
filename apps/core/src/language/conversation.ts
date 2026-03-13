@@ -82,9 +82,17 @@ export class ConversationHistory {
   }
 
   trimToLastMessages(count: number): void {
-    if (this.messages.length > count) {
-      this.messages = this.messages.slice(-count);
+    if (this.messages.length <= count) return;
+
+    let cutIndex = this.messages.length - count;
+
+    // Ensure we don't cut in the middle of a tool call sequence.
+    // Move the cut forward until we land on a non-tool message.
+    while (cutIndex < this.messages.length && this.messages[cutIndex]!.role === MESSAGE_ROLE.tool) {
+      cutIndex++;
     }
+
+    this.messages = this.messages.slice(cutIndex);
   }
 
   /**
@@ -125,7 +133,36 @@ export class ConversationHistory {
     const limit = this.options.maxMessages ?? 20;
     if (this.messages.length <= limit) return { didCompact: false, removedCount: 0 };
 
-    const cutIndex = Math.floor(this.messages.length / 2);
+    // Find a safe cut point that doesn't orphan tool result messages.
+    // A safe cut point is a "user" message — never cut between an assistant
+    // message with tool_calls and the corresponding tool result messages.
+    const idealCutIndex = Math.floor(this.messages.length / 2);
+    let cutIndex = idealCutIndex;
+
+    // Search forward from the ideal cut point for a "user" message boundary
+    for (let i = idealCutIndex; i < this.messages.length - 1; i++) {
+      if (this.messages[i]!.role === MESSAGE_ROLE.user) {
+        cutIndex = i;
+        break;
+      }
+    }
+
+    // If no safe point found forward, search backward
+    if (this.messages[cutIndex]!.role !== MESSAGE_ROLE.user) {
+      for (let i = idealCutIndex - 1; i > 0; i--) {
+        if (this.messages[i]!.role === MESSAGE_ROLE.user) {
+          cutIndex = i;
+          break;
+        }
+      }
+    }
+
+    // If still no safe point (shouldn't happen in normal flows), keep at least
+    // the last few messages to avoid sending an empty history
+    if (cutIndex <= 0) {
+      cutIndex = Math.max(1, this.messages.length - limit);
+    }
+
     const oldMessages = this.messages.slice(0, cutIndex);
     this.messages = this.messages.slice(cutIndex);
 
