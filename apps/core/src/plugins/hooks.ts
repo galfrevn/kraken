@@ -19,25 +19,27 @@ export class HookDispatcher {
   }
 
   async dispatchConversationStart(context: PluginContext): Promise<void> {
-    for (const { pluginName, hooks } of this.registrations) {
-      if (!hooks.onConversationStart) continue;
-      try {
-        await hooks.onConversationStart(context);
-      } catch (error) {
-        console.error(`[plugin:${pluginName}] onConversationStart error:`, error);
-      }
-    }
+    const promises = this.registrations
+      .filter(({ hooks }) => hooks.onConversationStart)
+      .map(({ pluginName, hooks }) =>
+        Promise.resolve(hooks.onConversationStart!(context)).catch((error: unknown) => {
+          console.error(`[plugin:${pluginName}] onConversationStart error:`, error);
+        }),
+      );
+
+    await Promise.allSettled(promises);
   }
 
   async dispatchConversationEnd(context: PluginContext): Promise<void> {
-    for (const { pluginName, hooks } of this.registrations) {
-      if (!hooks.onConversationEnd) continue;
-      try {
-        await hooks.onConversationEnd(context);
-      } catch (error) {
-        console.error(`[plugin:${pluginName}] onConversationEnd error:`, error);
-      }
-    }
+    const promises = this.registrations
+      .filter(({ hooks }) => hooks.onConversationEnd)
+      .map(({ pluginName, hooks }) =>
+        Promise.resolve(hooks.onConversationEnd!(context)).catch((error: unknown) => {
+          console.error(`[plugin:${pluginName}] onConversationEnd error:`, error);
+        }),
+      );
+
+    await Promise.allSettled(promises);
   }
 
   async dispatchBeforeToolCall(
@@ -63,14 +65,17 @@ export class HookDispatcher {
     parameters: Record<string, unknown>,
     result: ToolResult,
   ): Promise<void> {
-    for (const { pluginName, hooks } of this.registrations) {
-      if (!hooks.afterToolCall) continue;
-      try {
-        await hooks.afterToolCall(toolName, parameters, result);
-      } catch (error) {
-        console.error(`[plugin:${pluginName}] afterToolCall error:`, error);
-      }
-    }
+    const promises = this.registrations
+      .filter(({ hooks }) => hooks.afterToolCall)
+      .map(({ pluginName, hooks }) =>
+        Promise.resolve(hooks.afterToolCall!(toolName, parameters, result)).catch(
+          (error: unknown) => {
+            console.error(`[plugin:${pluginName}] afterToolCall error:`, error);
+          },
+        ),
+      );
+
+    await Promise.allSettled(promises);
   }
 
   get hasHooks(): boolean {
