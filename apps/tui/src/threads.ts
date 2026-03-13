@@ -3,7 +3,7 @@ import { ToolRegistry } from "@core/tools/registry.ts";
 import { AgentDatabase } from "@core/storage/database.ts";
 import type { ThreadMessageRow, ThreadConversationRow } from "@core/storage/database.ts";
 import { ChatEngine, type SerializedChatEngine } from "@/engine.ts";
-import type { MemoryContext, PromptOptions } from "@core/agent/prompt.ts";
+import type { MemoryContext, PromptOptions, EnvironmentContext } from "@core/agent/prompt.ts";
 import type { HookDispatcher } from "@core/plugins/hooks.ts";
 import type { PluginContext } from "@kraken/sdk";
 
@@ -21,10 +21,11 @@ export interface ThreadSummary {
 const UNTITLED_THREAD_PREFIX = "new conversation";
 const TITLE_GENERATION_MODEL = "openrouter/free";
 const TITLE_GENERATION_SYSTEM_PROMPT =
-  "Generate a very short title (max 6 words) that summarizes the user's request. " +
-  "Reply ONLY with the title text, no quotes, no punctuation at the end, no explanation. " +
-  "Use lowercase. Be concise and specific. " +
-  "Write the title in the same language the user wrote in.";
+  "You are a title generator. Given a user message, output a short label (3-6 words) that captures the TOPIC, not the answer. " +
+  "Never include data, prices, numbers, results, or conclusions — only the subject. " +
+  "Examples: 'precio elden ring ps5', 'refactor auth middleware', 'deploy staging fix'. " +
+  "Reply ONLY with the title. No quotes, no punctuation, no explanation. " +
+  "Lowercase. Same language as the user.";
 
 const SUMMARY_GENERATION_SYSTEM_PROMPT =
   "You are a session summarizer. Given a conversation between a user and a developer agent, " +
@@ -61,6 +62,7 @@ export class ThreadManager {
   private workingDirectory: string;
   private database: AgentDatabase;
   private changeListeners: Set<ThreadChangeListener> = new Set();
+  private savedMessageCounts: Map<string, number> = new Map();
   private saveTimeout: ReturnType<typeof setTimeout> | null = null;
   private promptExtensionsGetter: (() => string[]) | null = null;
   private hookDispatcher?: HookDispatcher;
@@ -118,6 +120,17 @@ export class ThreadManager {
     }
   }
 
+  private buildEnvironmentContext(): EnvironmentContext {
+    return {
+      workingDirectory: this.workingDirectory,
+      platform: process.platform,
+      shell: process.env.SHELL || (process.platform === "win32" ? "powershell" : "bash"),
+      date: new Date().toISOString().split("T")[0]!,
+      modelName: this.languageModelClient.getModel(),
+      projectName: this.workingDirectory.split(/[/\\]/).pop() || "unknown",
+    };
+  }
+
   private buildPromptOptions(): PromptOptions {
     const extensions = this.promptExtensionsGetter?.();
     return {
@@ -125,6 +138,7 @@ export class ThreadManager {
       pluginPromptExtensions: extensions && extensions.length > 0
         ? extensions
         : undefined,
+      environmentContext: this.buildEnvironmentContext(),
     };
   }
 
@@ -223,19 +237,25 @@ export class ThreadManager {
 
     if (!metadata) return;
 
-    const firstUserMessage = messages.find((message) => message.role === "user");
-    if (!firstUserMessage) return;
-
     const isUntitled = metadata.title === UNTITLED_THREAD_PREFIX;
     if (!isUntitled) return;
 
-    const truncatedFallback = firstUserMessage.content.length > 40
-      ? firstUserMessage.content.slice(0, 40) + "..."
-      : firstUserMessage.content;
+    // Wait until the agent has responded at least once
+    const userMessages = messages.filter((message) => message.role === "user");
+    const hasAssistantResponse = messages.some((message) => message.role === "assistant" && message.content.trim().length > 0);
+    if (userMessages.length === 0 || !hasAssistantResponse) return;
+
+    // Pick the first substantive user message (skip short greetings like "hola", "hi", "hey")
+    const substantiveMessage = userMessages.find((m) => m.content.trim().length > 10) ?? userMessages[0]!;
+    const titleInput = substantiveMessage.content.slice(0, 300);
+
+    const truncatedFallback = substantiveMessage.content.length > 40
+      ? substantiveMessage.content.slice(0, 40) + "..."
+      : substantiveMessage.content;
 
     try {
       const generatedTitle = await this.languageModelClient.singlePrompt(
-        firstUserMessage.content,
+        titleInput,
         TITLE_GENERATION_SYSTEM_PROMPT,
         {
           model: TITLE_GENERATION_MODEL,
@@ -365,6 +385,7 @@ export class ThreadManager {
       engine.removeAllListeners();
     }
 
+    this.savedMessageCounts.delete(identifier);
     this.threads.delete(identifier);
     this.threadMetadata.delete(identifier);
 
@@ -413,6 +434,7 @@ export class ThreadManager {
 
     this.threads.clear();
     this.threadMetadata.clear();
+    this.savedMessageCounts.clear();
 
     try {
       this.database.deleteAllThreads();
@@ -476,16 +498,26 @@ export class ThreadManager {
 
         const state = engine.exportState();
 
+        const savedCount = this.savedMessageCounts.get(identifier) ?? 0;
+
         const messageRows: ThreadMessageRow[] = state.messages.map((message) => ({
           role: message.role,
           content: message.content,
-          raw_content: message.rawContent ?? null,
+          raw_content: message.rawContent ?? (message.attachments ? JSON.stringify(message.attachments) : null),
           tool_name: message.toolName ?? null,
           tool_success: message.toolSuccess !== undefined ? (message.toolSuccess ? 1 : 0) : null,
           created_at: message.timestamp,
         }));
 
-        this.database.replaceThreadMessages(identifier, messageRows);
+        if (savedCount === 0) {
+          this.database.replaceThreadMessages(identifier, messageRows);
+        } else {
+          const newMessages = messageRows.slice(savedCount);
+          if (newMessages.length > 0) {
+            this.database.appendThreadMessages(identifier, newMessages);
+          }
+        }
+        this.savedMessageCounts.set(identifier, messageRows.length);
 
         const conversationRows: ThreadConversationRow[] = state.conversationMessages.map(
           (message, index) => ({
@@ -494,6 +526,24 @@ export class ThreadManager {
             position: index,
           }),
         );
+
+        // Persist pending questions as a special conversation row
+        if (state.pendingQuestions) {
+          conversationRows.push({
+            role: "__pending_questions__",
+            content: JSON.stringify(state.pendingQuestions),
+            position: conversationRows.length,
+          });
+        }
+
+        // Persist plan as a special conversation row
+        if (state.plan) {
+          conversationRows.push({
+            role: "__plan__",
+            content: JSON.stringify({ ...state.plan, planMode: state.planMode }),
+            position: conversationRows.length,
+          });
+        }
 
         this.database.replaceThreadConversation(identifier, conversationRows);
       }
@@ -531,18 +581,49 @@ export class ThreadManager {
         const conversationRows = this.database.getThreadConversation(row.id);
 
         const serializedState: SerializedChatEngine = {
-          messages: messageRows.map((messageRow) => ({
-            role: messageRow.role as any,
-            content: messageRow.content,
-            rawContent: messageRow.raw_content ?? undefined,
-            timestamp: messageRow.created_at,
-            toolName: messageRow.tool_name ?? undefined,
-            toolSuccess: messageRow.tool_success !== null ? messageRow.tool_success === 1 : undefined,
-          })),
-          conversationMessages: conversationRows.map((conversationRow) => ({
-            role: conversationRow.role,
-            content: conversationRow.content,
-          })),
+          messages: messageRows.map((messageRow) => {
+            let rawContent = messageRow.raw_content ?? undefined;
+            let attachments: import("@/engine.ts").FileAttachment[] | undefined;
+            // For user messages, raw_content may store attachments JSON
+            if (messageRow.role === "user" && rawContent) {
+              try {
+                const parsed = JSON.parse(rawContent);
+                if (Array.isArray(parsed) && parsed.length > 0 && parsed[0].path) {
+                  attachments = parsed;
+                  rawContent = undefined;
+                }
+              } catch { /* not JSON, keep as rawContent */ }
+            }
+            return {
+              role: messageRow.role as any,
+              content: messageRow.content,
+              rawContent,
+              timestamp: messageRow.created_at,
+              toolName: messageRow.tool_name ?? undefined,
+              toolSuccess: messageRow.tool_success !== null ? messageRow.tool_success === 1 : undefined,
+              attachments,
+            };
+          }),
+          conversationMessages: conversationRows
+            .filter((r) => r.role !== "__pending_questions__" && r.role !== "__plan__")
+            .map((conversationRow) => ({
+              role: conversationRow.role,
+              content: conversationRow.content,
+            })),
+          pendingQuestions: (() => {
+            const pqRow = conversationRows.find((r) => r.role === "__pending_questions__");
+            if (!pqRow) return undefined;
+            try { return JSON.parse(pqRow.content); } catch { return undefined; }
+          })(),
+          ...(() => {
+            const planRow = conversationRows.find((r) => r.role === "__plan__");
+            if (!planRow) return {};
+            try {
+              const parsed = JSON.parse(planRow.content);
+              const { planMode: pm, ...plan } = parsed;
+              return { plan, planMode: pm ?? undefined };
+            } catch { return {}; }
+          })(),
         };
 
         engine.importState(serializedState);

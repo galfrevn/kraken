@@ -7,11 +7,18 @@ import type { ToolExecutionContext } from "@core/tools/schema.ts";
 import type { CompletionResult, ToolCallEntry } from "@core/language/schema.ts";
 import type { HookDispatcher } from "@core/plugins/hooks.ts";
 import type { PluginContext } from "@kraken/sdk";
+import type { PendingQuestions } from "@core/tools/question.ts";
 
 const MAX_ITERATIONS_PER_MESSAGE = 40;
 const CONTINUE_PROMPT = "Continue from where you left off. Complete any remaining steps without repeating what was already done.";
 
 export type ChatMessageRole = "user" | "assistant" | "tool_call" | "tool_result" | "error" | "status";
+
+export interface FileAttachment {
+  path: string;
+  name: string;
+  isImage: boolean;
+}
 
 export interface ChatMessage {
   role: ChatMessageRole;
@@ -21,7 +28,23 @@ export interface ChatMessage {
   toolName?: string;
   toolSuccess?: boolean;
   streaming?: boolean;
+  attachments?: FileAttachment[];
 }
+
+export interface PlanStep {
+  id: number;
+  description: string;
+  status: "pending" | "in_progress" | "completed" | "failed";
+}
+
+export interface Plan {
+  goal: string;
+  steps: PlanStep[];
+  status: "draft" | "approved" | "executing" | "completed" | "failed";
+  feedback: string[];
+}
+
+export type PlanListener = (plan: Plan | null) => void;
 
 export interface SerializedChatMessage {
   role: ChatMessageRole;
@@ -30,6 +53,7 @@ export interface SerializedChatMessage {
   timestamp: string;
   toolName?: string;
   toolSuccess?: boolean;
+  attachments?: FileAttachment[];
 }
 
 export interface SerializedConversationMessage {
@@ -40,12 +64,40 @@ export interface SerializedConversationMessage {
   name?: string;
 }
 
+export interface SerializedPendingQuestions {
+  id: string;
+  items: import("@core/tools/question.ts").QuestionItem[];
+}
+
+export interface SerializedPlan {
+  goal: string;
+  steps: PlanStep[];
+  status: Plan["status"];
+  feedback: string[];
+}
+
 export interface SerializedChatEngine {
   messages: SerializedChatMessage[];
   conversationMessages: SerializedConversationMessage[];
+  pendingQuestions?: SerializedPendingQuestions;
+  plan?: SerializedPlan;
+  planMode?: boolean;
 }
 
 export type ChatEventListener = (messages: ChatMessage[]) => void;
+
+function parsePlanFromContent(content: string): { goal: string; steps: string[] } | null {
+  const planMatch = content.match(/<plan>([\s\S]*?)<\/plan>/);
+  if (!planMatch) return null;
+  const planContent = planMatch[1]!;
+  const goalMatch = planContent.match(/<goal>([\s\S]*?)<\/goal>/);
+  const steps = [...planContent.matchAll(/<step>([\s\S]*?)<\/step>/g)].map((m) => m[1]!.trim());
+  if (steps.length === 0) return null;
+  return {
+    goal: goalMatch ? goalMatch[1]!.trim() : "",
+    steps,
+  };
+}
 
 class CancelledError extends Error {
   constructor() {
@@ -65,10 +117,18 @@ export class ChatEngine {
   private emitTimer: ReturnType<typeof setTimeout> | null = null;
   private abortController: AbortController | null = null;
   private messageQueue: string[] = [];
+  private pendingAttachments: (FileAttachment[] | undefined)[] = [];
   private processingQueue: boolean = false;
   private reachedIterationLimit: boolean = false;
+  private pendingPlanFeedback: string | null = null;
   private hookDispatcher?: HookDispatcher;
   private pluginContext?: PluginContext;
+  private planMode: boolean = false;
+  private currentPlan: Plan | null = null;
+  private planListeners: Set<PlanListener> = new Set();
+  private pendingQuestions: PendingQuestions | null = null;
+  private questionListeners: Set<(q: PendingQuestions | null) => void> = new Set();
+  private promptOptions: PromptOptions;
 
   constructor(
     languageModelClient: LanguageModelClient,
@@ -79,8 +139,9 @@ export class ChatEngine {
     this.languageModelClient = languageModelClient;
     this.toolRegistry = toolRegistry;
     this.workingDirectory = workingDirectory;
+    this.promptOptions = promptOptions ?? {};
 
-    const systemPrompt = buildSystemPrompt(this.toolRegistry.listTools(), promptOptions);
+    const systemPrompt = buildSystemPrompt(this.toolRegistry.listTools(), this.promptOptions);
     this.conversation = new ConversationHistory(systemPrompt);
 
     this.languageModelClient.setNativeTools(toolsToNativeFormat(this.toolRegistry.listTools()));
@@ -103,6 +164,10 @@ export class ChatEngine {
     return this.messageQueue.length;
   }
 
+  getQueuedMessages(): string[] {
+    return [...this.messageQueue];
+  }
+
   addEventListener(listener: ChatEventListener): void {
     this.listeners.add(listener);
   }
@@ -115,6 +180,268 @@ export class ChatEngine {
     this.listeners.clear();
   }
 
+  setPlanMode(enabled: boolean): void {
+    this.planMode = enabled;
+    this.rebuildSystemPrompt();
+  }
+
+  private rebuildSystemPrompt(): void {
+    const updatedOptions: PromptOptions = { ...this.promptOptions, planMode: this.planMode };
+    const systemPrompt = buildSystemPrompt(this.toolRegistry.listTools(), updatedOptions);
+    this.conversation.setSystemPrompt(systemPrompt);
+  }
+
+  isPlanMode(): boolean {
+    return this.planMode;
+  }
+
+  getPlan(): Plan | null {
+    return this.currentPlan;
+  }
+
+  addPlanListener(listener: PlanListener): void {
+    this.planListeners.add(listener);
+  }
+
+  removePlanListener(listener: PlanListener): void {
+    this.planListeners.delete(listener);
+  }
+
+  getPendingQuestions(): PendingQuestions | null {
+    return this.pendingQuestions;
+  }
+
+  addQuestionListener(listener: (q: PendingQuestions | null) => void): void {
+    this.questionListeners.add(listener);
+  }
+
+  removeQuestionListener(listener: (q: PendingQuestions | null) => void): void {
+    this.questionListeners.delete(listener);
+  }
+
+  private notifyQuestionListeners(): void {
+    for (const listener of this.questionListeners) {
+      listener(this.pendingQuestions);
+    }
+  }
+
+  handleQuestionsAsked(pending: PendingQuestions): void {
+    const originalResolve = pending.resolve;
+    this.pendingQuestions = {
+      ...pending,
+      resolve: (answers) => {
+        this.pendingQuestions = null;
+        this.notifyQuestionListeners();
+        originalResolve(answers);
+      },
+    };
+    this.notifyQuestionListeners();
+  }
+
+  resolveQuestions(answers: import("@core/tools/question.ts").QuestionAnswer[]): void {
+    if (!this.pendingQuestions) return;
+    this.pendingQuestions.resolve(answers);
+  }
+
+  private notifyPlanListeners(): void {
+    for (const listener of this.planListeners) {
+      listener(this.currentPlan);
+    }
+  }
+
+  addPlanFeedback(feedback: string): void {
+    if (!this.currentPlan || this.currentPlan.status !== "draft") return;
+    this.currentPlan.feedback.push(feedback);
+    this.notifyPlanListeners();
+    // Ensure plan mode is on for feedback (it's inherently a plan operation)
+    this.planMode = true;
+    // Show only the user's feedback in chat, but send the full prompt to the LLM
+    this.pendingPlanFeedback = feedback;
+    this.enqueueMessage(feedback);
+  }
+
+  approvePlan(): void {
+    if (!this.currentPlan || this.currentPlan.status !== "draft") return;
+    this.currentPlan.status = "approved";
+    this.notifyPlanListeners();
+    this.processMessageWithPlanExecution();
+  }
+
+  private async processMessageWithPlanExecution(): Promise<void> {
+    const plan = this.currentPlan;
+    if (!plan) return;
+    if (this.processing) return;
+
+    this.processing = true;
+    this.abortController = new AbortController();
+    this.emitImmediate();
+
+    plan.status = "executing";
+    this.notifyPlanListeners();
+
+    try {
+      for (const step of plan.steps) {
+        if (this.abortController?.signal.aborted) {
+          step.status = "failed";
+          this.notifyPlanListeners();
+          continue;
+        }
+
+        step.status = "in_progress";
+        this.notifyPlanListeners();
+
+        const stepPrompt = `Execute step ${step.id} of the approved plan: ${step.description}\n\nOnly do this specific step. When done, confirm what was accomplished.`;
+        const stepLabel = `Step ${step.id}/${plan.steps.length}: ${step.description}`;
+
+        try {
+          await this.executeSingleStep(stepPrompt, stepLabel);
+          step.status = "completed";
+        } catch (err) {
+          if (err instanceof CancelledError) {
+            step.status = "failed";
+            this.notifyPlanListeners();
+            break;
+          }
+          step.status = "failed";
+        }
+
+        this.notifyPlanListeners();
+      }
+
+      plan.status = plan.steps.some((s) => s.status === "failed") ? "failed" : "completed";
+      this.notifyPlanListeners();
+    } finally {
+      this.processing = false;
+      this.abortController = null;
+      this.emitImmediate();
+
+      if (this.messageQueue.length > 0) {
+        queueMicrotask(() => this.processNextInQueue());
+      }
+    }
+  }
+
+  private async executeSingleStep(prompt: string, stepLabel?: string): Promise<void> {
+    // This is a sub-routine of executePlan that reuses the agent loop
+    // without setting this.processing (which is managed by the outer processMessage call)
+
+    if (stepLabel) {
+      this.pushMessage({
+        role: "status",
+        content: stepLabel,
+        timestamp: new Date(),
+      });
+    }
+
+    const toolContext: ToolExecutionContext = {
+      workingDirectory: this.workingDirectory,
+    };
+
+    let completionResult = await this.getResponse(prompt);
+    let iterations = 0;
+
+    while (iterations < MAX_ITERATIONS_PER_MESSAGE) {
+      this.checkCancelled();
+      iterations += 1;
+
+      if (completionResult.finishReason !== "tool_calls" || completionResult.toolCalls.length === 0) {
+        break;
+      }
+
+      const lastMsg = this.messages[this.messages.length - 1];
+      if (lastMsg && lastMsg.role === "assistant" && !lastMsg.content.trim()) {
+        this.removeLastMessage();
+      }
+
+      const preparedCalls = await Promise.all(
+        completionResult.toolCalls.map(async (toolCall) => {
+          let parameters: Record<string, unknown>;
+          try {
+            parameters = JSON.parse(toolCall.function.arguments);
+          } catch {
+            parameters = {};
+          }
+
+          if (this.hookDispatcher) {
+            parameters = await this.hookDispatcher.dispatchBeforeToolCall(toolCall.function.name, parameters);
+          }
+
+          this.pushMessage({
+            role: "tool_call",
+            content: JSON.stringify(parameters, null, 2),
+            toolName: toolCall.function.name,
+            timestamp: new Date(),
+          });
+
+          return { toolCall, parameters };
+        }),
+      );
+
+      this.checkCancelled();
+
+      const results = await Promise.all(
+        preparedCalls.map(async ({ toolCall, parameters }) => {
+          try {
+            const toolResult = await this.raceWithAbort(
+              this.toolRegistry.executeTool(toolCall.function.name, parameters, toolContext),
+            );
+
+            if (this.hookDispatcher) {
+              await this.hookDispatcher.dispatchAfterToolCall(toolCall.function.name, parameters, toolResult);
+            }
+
+            return { toolCall, parameters, toolResult, error: null };
+          } catch (toolError) {
+            if (toolError instanceof CancelledError) throw toolError;
+            const toolErrorMessage = toolError instanceof Error ? toolError.message : String(toolError);
+            return { toolCall, parameters, toolResult: null, error: toolErrorMessage };
+          }
+        }),
+      );
+
+      for (const { toolCall, toolResult, error } of results) {
+        if (toolResult) {
+          const resultPreview = toolResult.output.length > 3000
+            ? toolResult.output.slice(0, 3000) + "..."
+            : toolResult.output;
+
+          this.pushMessage({
+            role: "tool_result",
+            content: resultPreview,
+            rawContent: toolResult.output,
+            toolName: toolCall.function.name,
+            toolSuccess: toolResult.success,
+            timestamp: new Date(),
+          });
+
+          this.conversation.addToolResultMessage(
+            toolCall.id,
+            toolCall.function.name,
+            toolResult.success ? toolResult.output : (toolResult.error ?? toolResult.output),
+          );
+        } else {
+          this.pushMessage({
+            role: "tool_result",
+            content: error!,
+            rawContent: error!,
+            toolName: toolCall.function.name,
+            toolSuccess: false,
+            timestamp: new Date(),
+          });
+
+          this.conversation.addToolResultMessage(toolCall.id, toolCall.function.name, error!);
+        }
+      }
+
+      try {
+        completionResult = await this.getResponseContinuation();
+      } catch (followUpError) {
+        if (followUpError instanceof CancelledError) throw followUpError;
+        break;
+      }
+    }
+  }
+
   cancelCurrentResponse(): boolean {
     if (!this.processing || !this.abortController) return false;
 
@@ -122,15 +449,16 @@ export class ChatEngine {
     return true;
   }
 
-  enqueueMessage(userInput: string): void {
+  enqueueMessage(userInput: string, attachments?: FileAttachment[]): void {
     if (!userInput.trim()) return;
 
     if (!this.processing) {
-      this.processMessage(userInput);
+      this.processMessage(userInput, attachments);
       return;
     }
 
     this.messageQueue.push(userInput);
+    this.pendingAttachments.push(attachments);
     this.emit();
   }
 
@@ -140,7 +468,8 @@ export class ChatEngine {
 
     while (this.messageQueue.length > 0) {
       const nextMessage = this.messageQueue.shift()!;
-      await this.processMessage(nextMessage);
+      const nextAttachments = this.pendingAttachments.shift();
+      await this.processMessage(nextMessage, nextAttachments);
     }
 
     this.processingQueue = false;
@@ -179,6 +508,7 @@ export class ChatEngine {
           timestamp: message.timestamp.toISOString(),
           toolName: message.toolName,
           toolSuccess: message.toolSuccess,
+          attachments: message.attachments,
         })),
       conversationMessages: this.conversation.getMessages().map((message) => ({
         role: message.role,
@@ -187,6 +517,13 @@ export class ChatEngine {
         toolCallId: message.toolCallId,
         name: message.name,
       })),
+      pendingQuestions: this.pendingQuestions
+        ? { id: this.pendingQuestions.id, items: this.pendingQuestions.items }
+        : undefined,
+      plan: this.currentPlan
+        ? { goal: this.currentPlan.goal, steps: this.currentPlan.steps, status: this.currentPlan.status, feedback: this.currentPlan.feedback }
+        : undefined,
+      planMode: this.planMode || undefined,
     };
   }
 
@@ -198,6 +535,7 @@ export class ChatEngine {
       timestamp: new Date(message.timestamp),
       toolName: message.toolName,
       toolSuccess: message.toolSuccess,
+      attachments: message.attachments,
     }));
 
     this.conversation.clear();
@@ -217,6 +555,47 @@ export class ChatEngine {
           conversationMessage.content,
         );
       }
+    }
+
+    if (state.pendingQuestions) {
+      const sq = state.pendingQuestions;
+      this.pendingQuestions = {
+        id: sq.id,
+        items: sq.items,
+        resolve: (answers) => {
+          const lines = ["# Questions", ""];
+          for (const a of answers) {
+            lines.push(a.question);
+            lines.push(a.answer);
+            lines.push("");
+          }
+          this.pendingQuestions = null;
+          this.notifyQuestionListeners();
+          this.pushMessage({
+            role: "tool_result",
+            content: lines.join("\n"),
+            toolName: "ask_question",
+            toolSuccess: true,
+            timestamp: new Date(),
+          });
+          this.conversation.addUserMessage(lines.join("\n"));
+        },
+      };
+      this.notifyQuestionListeners();
+    }
+
+    if (state.plan) {
+      this.currentPlan = {
+        goal: state.plan.goal,
+        steps: state.plan.steps.map((s) => ({ ...s })),
+        status: state.plan.status,
+        feedback: state.plan.feedback ?? [],
+      };
+      this.notifyPlanListeners();
+    }
+
+    if (state.planMode) {
+      this.planMode = true;
     }
 
     this.emitImmediate();
@@ -276,6 +655,8 @@ export class ChatEngine {
       let reasoningDirty = false;
       let cachedRawPrefix = "";
 
+      this.conversation.compactIfNeeded();
+
       const completionResult = await this.languageModelClient.streamConversation(
         this.conversation,
         inputMessage,
@@ -328,11 +709,11 @@ export class ChatEngine {
     }
   }
 
-  async sendMessage(userInput: string): Promise<void> {
-    this.enqueueMessage(userInput);
+  async sendMessage(userInput: string, attachments?: FileAttachment[]): Promise<void> {
+    this.enqueueMessage(userInput, attachments);
   }
 
-  private async processMessage(userInput: string): Promise<void> {
+  private async processMessage(userInput: string, attachments?: FileAttachment[]): Promise<void> {
     if (this.processing) return;
 
     this.processing = true;
@@ -343,6 +724,7 @@ export class ChatEngine {
       role: "user",
       content: userInput,
       timestamp: new Date(),
+      attachments: attachments && attachments.length > 0 ? attachments : undefined,
     });
 
     const toolContext: ToolExecutionContext = {
@@ -354,7 +736,25 @@ export class ChatEngine {
     }
 
     try {
-      let completionResult = await this.getResponse(userInput);
+      const isPlanGeneration = this.planMode;
+
+      const isFeedback = this.pendingPlanFeedback !== null;
+      let llmInput = userInput;
+      if (isFeedback) {
+        llmInput = `Revise the plan based on this feedback: ${this.pendingPlanFeedback}\n\nYou may use read-only tools to investigate further if needed. If the feedback raises new ambiguities or choices, use ask_question to clarify with the user before finalizing. Then output the updated plan inside <plan> tags with <goal> and <step> tags.`;
+        this.pendingPlanFeedback = null;
+      }
+      if (attachments && attachments.length > 0) {
+        const attachmentLines = attachments.map((a) =>
+          a.isImage
+            ? `[Attached image: ${a.path}] (use view_image tool to analyze)`
+            : `[Attached file: ${a.path}] (use read_file tool to read)`,
+        );
+        llmInput = llmInput + "\n\n" + attachmentLines.join("\n");
+      }
+
+      let completionResult = await this.getResponse(llmInput);
+
       let iterations = 0;
 
       while (iterations < MAX_ITERATIONS_PER_MESSAGE) {
@@ -477,7 +877,34 @@ export class ChatEngine {
         }
       }
 
-      if (iterations >= MAX_ITERATIONS_PER_MESSAGE) {
+      if (isPlanGeneration) {
+        // Scan all assistant messages for a <plan> block (the last one wins)
+        for (let i = this.messages.length - 1; i >= 0; i--) {
+          const msg = this.messages[i];
+          if (msg && msg.role === "assistant") {
+            const raw = msg.rawContent ?? msg.content;
+            const parsed = parsePlanFromContent(raw);
+            if (parsed) {
+              this.currentPlan = {
+                goal: parsed.goal,
+                steps: parsed.steps.map((desc, idx) => ({
+                  id: idx + 1,
+                  description: desc,
+                  status: "pending",
+                })),
+                status: "draft",
+                feedback: [],
+              };
+              this.notifyPlanListeners();
+              // Auto-approve: execute the plan immediately after generation
+              queueMicrotask(() => this.approvePlan());
+              break;
+            }
+          }
+        }
+      }
+
+      if (iterations >= MAX_ITERATIONS_PER_MESSAGE && !isPlanGeneration) {
         this.reachedIterationLimit = true;
         this.pushMessage({
           role: "status",
@@ -538,6 +965,7 @@ export class ChatEngine {
     });
 
     try {
+      this.conversation.compactIfNeeded();
       const messages = this.conversation.getMessagesWithSystemPrompt();
       const completionResult = await this.languageModelClient.complete(messages);
 
@@ -585,6 +1013,7 @@ export class ChatEngine {
     this.messages = [];
     this.conversation.clear();
     this.messageQueue = [];
+    this.pendingAttachments = [];
     this.emitImmediate();
   }
 
