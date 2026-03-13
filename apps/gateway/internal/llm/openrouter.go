@@ -7,9 +7,11 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"net"
 	"net/http"
 	"os"
 	"strings"
+	"time"
 )
 
 const defaultBaseURL = "https://openrouter.ai/api/v1"
@@ -85,10 +87,24 @@ func NewClient() *Client {
 		baseURL = defaultBaseURL
 	}
 
+	transport := &http.Transport{
+		MaxIdleConns:        10,
+		MaxIdleConnsPerHost: 5,
+		IdleConnTimeout:     90 * time.Second,
+		DialContext: (&net.Dialer{
+			Timeout:   10 * time.Second,
+			KeepAlive: 30 * time.Second,
+		}).DialContext,
+		DisableCompression: false,
+	}
+
 	return &Client{
 		apiKey:     apiKey,
 		baseURL:    baseURL,
-		httpClient: &http.Client{},
+		httpClient: &http.Client{
+			Transport: transport,
+			Timeout:   120 * time.Second,
+		},
 	}
 }
 
