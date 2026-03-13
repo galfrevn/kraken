@@ -2,7 +2,6 @@ import { useState, useEffect, useCallback } from "react";
 import { useKeyboard } from "@opentui/react";
 import { COLORS } from "@/theme.ts";
 import type { TuiStore } from "@/store.ts";
-import type { ThreadManager } from "@/threads.ts";
 
 const REFRESH_INTERVAL_MILLISECONDS = 1_500;
 
@@ -29,11 +28,10 @@ interface UnifiedLogEntry {
 
 interface LogsViewProps {
   store: TuiStore;
-  threadManager: ThreadManager;
   focused: boolean;
 }
 
-export function LogsView({ store, threadManager, focused }: LogsViewProps) {
+export function LogsView({ store, focused }: LogsViewProps) {
   const [logs, setLogs] = useState<UnifiedLogEntry[]>([]);
   const [filterLevel, setFilterLevel] = useState<LogLevel>("all");
   const [filterSource, setFilterSource] = useState<LogSource>("all");
@@ -47,17 +45,17 @@ export function LogsView({ store, threadManager, focused }: LogsViewProps) {
       message: log.message,
     }));
 
-    const engineLogs: UnifiedLogEntry[] = threadManager.getActiveEngine().getDebugLog().map((entry) => ({
-      timestamp: entry.timestamp.toISOString().replace("T", " ").slice(0, 19),
-      level: entry.level,
+    const engineLogs: UnifiedLogEntry[] = store.fetchEngineLogs(200).map((log) => ({
+      timestamp: log.created_at,
+      level: log.level,
       source: "engine" as const,
-      prefix: entry.source,
-      message: entry.message,
+      prefix: log.source.padEnd(8).slice(0, 8),
+      message: log.message,
     }));
 
     const merged = [...taskLogs, ...engineLogs].sort((a, b) => a.timestamp.localeCompare(b.timestamp));
     setLogs(merged);
-  }, [store, threadManager]);
+  }, [store]);
 
   useEffect(() => {
     refresh();

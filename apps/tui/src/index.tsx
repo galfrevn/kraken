@@ -187,6 +187,10 @@ export async function main(): Promise<void> {
     indexer.indexProject(configuration.repo).catch(() => {});
   }
 
+  setInterval(() => {
+    database.pruneEngineLogs(5000);
+  }, 10 * 60 * 1000);
+
   const renderer = await createCliRenderer({
     exitOnCtrlC: false,
   });

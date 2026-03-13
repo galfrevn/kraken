@@ -1,4 +1,4 @@
-import type { AgentDatabase, TaskRow, TaskLogRow } from "@core/storage/database.ts";
+import type { AgentDatabase, TaskRow, TaskLogRow, EngineLogRow } from "@core/storage/database.ts";
 import type { TaskQueueManager } from "@core/queue/manager.ts";
 import type { SchedulerClient } from "@core/clients/scheduler.ts";
 import type { GatewayClient } from "@core/clients/gateway.ts";
@@ -140,6 +140,10 @@ export class TuiStore {
 
   fetchAllLogs(limit: number = 100): TaskLogRow[] {
     return this.database.listRecentLogs(limit);
+  }
+
+  fetchEngineLogs(limit: number = 200): EngineLogRow[] {
+    return this.database.listRecentEngineLogs(limit);
   }
 
   approveTask(taskId: string): void {

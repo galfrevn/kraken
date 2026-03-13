@@ -212,7 +212,7 @@ export function Application({ store, threadManager, pluginRegistry, pluginFailur
               <ReviewsView store={store} focused={activeView === "reviews"} />
             )}
             {activeView === "logs" && (
-              <LogsView store={store} threadManager={threadManager} focused={activeView === "logs"} />
+              <LogsView store={store} focused={activeView === "logs"} />
             )}
           </box>
         </box>
