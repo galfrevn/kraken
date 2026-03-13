@@ -212,7 +212,11 @@ export default definePlugin({
   promptExtension:
     "You have email tools from the 'email' plugin (powered by Resend):\n" +
     "- email_send: Send an email. The user will see a confirmation panel before sending.\n" +
-    "- email_list: List recently sent emails.",
+    "- email_list: List recently sent emails.\n\n" +
+    "First-time setup: This plugin requires a Resend API key (get one at resend.com/api-keys). " +
+    "If not configured, ask the user for their key and save it with plugin_manager " +
+    '(action="configure", plugin_name="email", field="api_key", value="<key>"). ' +
+    "Optionally also configure from_address for the default sender.",
 
   activate: async (context: PluginContext) => {
     apiKey =

@@ -6,6 +6,7 @@ import type { ToolRegistry } from "@/tools/registry.ts";
 import { PluginRegistry, type MissingConfigField } from "@/plugins/registry.ts";
 import type { PluginContext, PluginConfigField } from "@kraken/sdk";
 import { fetchRegistry, installPluginFromRegistry, isPluginInstalled } from "@/plugins/installer.ts";
+import { appendToGlobalEnvFile } from "@/configuration/loader.ts";
 
 export interface SetupFieldForPrompt {
   pluginName: string;
@@ -29,20 +30,7 @@ export function createPluginManagerTool(dependencies: PluginManagerDependencies)
   return {
     definition: {
       name: "plugin_manager",
-      description:
-        "Manage plugins. Actions:\n" +
-        "  - list: Show all installed plugins with their status and tools\n" +
-        "  - store: Browse available plugins from the official registry\n" +
-        "  - inspect <name>: Detailed info about a specific installed plugin\n" +
-        "  - check_updates: Check all installed plugins for available updates\n" +
-        "  - update <name>: Update a plugin to the latest version from the registry\n" +
-        "  - install_from_store <name>: Download and install a plugin from the registry\n" +
-        "  - install <path>: Load a plugin from a local path at runtime\n" +
-        "  - uninstall <name>: Delete a plugin from disk and unload it [destructive]\n" +
-        "  - disable <name>: Deactivate a plugin for the current session [destructive]\n" +
-        "  - enable <name>: Re-activate a disabled plugin\n" +
-        "  - remove <name>: Unload a plugin from the current session (keeps files) [destructive]\n\n" +
-        "For destructive actions (disable, remove, uninstall), set confirmed=true after user confirmation.",
+      description: "Manage plugins (list, install, configure, update, remove).",
       parameters: [
         {
           name: "action",
@@ -55,7 +43,19 @@ export function createPluginManagerTool(dependencies: PluginManagerDependencies)
           name: "plugin_name",
           type: "string" as const,
           description:
-            "The plugin name or path (required for inspect, install, disable, enable, remove).",
+            "The plugin name, path, or search query (required for inspect, install, disable, enable, remove, configure; optional for store).",
+          required: false,
+        },
+        {
+          name: "field",
+          type: "string" as const,
+          description: "Config field name (required for configure action).",
+          required: false,
+        },
+        {
+          name: "value",
+          type: "string" as const,
+          description: "Config field value (required for configure action).",
           required: false,
         },
         {
@@ -70,6 +70,8 @@ export function createPluginManagerTool(dependencies: PluginManagerDependencies)
     async execute(parameters: Record<string, unknown>): Promise<ToolResult> {
       const action = ((parameters["action"] as string) ?? "").toLowerCase().trim();
       const pluginName = ((parameters["plugin_name"] as string) ?? "").trim();
+      const fieldName = ((parameters["field"] as string) ?? "").trim();
+      const fieldValue = ((parameters["value"] as string) ?? "").trim();
       const confirmed = (parameters["confirmed"] as boolean) ?? false;
 
       switch (action) {
@@ -77,7 +79,16 @@ export function createPluginManagerTool(dependencies: PluginManagerDependencies)
           return handleList(pluginRegistry);
         case "store":
         case "browse":
-          return handleStore(pluginRegistry);
+          return handleStore(pluginRegistry, pluginName);
+        case "configure":
+          return handleConfigure(
+            pluginRegistry,
+            toolRegistry,
+            pluginName,
+            fieldName,
+            fieldValue,
+            onToolDisplayNamesChanged,
+          );
         case "inspect":
           return handleInspect(pluginRegistry, pluginName);
         case "check_updates":
@@ -217,6 +228,106 @@ function handleInspect(registry: PluginRegistry, name: string): ToolResult {
   }
 
   return { success: true, output: sections.join("\n") };
+}
+
+async function handleConfigure(
+  registry: PluginRegistry,
+  toolReg: ToolRegistry,
+  pluginName: string,
+  fieldName: string,
+  value: string,
+  onToolDisplayNamesChanged?: (names: Record<string, string>) => void,
+): Promise<ToolResult> {
+  if (!pluginName) {
+    return { success: false, output: "", error: "plugin_name is required for configure" };
+  }
+  if (!fieldName) {
+    return { success: false, output: "", error: "field is required for configure" };
+  }
+  if (!value) {
+    return { success: false, output: "", error: "value is required for configure" };
+  }
+
+  // Check if it's a deferred plugin
+  const deferred = registry.getDeferredPlugins();
+  const deferredEntry = deferred.find((d) => d.name === pluginName);
+
+  // Check if it's a loaded plugin
+  const loadedEntry = registry.getPluginByName(pluginName);
+
+  if (!deferredEntry && !loadedEntry) {
+    return { success: false, output: "", error: `plugin "${pluginName}" not found` };
+  }
+
+  // Find the config field definition
+  let fieldDef: PluginConfigField | undefined;
+
+  if (loadedEntry) {
+    fieldDef = loadedEntry.plugin.configSchema?.[fieldName];
+  } else if (deferredEntry) {
+    const missing = deferredEntry.missing.find((m) => m.fieldName === fieldName);
+    fieldDef = missing?.field;
+  }
+  if (!fieldDef) {
+    return { success: false, output: "", error: `unknown config field "${fieldName}" for plugin "${pluginName}"` };
+  }
+
+  // Save the value
+  if (fieldDef.envVar) {
+    await appendToGlobalEnvFile(fieldDef.envVar, value);
+  }
+
+  // If this was a deferred plugin, try to activate it
+  if (deferredEntry) {
+    // Check if all required fields are now satisfied
+    const stillMissing = deferredEntry.missing.filter((m) => {
+      if (m.fieldName === fieldName) return false; // just configured this one
+      if (m.field.envVar && process.env[m.field.envVar]) return false;
+      return true;
+    });
+
+    if (stillMissing.length === 0) {
+      const activateResult = await registry.activateDeferred();
+
+      if (activateResult.loaded.length > 0) {
+        for (const tool of registry.getTools()) {
+          if (!toolReg.getTool(tool.definition.name)) {
+            try { toolReg.register(tool); } catch { /* skip */ }
+          }
+        }
+        if (onToolDisplayNamesChanged) {
+          onToolDisplayNamesChanged(registry.getToolDisplayNames());
+        }
+        return {
+          success: true,
+          output:
+            `Saved ${fieldName} for "${pluginName}". ` +
+            `All configuration complete — plugin activated. ` +
+            `Tools: ${activateResult.loaded.join(", ")}`,
+        };
+      }
+
+      if (activateResult.failed.length > 0) {
+        return {
+          success: false,
+          output: "",
+          error: `Saved config but activation failed: ${activateResult.failed.map((f) => f.error).join(", ")}`,
+        };
+      }
+    }
+
+    return {
+      success: true,
+      output:
+        `Saved ${fieldName} for "${pluginName}". ` +
+        `Still missing: ${stillMissing.map((m) => m.fieldName).join(", ")}`,
+    };
+  }
+
+  return {
+    success: true,
+    output: `Saved ${fieldName}="${value}" for "${pluginName}". Restart or reload the plugin for the change to take effect.`,
+  };
 }
 
 async function promptAndActivateDeferred(
@@ -403,13 +514,37 @@ async function handleRemove(
     : { success: false, output: "", error: `failed to remove plugin "${name}"` };
 }
 
-async function handleStore(localRegistry: PluginRegistry): Promise<ToolResult> {
+async function handleStore(localRegistry: PluginRegistry, query: string): Promise<ToolResult> {
   try {
     const registry = await fetchRegistry();
     const loadedPlugins = localRegistry.getLoadedPlugins();
     const loadedNames = new Set(loadedPlugins.map((p) => p.plugin.name));
 
-    const lines = registry.plugins.map((entry) => {
+    let plugins = registry.plugins;
+
+    if (query) {
+      const terms = query.toLowerCase().split(/\s+/);
+      plugins = plugins.filter((entry) => {
+        const searchable = [
+          entry.name,
+          entry.description,
+          entry.author,
+          ...entry.tools,
+        ].join(" ").toLowerCase();
+        return terms.every((term) => searchable.includes(term));
+      });
+    }
+
+    if (plugins.length === 0) {
+      return {
+        success: true,
+        output: query
+          ? `No plugins found matching "${query}".`
+          : "The plugin store is empty.",
+      };
+    }
+
+    const lines = plugins.map((entry) => {
       const installed = isPluginInstalled(entry.name);
       const loaded = loadedNames.has(entry.name);
       let status = "available";
@@ -426,10 +561,14 @@ async function handleStore(localRegistry: PluginRegistry): Promise<ToolResult> {
       );
     });
 
+    const header = query
+      ? `Plugin Store — ${plugins.length} result(s) for "${query}":`
+      : `Plugin Store — ${plugins.length} plugin(s) available:`;
+
     return {
       success: true,
       output:
-        `Plugin Store — ${registry.plugins.length} plugin(s) available:\n\n${lines.join("\n\n")}\n\n` +
+        `${header}\n\n${lines.join("\n\n")}\n\n` +
         'To install a plugin, use action "install_from_store" with the plugin name.',
     };
   } catch (error) {

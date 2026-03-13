@@ -324,10 +324,27 @@ export class PluginRegistry {
   }
 
   getPromptExtensions(): string[] {
-    return this.plugins
+    const extensions: string[] = this.plugins
       .filter((p) => p.enabled)
       .map((p) => p.plugin.promptExtension)
       .filter((extension): extension is string => !!extension);
+
+    for (const deferred of this.deferredPlugins) {
+      const base = deferred.plugin.promptExtension ?? "";
+      const missingLines = deferred.missing.map((m) => {
+        const envHint = m.field.envVar ? ` (env: ${m.field.envVar})` : "";
+        return `  - ${m.fieldName}: ${m.field.description}${envHint}`;
+      });
+      const setupNote =
+        `[SETUP REQUIRED] The '${deferred.plugin.name}' plugin is installed but not yet configured.\n` +
+        `Missing configuration:\n${missingLines.join("\n")}\n` +
+        `Ask the user for these values, then use plugin_manager with action "configure" to save each one ` +
+        `(plugin_name="${deferred.plugin.name}", field="<fieldName>", value="<value>").` +
+        `\nOnce all fields are configured the plugin will activate automatically.`;
+      extensions.push(base ? `${base}\n\n${setupNote}` : setupNote);
+    }
+
+    return extensions;
   }
 
   getToolDisplayNames(): Record<string, string> {

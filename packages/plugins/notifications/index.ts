@@ -210,7 +210,11 @@ export default definePlugin({
     "You have the 'notify_send' tool from the notifications plugin.\n" +
     "Use it to send messages to Slack, Discord, or Telegram.\n" +
     "The user has configured their preferred platforms — just provide a message and it sends to all of them.\n" +
-    'Optionally filter with the platforms parameter (e.g., "slack,telegram").',
+    'Optionally filter with the platforms parameter (e.g., "slack,telegram").\n\n' +
+    "First-time setup: Ask the user which platforms they want to use, then save each with plugin_manager " +
+    '(action="configure", plugin_name="notifications", field="<field>", value="<value>").\n' +
+    "Available fields: slack_webhook_url, discord_webhook_url, telegram_bot_token, telegram_chat_id. " +
+    "All are optional — only configure the platforms the user wants.",
 
   activate: async (context: PluginContext) => {
     slackWebhookUrl =
