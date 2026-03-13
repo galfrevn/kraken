@@ -1,7 +1,7 @@
 import { LanguageModelClient } from "@/language/client.ts";
 import { ConversationHistory } from "@/language/conversation.ts";
 import { ToolRegistry } from "@/tools/registry.ts";
-import { buildSystemPrompt } from "@/agent/prompt.ts";
+import { buildSystemPrompt, type EnvironmentContext } from "@/agent/prompt.ts";
 import { toolsToNativeFormat } from "@/tools/schema.ts";
 import type { ToolExecutionContext } from "@/tools/schema.ts";
 
@@ -38,7 +38,14 @@ export class SubagentRunner {
 
   async execute(configuration: SubagentConfiguration): Promise<SubagentResult> {
     const maxIterations = configuration.maxIterations ?? DEFAULT_SUBAGENT_MAX_ITERATIONS;
-    const systemPrompt = buildSystemPrompt(this.toolRegistry.listTools());
+    const environmentContext: EnvironmentContext = {
+      workingDirectory: this.workingDirectory,
+      platform: process.platform,
+      shell: process.env.SHELL || (process.platform === "win32" ? "powershell" : "bash"),
+      date: new Date().toISOString().split("T")[0]!,
+      modelName: configuration.model ?? this.languageModelClient.getModel(),
+    };
+    const systemPrompt = buildSystemPrompt(this.toolRegistry.listTools(), { environmentContext });
     const conversation = new ConversationHistory(systemPrompt);
 
     this.languageModelClient.setNativeTools(toolsToNativeFormat(this.toolRegistry.listTools()));

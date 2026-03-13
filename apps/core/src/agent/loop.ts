@@ -2,7 +2,7 @@ import { LanguageModelClient } from "@/language/client.ts";
 import { ConversationHistory } from "@/language/conversation.ts";
 import { TaskQueueManager } from "@/queue/manager.ts";
 import { ToolRegistry } from "@/tools/registry.ts";
-import { buildSystemPrompt, buildTaskPrompt } from "@/agent/prompt.ts";
+import { buildSystemPrompt, buildTaskPrompt, type EnvironmentContext } from "@/agent/prompt.ts";
 import { toolsToNativeFormat } from "@/tools/schema.ts";
 import type { Task } from "@/queue/schema.ts";
 import type { ToolExecutionContext } from "@/tools/schema.ts";
@@ -57,7 +57,14 @@ export class AgentExecutionLoop {
     const task = this.taskQueueManager.startTask(taskId);
     this.database.addTaskLog(task.id, "info", `executing task: ${task.name}`);
 
-    const systemPrompt = buildSystemPrompt(this.toolRegistry.listTools());
+    const environmentContext: EnvironmentContext = {
+      workingDirectory: this.workingDirectory,
+      platform: process.platform,
+      shell: process.env.SHELL || (process.platform === "win32" ? "powershell" : "bash"),
+      date: new Date().toISOString().split("T")[0]!,
+      modelName: this.languageModelClient.getModel(),
+    };
+    const systemPrompt = buildSystemPrompt(this.toolRegistry.listTools(), { environmentContext });
     const conversation = new ConversationHistory(systemPrompt);
     const taskPrompt = buildTaskPrompt(task);
 
