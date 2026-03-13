@@ -458,6 +458,40 @@ export class AgentDatabase {
     return result.count;
   }
 
+  appendThreadMessages(threadId: string, messages: ThreadMessageRow[]): void {
+    if (messages.length === 0) return;
+
+    const statement = this.database.prepare(`
+      INSERT INTO thread_messages (thread_id, role, content, raw_content, tool_name, tool_success, created_at)
+      VALUES (?, ?, ?, ?, ?, ?, ?)
+    `);
+
+    for (const message of messages) {
+      statement.run(
+        threadId,
+        message.role,
+        message.content,
+        message.raw_content ?? null,
+        message.tool_name ?? null,
+        message.tool_success ?? null,
+        message.created_at,
+      );
+    }
+  }
+
+  replaceThreadConversationFrom(threadId: string, fromPosition: number, messages: ThreadConversationRow[]): void {
+    this.database.prepare("DELETE FROM thread_conversation WHERE thread_id = ? AND position >= ?").run(threadId, fromPosition);
+
+    const statement = this.database.prepare(`
+      INSERT INTO thread_conversation (thread_id, role, content, position)
+      VALUES (?, ?, ?, ?)
+    `);
+
+    for (const message of messages) {
+      statement.run(threadId, message.role, message.content, message.position);
+    }
+  }
+
   close(): void {
     this.database.close();
   }
