@@ -116,9 +116,11 @@ export interface ToolRegistryOptions {
   commandPolicy?: CommandPolicyConfiguration;
   workingDirectory?: string;
   pluginTools?: Tool[];
+  profile?: "chat" | "daemon" | "cli";
 }
 
 export function createDefaultToolRegistry(options?: ToolRegistryOptions): ToolRegistry {
+  const profile = options?.profile ?? "daemon";
   const registry = new ToolRegistry();
 
   registry.register(readFileTool);
@@ -142,7 +144,9 @@ export function createDefaultToolRegistry(options?: ToolRegistryOptions): ToolRe
   registry.register(fetchUrlTool);
   registry.register(httpRequestTool);
   registry.register(environmentTool);
-  registry.register(countTokensTool);
+  if (profile !== "chat" && profile !== "cli") {
+    registry.register(countTokensTool);
+  }
   registry.register(viewImageTool);
   registry.register(createModelListTool());
 
@@ -157,26 +161,34 @@ export function createDefaultToolRegistry(options?: ToolRegistryOptions): ToolRe
   if (options?.database) {
     registry.register(createRememberTool(options.database));
     registry.register(createRecallTool(options.database));
-    registry.register(createIndexProjectTool(options.database));
+    if (profile !== "chat" && profile !== "cli") {
+      registry.register(createIndexProjectTool(options.database));
+    }
   }
 
   if (options?.taskQueueManager) {
-    registry.register(createTaskListTool(options.taskQueueManager));
-    registry.register(createTaskSubmitTool(options.taskQueueManager));
+    if (profile !== "chat" && profile !== "cli") {
+      registry.register(createTaskListTool(options.taskQueueManager));
+      registry.register(createTaskSubmitTool(options.taskQueueManager));
+    }
   }
 
   if (options?.timerManager) {
-    registry.register(createScheduleOnceTool(options.timerManager));
-    registry.register(createListTimersTool(options.timerManager));
-    registry.register(createCancelTimerTool(options.timerManager));
+    if (profile !== "chat" && profile !== "cli") {
+      registry.register(createScheduleOnceTool(options.timerManager));
+      registry.register(createListTimersTool(options.timerManager));
+      registry.register(createCancelTimerTool(options.timerManager));
+    }
   }
 
   if (options?.schedulerClient) {
-    registry.register(createScheduleCronTool(options.schedulerClient));
-    registry.register(createListSchedulesTool(options.schedulerClient));
-    registry.register(createDeleteScheduleTool(options.schedulerClient));
-    registry.register(createScheduleWatcherTool(options.schedulerClient));
-    registry.register(createDeleteWatcherTool(options.schedulerClient));
+    if (profile !== "chat" && profile !== "cli") {
+      registry.register(createScheduleCronTool(options.schedulerClient));
+      registry.register(createListSchedulesTool(options.schedulerClient));
+      registry.register(createDeleteScheduleTool(options.schedulerClient));
+      registry.register(createScheduleWatcherTool(options.schedulerClient));
+      registry.register(createDeleteWatcherTool(options.schedulerClient));
+    }
   }
 
   if (options?.pluginTools) {

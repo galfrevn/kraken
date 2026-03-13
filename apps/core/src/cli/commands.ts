@@ -427,6 +427,7 @@ export async function runCommand(prompt: string): Promise<void> {
     languageModelClient,
     database,
     commandPolicy: configuration.commands,
+    profile: "cli",
   });
   const systemPrompt = buildSystemPrompt(toolRegistry.listTools());
   const conversation = new ConversationHistory(systemPrompt);

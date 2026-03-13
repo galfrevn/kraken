@@ -123,6 +123,7 @@ export async function main(): Promise<void> {
     commandPolicy: configuration.commands,
     workingDirectory: configuration.repo,
     pluginTools: pluginRegistry.getTools(),
+    profile: "chat",
   });
 
   const executionLoop = new AgentExecutionLoop(
@@ -156,7 +157,10 @@ export async function main(): Promise<void> {
     toolRegistry,
     workingDirectory: configuration.repo,
     baseContext: basePluginContext,
-    onToolDisplayNamesChanged: (names) => registerToolDisplayNames(names),
+    onToolDisplayNamesChanged: (names) => {
+      registerToolDisplayNames(names);
+      threadManager.refreshPluginPromptExtensions();
+    },
     onSetupRequired: (fields) => {
       return new Promise<void>((resolve) => {
         const engine = threadManager.getActiveEngine();
@@ -211,6 +215,7 @@ export async function main(): Promise<void> {
       }
     }
     registerToolDisplayNames(pluginRegistry.getToolDisplayNames());
+    threadManager.refreshPluginPromptExtensions();
   };
 
   createRoot(renderer).render(
