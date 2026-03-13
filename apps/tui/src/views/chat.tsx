@@ -572,6 +572,7 @@ export function ChatView({ threadManager, focused, onRequestFocus, onRequestBlur
     let currentQuestionListener: ((q: PendingQuestions | null) => void) | null = null;
     let currentEngine: ReturnType<typeof threadManager.getActiveEngine> | null = null;
     let previousMessageCount = 0;
+    let streamingUpdateTimer: ReturnType<typeof setTimeout> | null = null;
 
     function attachToEngine() {
       if (currentEngine && currentEngineListener) {
@@ -586,16 +587,49 @@ export function ChatView({ threadManager, focused, onRequestFocus, onRequestBlur
 
       currentEngine = threadManager.getActiveEngine();
       previousMessageCount = currentEngine.getMessages().length;
+      let lastMessageCount = previousMessageCount;
+      let lastProcessing = currentEngine.isProcessing();
+      let lastQueueLength = 0;
+      let lastPlanMode = currentEngine.isPlanMode();
+      streamingUpdateTimer = null;
 
       currentEngineListener = (updatedMessages: ChatMessage[]) => {
-        setMessages([...updatedMessages]);
-        const wasProcessing = currentEngine!.isProcessing();
-        setProcessing(wasProcessing);
-        setQueuedMessages(currentEngine!.getQueuedMessages());
-        setInPlanMode(currentEngine!.isPlanMode());
+        const nowProcessing = currentEngine!.isProcessing();
+        const nowQueueLength = currentEngine!.getQueueLength();
+        const nowPlanMode = currentEngine!.isPlanMode();
+        const lastMsg = updatedMessages[updatedMessages.length - 1];
+        const isStreaming = lastMsg?.streaming === true;
+
+        // Messages changed structurally (new message, removed, or streaming finished)
+        if (updatedMessages.length !== lastMessageCount || (lastMsg && !isStreaming)) {
+          if (streamingUpdateTimer) { clearTimeout(streamingUpdateTimer); streamingUpdateTimer = null; }
+          setMessages([...updatedMessages]);
+          lastMessageCount = updatedMessages.length;
+        } else if (isStreaming) {
+          // During streaming, throttle content updates to ~50ms to reduce re-renders
+          if (!streamingUpdateTimer) {
+            streamingUpdateTimer = setTimeout(() => {
+              streamingUpdateTimer = null;
+              setMessages([...currentEngine!.getMessages()]);
+            }, 50);
+          }
+        }
+
+        if (nowProcessing !== lastProcessing) {
+          setProcessing(nowProcessing);
+          lastProcessing = nowProcessing;
+        }
+        if (nowQueueLength !== lastQueueLength) {
+          setQueuedMessages(currentEngine!.getQueuedMessages());
+          lastQueueLength = nowQueueLength;
+        }
+        if (nowPlanMode !== lastPlanMode) {
+          setInPlanMode(nowPlanMode);
+          lastPlanMode = nowPlanMode;
+        }
 
         // Generate title once the agent finishes its first response
-        if (!wasProcessing && threadManager.getActiveThreadTitle() === "new conversation") {
+        if (!nowProcessing && threadManager.getActiveThreadTitle() === "new conversation") {
           threadManager.generateActiveThreadTitle().then(() => {
             setThreadTitle(threadManager.getActiveThreadTitle());
             threadManager.saveNow();
@@ -653,6 +687,7 @@ export function ChatView({ threadManager, focused, onRequestFocus, onRequestBlur
     threadManager.onThreadChange(threadChangeListener);
 
     return () => {
+      if (streamingUpdateTimer) clearTimeout(streamingUpdateTimer);
       if (currentEngine && currentEngineListener) {
         currentEngine.removeEventListener(currentEngineListener);
       }
