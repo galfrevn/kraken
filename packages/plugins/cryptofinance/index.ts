@@ -292,7 +292,14 @@ const exchangeConvertTool: Tool = {
 // OHLCV Chart
 // ---------------------------------------------------------------------------
 
-interface OHLCVData {
+interface TickerHistoryPoint {
+  timestamp: string;
+  price: number;
+  volume_24h: number;
+  market_cap: number;
+}
+
+interface CandleData {
   time_open: string;
   open: number;
   high: number;
@@ -302,48 +309,46 @@ interface OHLCVData {
 }
 
 const PERIOD_CONFIG: Record<string, { days: number; defaultInterval: string }> = {
-  "7d": { days: 7, defaultInterval: "4h" },
+  "7d": { days: 7, defaultInterval: "1d" },
   "30d": { days: 30, defaultInterval: "1d" },
   "90d": { days: 90, defaultInterval: "1d" },
   "1y": { days: 365, defaultInterval: "1w" },
 };
 
-function aggregateCandles(data: OHLCVData[], interval: string): OHLCVData[] {
-  if (interval === "1d" || data.length === 0) return data;
+function buildCandles(points: TickerHistoryPoint[], interval: string): CandleData[] {
+  if (points.length === 0) return [];
 
-  let groupSize: number;
-  if (interval === "1w") groupSize = 7;
-  else if (interval === "4h") return data; // API returns daily; can't subdivide
-  else return data;
+  const groupSize = interval === "1w" ? 7 : 1;
 
-  const result: OHLCVData[] = [];
-  for (let i = 0; i < data.length; i += groupSize) {
-    const group = data.slice(i, i + groupSize);
+  const candles: CandleData[] = [];
+  for (let i = 0; i < points.length; i += groupSize) {
+    const group = points.slice(i, i + groupSize);
+    const prices = group.map((p) => p.price);
     const first = group[0]!;
     const last = group[group.length - 1]!;
-    result.push({
-      time_open: first.time_open,
-      open: first.open,
-      high: Math.max(...group.map((g) => g.high)),
-      low: Math.min(...group.map((g) => g.low)),
-      close: last.close,
-      volume: group.reduce((s, g) => s + g.volume, 0),
+    candles.push({
+      time_open: first.timestamp,
+      open: first.price,
+      close: last.price,
+      high: Math.max(...prices),
+      low: Math.min(...prices),
+      volume: group.reduce((s, p) => s + p.volume_24h, 0),
     });
   }
-  return result;
+  return candles;
 }
 
-function sampleUniform(data: OHLCVData[], maxCandles: number): OHLCVData[] {
+function sampleUniform(data: CandleData[], maxCandles: number): CandleData[] {
   if (data.length <= maxCandles) return data;
   const step = data.length / maxCandles;
-  const result: OHLCVData[] = [];
+  const result: CandleData[] = [];
   for (let i = 0; i < maxCandles; i++) {
     result.push(data[Math.floor(i * step)]!);
   }
   return result;
 }
 
-function renderCandlestickChart(data: OHLCVData[], symbol: string, period: string, interval: string): string {
+function renderCandlestickChart(data: CandleData[], symbol: string, period: string, interval: string): string {
   const CHART_HEIGHT = 18;
   const MAX_CANDLES = 60;
 
@@ -463,21 +468,20 @@ const cryptoChartTool: Tool = {
         return { success: false, output: `'${symbol}' not found. Use crypto_list to see available coins.` };
       }
 
-      const end = new Date();
       const start = new Date();
       start.setDate(start.getDate() - config.days);
 
-      const url = `${COINPAPRIKA_API}/coins/${coin.id}/ohlcv/historical?start=${start.toISOString().split("T")[0]}&end=${end.toISOString().split("T")[0]}`;
+      const url = `${COINPAPRIKA_API}/tickers/${coin.id}/historical?start=${start.toISOString()}&interval=1d`;
       const response = await fetch(url);
-      if (!response.ok) return { success: false, output: `Failed to fetch OHLCV data: ${response.status}` };
+      if (!response.ok) return { success: false, output: `Failed to fetch historical data: ${response.status}` };
 
-      const raw = (await response.json()) as OHLCVData[];
-      if (!Array.isArray(raw) || raw.length === 0) {
+      const points = (await response.json()) as TickerHistoryPoint[];
+      if (!Array.isArray(points) || points.length === 0) {
         return { success: false, output: `No historical data available for ${symbol}.` };
       }
 
-      const aggregated = aggregateCandles(raw, interval);
-      const chart = renderCandlestickChart(aggregated, symbol, period, interval);
+      const candles = buildCandles(points, interval);
+      const chart = renderCandlestickChart(candles, symbol, period, interval);
 
       return { success: true, output: chart };
     } catch (error) {
@@ -492,7 +496,7 @@ const cryptoChartTool: Tool = {
 
 export default definePlugin({
   name: "cryptofinance",
-  version: "0.2.0",
+  version: "0.3.0",
   description: "Cryptocurrency prices and exchange rates using free public APIs. No API keys needed.",
   author: "kraken",
 
