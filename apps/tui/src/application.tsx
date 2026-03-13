@@ -138,18 +138,33 @@ export function Application({ store, threadManager, pluginRegistry, pluginFailur
         visibleToasts={4}
         maxWidth={50}
         offset={{ top: 2, right: 2 }}
+        icons={false}
         toastOptions={{
           style: {
             backgroundColor: COLORS.surface,
             foregroundColor: COLORS.text,
-            border: false,
+            border: ["left"],
+            borderColor: COLORS.textMuted,
             mutedColor: COLORS.textMuted,
             paddingX: 1,
-            paddingY: 0,
-            minHeight: 1,
+            paddingY: 1,
+            minHeight: 3,
           },
           duration: 3000,
-          error: { duration: 5000 },
+          success: {
+            style: { borderColor: COLORS.green },
+          },
+          info: {
+            style: { borderColor: COLORS.blue },
+          },
+          warning: {
+            style: { borderColor: COLORS.yellow },
+            duration: 4000,
+          },
+          error: {
+            style: { borderColor: COLORS.red },
+            duration: 5000,
+          },
         }}
       />
 
