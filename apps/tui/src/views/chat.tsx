@@ -4,12 +4,13 @@ import { useState, useEffect, useCallback, useRef, useMemo } from "react";
 
 import { useDialog, useDialogKeyboard, useDialogState } from "@opentui-ui/dialog/react";
 import { toast } from "@opentui-ui/toast/react";
-import { SyntaxStyle, type TextareaRenderable } from "@opentui/core";
+import { SyntaxStyle, RGBA, type TextareaRenderable } from "@opentui/core";
 import { useKeyboard, useRenderer } from "@opentui/react";
 
 import { COLORS } from "@/theme.ts";
 
-import type { ChatMessage } from "@/engine.ts";
+import type { ChatMessage, Plan, FileAttachment } from "@/engine.ts";
+import type { PendingQuestions, QuestionAnswer } from "@core/tools/question.ts";
 import type { ThreadManager } from "@/threads.ts";
 import type { PluginRegistry, LoadedPlugin } from "@core/plugins/registry.ts";
 import {
@@ -20,8 +21,81 @@ import {
 import { handleSlashCommand, ALL_COMMANDS, commandRequiresArguments, type SlashCommand, type CommandResult } from "@/commands.ts";
 import { Avatar, type AvatarState } from "@/avatar.tsx";
 import { loadImagePreview, generatePreviewRows } from "@/images.ts";
+import { existsSync } from "node:fs";
+import { basename, isAbsolute } from "node:path";
 
-const syntaxStyle = SyntaxStyle.create();
+const syntaxStyle = SyntaxStyle.fromStyles({
+  keyword: { fg: RGBA.fromHex("#ff7b72"), bold: true },
+  "keyword.return": { fg: RGBA.fromHex("#ff7b72"), bold: true },
+  "keyword.function": { fg: RGBA.fromHex("#ff7b72"), bold: true },
+  "keyword.operator": { fg: RGBA.fromHex("#ff7b72") },
+  type: { fg: RGBA.fromHex("#ffa657") },
+  "type.builtin": { fg: RGBA.fromHex("#ffa657") },
+  constructor: { fg: RGBA.fromHex("#ffa657") },
+  variable: { fg: RGBA.fromHex("#e6edf3") },
+  "variable.builtin": { fg: RGBA.fromHex("#79c0ff") },
+  "variable.parameter": { fg: RGBA.fromHex("#e6edf3") },
+  property: { fg: RGBA.fromHex("#e6edf3") },
+  constant: { fg: RGBA.fromHex("#79c0ff") },
+  "constant.builtin": { fg: RGBA.fromHex("#79c0ff") },
+  function: { fg: RGBA.fromHex("#d2a8ff") },
+  "function.method": { fg: RGBA.fromHex("#d2a8ff") },
+  "function.builtin": { fg: RGBA.fromHex("#d2a8ff") },
+  string: { fg: RGBA.fromHex("#a5d6ff") },
+  "string.special": { fg: RGBA.fromHex("#a5d6ff") },
+  number: { fg: RGBA.fromHex("#79c0ff") },
+  boolean: { fg: RGBA.fromHex("#79c0ff") },
+  comment: { fg: RGBA.fromHex("#8b949e"), italic: true },
+  operator: { fg: RGBA.fromHex("#ff7b72") },
+  punctuation: { fg: RGBA.fromHex("#e6edf3") },
+  "punctuation.bracket": { fg: RGBA.fromHex("#e6edf3") },
+  "punctuation.delimiter": { fg: RGBA.fromHex("#e6edf3") },
+  tag: { fg: RGBA.fromHex("#7ee787") },
+  attribute: { fg: RGBA.fromHex("#79c0ff") },
+  label: { fg: RGBA.fromHex("#79c0ff") },
+  namespace: { fg: RGBA.fromHex("#ffa657") },
+  embedded: { fg: RGBA.fromHex("#e6edf3") },
+});
+
+const IMAGE_EXTENSIONS = new Set([".png", ".jpg", ".jpeg", ".gif", ".bmp", ".webp", ".svg"]);
+
+function isImagePath(filePath: string): boolean {
+  const ext = filePath.slice(filePath.lastIndexOf(".")).toLowerCase();
+  return IMAGE_EXTENSIONS.has(ext);
+}
+
+function extractFileAttachments(text: string): { cleanText: string; attachments: FileAttachment[] } {
+  // Match absolute paths (Windows: C:\... or Unix: /...) or quoted paths
+  const pathPattern = /(?:"([^"]+\.[a-zA-Z0-9]+)"|'([^']+\.[a-zA-Z0-9]+)'|([A-Za-z]:\\[^\s,]+\.[a-zA-Z0-9]+)|(\/[^\s,]+\.[a-zA-Z0-9]+))/g;
+  const attachments: FileAttachment[] = [];
+  const seen = new Set<string>();
+
+  let match: RegExpExecArray | null;
+  while ((match = pathPattern.exec(text)) !== null) {
+    const filePath = (match[1] ?? match[2] ?? match[3] ?? match[4])!;
+    if (!isAbsolute(filePath)) continue;
+    if (seen.has(filePath)) continue;
+    if (!existsSync(filePath)) continue;
+    seen.add(filePath);
+    attachments.push({
+      path: filePath,
+      name: basename(filePath),
+      isImage: isImagePath(filePath),
+    });
+  }
+
+  if (attachments.length === 0) return { cleanText: text, attachments: [] };
+
+  // Remove the file paths from the display text, keep only the message
+  let cleanText = text;
+  for (const att of attachments) {
+    cleanText = cleanText.replace(`"${att.path}"`, "").replace(`'${att.path}'`, "").replace(att.path, "");
+  }
+  cleanText = cleanText.replace(/\s+/g, " ").trim();
+  if (!cleanText) cleanText = attachments.map((a) => a.name).join(", ");
+
+  return { cleanText, attachments };
+}
 
 const TOOL_DISPLAY_NAMES: Record<string, string> = {
   read_file: "Read File",
@@ -39,6 +113,7 @@ const TOOL_DISPLAY_NAMES: Record<string, string> = {
   code_outline: "Code Outline",
   diff_files: "Diff Files",
   count_tokens: "Count Tokens",
+  view_image: "View Image",
   web_search: "Web Search",
   fetch_url: "Fetch URL",
   http_request: "HTTP Request",
@@ -65,6 +140,7 @@ const TOOL_DISPLAY_NAMES: Record<string, string> = {
   delegate: "Subagent",
   session_command: "Session",
   plugin_manager: "Plugins",
+  ask_question: "Asked Question",
 };
 
 export function registerToolDisplayNames(names: Record<string, string>): void {
@@ -87,20 +163,27 @@ type RenderItem =
 
 function groupMessages(messages: ChatMessage[]): RenderItem[] {
   const items: RenderItem[] = [];
+  const consumedResults = new Set<number>();
 
   for (let index = 0; index < messages.length; index++) {
     const message = messages[index]!;
 
     if (message.role === "tool_call") {
-      const next = messages[index + 1];
-      if (next && next.role === "tool_result" && next.toolName === message.toolName) {
-        items.push({ type: "tool", call: message, result: next });
-        index++;
-      } else {
-        items.push({ type: "tool", call: message });
+      // Scan forward for the first unconsumed matching tool_result
+      let matchedResult: ChatMessage | undefined;
+      for (let j = index + 1; j < messages.length; j++) {
+        const candidate = messages[j]!;
+        if (candidate.role === "tool_result" && candidate.toolName === message.toolName && !consumedResults.has(j)) {
+          matchedResult = candidate;
+          consumedResults.add(j);
+          break;
+        }
       }
+      items.push({ type: "tool", call: message, result: matchedResult });
     } else if (message.role === "tool_result") {
-      items.push({ type: "tool", call: message, result: message });
+      if (!consumedResults.has(index)) {
+        items.push({ type: "tool", call: message, result: message });
+      }
     } else {
       items.push({ type: "message", message });
     }
@@ -110,12 +193,21 @@ function groupMessages(messages: ChatMessage[]): RenderItem[] {
 }
 
 interface ContentSegment {
-  type: "text" | "thinking" | "tool_call";
+  type: "text" | "thinking" | "tool_call" | "plan";
   content: string;
 }
 
 function parseAssistantContent(raw: string): ContentSegment[] {
-  const cleaned = raw
+  // Extract plan blocks before cleaning
+  const planBlocks: string[] = [];
+  const withoutPlans = raw
+    .replace(/<plan>([\s\S]*?)<\/plan>/g, (_, inner) => {
+      planBlocks.push(inner);
+      return "___PLAN_PLACEHOLDER___";
+    })
+    .replace(/<plan>[\s\S]*$/g, "");
+
+  const cleaned = withoutPlans
     .replace(/<tool_result[\s\S]*?<\/tool_result>/g, "")
     .replace(/<tool_result[\s\S]*$/g, "")
     .replace(/<function_calls>\s*([\s\S]*?)\s*<\/function_calls>/g, (_match, inner) => {
@@ -160,11 +252,44 @@ function parseAssistantContent(raw: string): ContentSegment[] {
     segments.push({ type: "text", content: cleaned.trim() });
   }
 
+  // Expand plan placeholders into plan segments
+  if (planBlocks.length > 0) {
+    let planIdx = 0;
+    const expanded: ContentSegment[] = [];
+    for (const seg of segments) {
+      if (seg.type === "text" && seg.content.includes("___PLAN_PLACEHOLDER___")) {
+        const parts = seg.content.split("___PLAN_PLACEHOLDER___");
+        for (let i = 0; i < parts.length; i++) {
+          const part = parts[i]!.trim();
+          if (part) expanded.push({ type: "text", content: part });
+          if (i < parts.length - 1 && planIdx < planBlocks.length) {
+            expanded.push({ type: "plan", content: planBlocks[planIdx]! });
+            planIdx++;
+          }
+        }
+      } else {
+        expanded.push(seg);
+      }
+    }
+    return expanded;
+  }
+
   return segments;
+}
+
+function planToMarkdown(planXml: string): string {
+  const goalMatch = planXml.match(/<goal>([\s\S]*?)<\/goal>/);
+  const steps = [...planXml.matchAll(/<step>([\s\S]*?)<\/step>/g)].map((m) => m[1]!.trim());
+  const goal = goalMatch ? goalMatch[1]!.trim() : "Plan";
+  const lines = [`**${goal}**`, ""];
+  steps.forEach((step, i) => lines.push(`${i + 1}. ${step}`));
+  return lines.join("\n");
 }
 
 function stripXmlTags(content: string): string {
   return content
+    .replace(/<plan>[\s\S]*?<\/plan>/g, "")
+    .replace(/<plan>[\s\S]*$/g, "")
     .replace(/<tool_result[\s\S]*?<\/tool_result>/g, "")
     .replace(/<tool_result[\s\S]*$/g, "")
     .replace(/<function_calls>[\s\S]*?<\/function_calls>/g, "")
@@ -181,18 +306,34 @@ interface ChatViewProps {
   focused: boolean;
   onRequestFocus: () => void;
   onRequestBlur: () => void;
+  onQuestionStateChange?: (hasQuestions: boolean) => void;
 }
 
 const DOUBLE_ESCAPE_THRESHOLD_MILLISECONDS = 500;
 
-export function ChatView({ threadManager, focused, onRequestFocus, onRequestBlur }: ChatViewProps) {
+export function ChatView({ threadManager, focused, onRequestFocus, onRequestBlur, onQuestionStateChange }: ChatViewProps) {
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [inputValue, setInputValue] = useState("");
   const [processing, setProcessing] = useState(false);
-  const [queueLength, setQueueLength] = useState(0);
+  const [queuedMessages, setQueuedMessages] = useState<string[]>([]);
   const [threadTitle, setThreadTitle] = useState(threadManager.getActiveThreadTitle());
   const [threadCount, setThreadCount] = useState(threadManager.getThreadCount());
   const [activeThreadId, setActiveThreadId] = useState(threadManager.getActiveThreadIdentifier());
+  const [currentPlan, setCurrentPlan] = useState<Plan | null>(null);
+  const [inPlanMode, setInPlanMode] = useState(false);
+  const [pendingQuestions, setPendingQuestions] = useState<PendingQuestions | null>(null);
+
+  useEffect(() => {
+    onQuestionStateChange?.(pendingQuestions !== null);
+  }, [pendingQuestions, onQuestionStateChange]);
+
+  const scrollboxRef = useRef<any>(null);
+
+  useEffect(() => {
+    const sb = scrollboxRef.current;
+    if (sb) sb.focusable = !pendingQuestions;
+  }, [pendingQuestions]);
+
   const lastEscapeTimestamp = useRef(0);
   const textareaReference = useRef<TextareaRenderable>(null);
   const messageHistory = useRef<string[]>([]);
@@ -248,6 +389,9 @@ export function ChatView({ threadManager, focused, onRequestFocus, onRequestBlur
       const newEngine = threadManager.getActiveEngine();
       setMessages([...newEngine.getMessages()]);
     }
+
+    // Sync plan mode indicator after any command (e.g. /plan toggle)
+    setInPlanMode(threadManager.getActiveEngine().isPlanMode());
   }, [dialog, threadManager]);
 
   const executeCommandDirectly = useCallback(async (command: SlashCommand) => {
@@ -309,6 +453,7 @@ export function ChatView({ threadManager, focused, onRequestFocus, onRequestBlur
 
   useKeyboard((key) => {
     if (dialogIsOpen) return;
+    if (pendingQuestions) return;
 
     if (key.name === "c" && !focused) {
       const selection = renderer.getSelection();
@@ -342,6 +487,15 @@ export function ChatView({ threadManager, focused, onRequestFocus, onRequestBlur
 
     if (key.name === "escape" && commandFilter !== null) {
       setCommandFilter(null);
+      return;
+    }
+
+    if (key.name === "tab" && key.shift) {
+      const engine = threadManager.getActiveEngine();
+      const next = !engine.isPlanMode();
+      engine.setPlanMode(next);
+      setInPlanMode(next);
+      toast.info(next ? "plan mode" : "build mode");
       return;
     }
 
@@ -414,6 +568,8 @@ export function ChatView({ threadManager, focused, onRequestFocus, onRequestBlur
 
   useEffect(() => {
     let currentEngineListener: ((messages: ChatMessage[]) => void) | null = null;
+    let currentPlanListener: ((plan: Plan | null) => void) | null = null;
+    let currentQuestionListener: ((q: PendingQuestions | null) => void) | null = null;
     let currentEngine: ReturnType<typeof threadManager.getActiveEngine> | null = null;
     let previousMessageCount = 0;
 
@@ -421,14 +577,30 @@ export function ChatView({ threadManager, focused, onRequestFocus, onRequestBlur
       if (currentEngine && currentEngineListener) {
         currentEngine.removeEventListener(currentEngineListener);
       }
+      if (currentEngine && currentPlanListener) {
+        currentEngine.removePlanListener(currentPlanListener);
+      }
+      if (currentEngine && currentQuestionListener) {
+        currentEngine.removeQuestionListener(currentQuestionListener);
+      }
 
       currentEngine = threadManager.getActiveEngine();
       previousMessageCount = currentEngine.getMessages().length;
 
       currentEngineListener = (updatedMessages: ChatMessage[]) => {
         setMessages([...updatedMessages]);
-        setProcessing(currentEngine!.isProcessing());
-        setQueueLength(currentEngine!.getQueueLength());
+        const wasProcessing = currentEngine!.isProcessing();
+        setProcessing(wasProcessing);
+        setQueuedMessages(currentEngine!.getQueuedMessages());
+        setInPlanMode(currentEngine!.isPlanMode());
+
+        // Generate title once the agent finishes its first response
+        if (!wasProcessing && threadManager.getActiveThreadTitle() === "new conversation") {
+          threadManager.generateActiveThreadTitle().then(() => {
+            setThreadTitle(threadManager.getActiveThreadTitle());
+            threadManager.saveNow();
+          });
+        }
 
         for (let index = previousMessageCount; index < updatedMessages.length; index++) {
           const message = updatedMessages[index];
@@ -452,9 +624,21 @@ export function ChatView({ threadManager, focused, onRequestFocus, onRequestBlur
         previousMessageCount = updatedMessages.length;
       };
 
+      currentPlanListener = (plan: Plan | null) => {
+        setCurrentPlan(plan ? { ...plan, steps: plan.steps.map((s) => ({ ...s })) } : null);
+      };
+
+      currentQuestionListener = (q: PendingQuestions | null) => {
+        setPendingQuestions(q);
+      };
+
       currentEngine.addEventListener(currentEngineListener);
+      currentEngine.addPlanListener(currentPlanListener);
+      currentEngine.addQuestionListener(currentQuestionListener);
       setMessages([...currentEngine.getMessages()]);
       setProcessing(currentEngine.isProcessing());
+      setCurrentPlan(currentEngine.getPlan());
+      setInPlanMode(currentEngine.isPlanMode());
       setThreadTitle(threadManager.getActiveThreadTitle());
       setThreadCount(threadManager.getThreadCount());
       setActiveThreadId(threadManager.getActiveThreadIdentifier());
@@ -471,6 +655,12 @@ export function ChatView({ threadManager, focused, onRequestFocus, onRequestBlur
     return () => {
       if (currentEngine && currentEngineListener) {
         currentEngine.removeEventListener(currentEngineListener);
+      }
+      if (currentEngine && currentPlanListener) {
+        currentEngine.removePlanListener(currentPlanListener);
+      }
+      if (currentEngine && currentQuestionListener) {
+        currentEngine.removeQuestionListener(currentQuestionListener);
       }
       threadManager.offThreadChange(threadChangeListener);
     };
@@ -500,18 +690,21 @@ export function ChatView({ threadManager, focused, onRequestFocus, onRequestBlur
     }
 
     const engine = threadManager.getActiveEngine();
-    if (engine.isProcessing()) {
-      toast("message queued", {
-        description: currentText.slice(0, 60) + (currentText.length > 60 ? "..." : ""),
-      });
+
+    // Route feedback to plan when a draft plan exists
+    const activePlan = engine.getPlan();
+    if (activePlan && activePlan.status === "draft") {
+      engine.addPlanFeedback(currentText);
+      return;
     }
-    engine.sendMessage(currentText);
 
-    threadManager.generateActiveThreadTitle().then(() => {
-      setThreadTitle(threadManager.getActiveThreadTitle());
-    });
+    const { cleanText, attachments } = extractFileAttachments(currentText);
+    engine.sendMessage(attachments.length > 0 ? cleanText : currentText, attachments.length > 0 ? attachments : undefined);
+    setQueuedMessages(engine.getQueuedMessages());
 
-    threadManager.saveNow();
+    // Update mode indicator immediately (planMode is consumed per-message)
+    setInPlanMode(engine.isPlanMode());
+
   }, [inputValue, threadManager]);
 
   const engine = threadManager.getActiveEngine();
@@ -530,26 +723,24 @@ export function ChatView({ threadManager, focused, onRequestFocus, onRequestBlur
     ? `${threadTitle} (${threadCount} threads)`
     : threadTitle;
 
-  const queueLabel = queueLength > 0 ? ` · ${queueLength} queued` : "";
-  const statusLabel = processing
-    ? (isStreaming ? "streaming..." : "thinking...") + "  esc×2 cancel" + queueLabel
-    : "h commands";
+  const isPlanActive = inPlanMode || (currentPlan !== null && (currentPlan.status === "draft" || currentPlan.status === "executing"));
+  const modeColor = isPlanActive ? COLORS.green : COLORS.blue;
+  const modeLabel = isPlanActive ? "Plan" : "Build";
 
   return (
     <box flexDirection="column" flexGrow={1} width="100%">
       <box flexDirection="row" paddingBottom={1}>
-        <text fg={COLORS.textSecondary}>{threadLabel}</text>
+        <text fg={modeColor}>{modeLabel}</text>
         <text fg={COLORS.textMuted}>{"  ·  "}</text>
-        <text fg={processing ? COLORS.yellow : COLORS.textMuted}>{statusLabel}</text>
+        <text fg={COLORS.textSecondary}>{threadLabel}</text>
+        <box flexGrow={1} />
         {tokenLabel ? (
-          <>
-            <text fg={COLORS.textMuted}>{"  ·  "}</text>
-            <text fg={COLORS.textMuted}>{tokenLabel}</text>
-          </>
+          <text fg={COLORS.textMuted}>{tokenLabel}</text>
         ) : null}
       </box>
 
       <scrollbox
+        ref={scrollboxRef}
         key={activeThreadId}
         flexGrow={1}
         width="100%"
@@ -588,38 +779,71 @@ export function ChatView({ threadManager, focused, onRequestFocus, onRequestBlur
             })}
           </box>
         ) : null}
-        <box flexDirection="row" width="100%" height={6} flexShrink={0}>
-          <box paddingRight={1} paddingTop={1} flexShrink={0}>
-            <Avatar state={avatarState} />
+        {queuedMessages.length > 0 ? (
+          <box flexDirection="column" width="100%" paddingBottom={1}>
+            {queuedMessages.map((msg, idx) => (
+              <box key={idx} flexDirection="row" width="100%">
+                <text fg={COLORS.textMuted}>{"  ⏳ "}</text>
+                <text fg={COLORS.textSecondary}>
+                  {msg.length > 80 ? msg.slice(0, 77) + "..." : msg}
+                </text>
+              </box>
+            ))}
           </box>
-          <box
-            flexGrow={1}
-            height={6}
-            backgroundColor={COLORS.inputBackground}
-            padding={1}
-            onMouseUp={onRequestFocus}
-          >
-            <textarea
-              ref={textareaReference}
-              initialValue={inputValue}
-              placeholder={processing ? "type to queue a message..." : "message kraken..."}
-              placeholderColor={COLORS.textMuted}
+        ) : null}
+        {pendingQuestions ? (
+          <QuestionPanel
+            questions={pendingQuestions}
+            onResolve={(answers) => {
+              const eng = threadManager.getActiveEngine();
+              eng.resolveQuestions(answers);
+            }}
+          />
+        ) : (
+          <box flexDirection="row" width="100%" height={6} flexShrink={0}>
+            <box paddingRight={1} paddingTop={1} flexShrink={0}>
+              <Avatar state={avatarState} />
+            </box>
+            <box flexShrink={0} width={1} height={6} backgroundColor={modeColor} />
+            <box
+              flexGrow={1}
+              height={6}
               backgroundColor={COLORS.inputBackground}
-              textColor={COLORS.text}
-              width="100%"
-              height="100%"
-              wrapMode="word"
-              focused={focused && !dialogIsOpen}
-              onSubmit={handleSubmit}
-              keyBindings={[
-                { name: "return", action: "submit" },
-                { name: "return", ctrl: true, action: "newline" },
-                { name: "a", meta: true, action: "select-all" },
-                { name: "a", ctrl: true, action: "select-all" },
-              ]}
-            />
+              padding={1}
+              onMouseUp={onRequestFocus}
+            >
+              <textarea
+                ref={textareaReference}
+                initialValue={inputValue}
+                placeholder={
+                  currentPlan?.status === "draft"
+                    ? "give feedback on the plan..."
+                    : currentPlan?.status === "executing"
+                      ? "plan executing..."
+                      : isPlanActive
+                        ? "describe what to plan... (shift+tab to switch mode)"
+                        : processing
+                          ? "type to queue a message..."
+                          : "message kraken..."
+                }
+                placeholderColor={COLORS.textMuted}
+                backgroundColor={COLORS.inputBackground}
+                textColor={COLORS.text}
+                width="100%"
+                height="100%"
+                wrapMode="word"
+                focused={focused && !dialogIsOpen}
+                onSubmit={handleSubmit}
+                keyBindings={[
+                  { name: "return", action: "submit" },
+                  { name: "return", ctrl: true, action: "newline" },
+                  { name: "a", meta: true, action: "select-all" },
+                  { name: "a", ctrl: true, action: "select-all" },
+                ]}
+              />
+            </box>
           </box>
-        </box>
+        )}
       </box>
     </box>
   );
@@ -1003,8 +1227,310 @@ function PluginStoreContent({
   );
 }
 
+
+function QuestionPanel({
+  questions,
+  onResolve,
+}: {
+  questions: PendingQuestions;
+  onResolve: (answers: QuestionAnswer[]) => void;
+}) {
+  const items = questions.items;
+  const stepCount = items.length;
+  const [activeStep, setActiveStep] = useState(0);
+  const [answers, setAnswers] = useState<string[][]>(() => items.map(() => []));
+  const [cursor, setCursor] = useState<number[]>(() => items.map(() => 0));
+  const [customTexts, setCustomTexts] = useState<string[]>(() => items.map(() => ""));
+  const [editingCustom, setEditingCustom] = useState(false);
+  const customInputRef = useRef<TextareaRenderable>(null);
+
+  useEffect(() => {
+    if (editingCustom) {
+      // Focus after the textarea mounts
+      setTimeout(() => customInputRef.current?.focus(), 0);
+    }
+  }, [editingCustom]);
+  const isConfirmStep = activeStep === stepCount;
+  const currentItem = items[activeStep];
+  // +1 for the "Other..." option
+  const totalOptions = (currentItem?.options.length ?? 0) + 1;
+  const customIdx = currentItem?.options.length ?? 0;
+  const currentCursor = cursor[activeStep] ?? 0;
+  const isMultiple = currentItem?.multiple ?? false;
+  const currentAnswers = answers[activeStep] ?? [];
+  const isCursorOnCustom = currentCursor === customIdx;
+
+  const formatAnswer = (ans: string[]): string => ans.length > 0 ? ans.join(", ") : "(no answer)";
+
+  const resolve = useCallback(() => {
+    const result: QuestionAnswer[] = items.map((item, i) => ({
+      question: item.question,
+      answer: formatAnswer(answers[i] ?? []),
+    }));
+    onResolve(result);
+  }, [items, answers, onResolve]);
+
+  const toggleOption = useCallback((label: string) => {
+    setAnswers((prev) => {
+      const next = [...prev];
+      const current = next[activeStep] ?? [];
+      if (isMultiple) {
+        next[activeStep] = current.includes(label)
+          ? current.filter((l) => l !== label)
+          : [...current, label];
+      } else {
+        next[activeStep] = [label];
+      }
+      return next;
+    });
+    if (!isMultiple && activeStep < stepCount) {
+      setActiveStep((prev) => prev + 1);
+    }
+  }, [activeStep, stepCount, isMultiple]);
+
+  const submitCustomText = useCallback(() => {
+    const text = customInputRef.current?.plainText?.trim() ?? "";
+    if (!text) {
+      setEditingCustom(false);
+      return;
+    }
+    setCustomTexts((prev) => {
+      const next = [...prev];
+      next[activeStep] = text;
+      return next;
+    });
+    setAnswers((prev) => {
+      const next = [...prev];
+      const current = (next[activeStep] ?? []).filter((a) =>
+        items[activeStep]?.options.some((o) => o.label === a),
+      );
+      if (isMultiple) {
+        next[activeStep] = [...current, text];
+      } else {
+        next[activeStep] = [text];
+      }
+      return next;
+    });
+    setEditingCustom(false);
+    if (!isMultiple && activeStep < stepCount) {
+      setActiveStep((prev) => prev + 1);
+    }
+  }, [activeStep, stepCount, isMultiple, items]);
+
+  useKeyboard((key) => {
+    // When editing custom text, only handle escape and enter
+    if (editingCustom) {
+      if (key.name === "escape") {
+        setEditingCustom(false);
+      } else if (key.name === "return") {
+        submitCustomText();
+      }
+      return;
+    }
+
+    if (key.name === "escape") {
+      resolve();
+      return;
+    }
+
+    if ((key.name === "tab" && !key.shift) || key.name === "right") {
+      setActiveStep((prev) => Math.min(stepCount, prev + 1));
+      return;
+    }
+    if ((key.name === "tab" && key.shift) || key.name === "left") {
+      setActiveStep((prev) => Math.max(0, prev - 1));
+      return;
+    }
+
+    if (isConfirmStep) {
+      if (key.name === "return") resolve();
+      return;
+    }
+
+    if (key.name === "up" || key.name === "k") {
+      setCursor((prev) => {
+        const next = [...prev];
+        next[activeStep] = Math.max(0, (next[activeStep] ?? 0) - 1);
+        return next;
+      });
+      return;
+    }
+    if (key.name === "down" || key.name === "j") {
+      setCursor((prev) => {
+        const next = [...prev];
+        next[activeStep] = Math.min(totalOptions - 1, (next[activeStep] ?? 0) + 1);
+        return next;
+      });
+      return;
+    }
+
+    if (key.name === "return" || (isMultiple && key.name === "space")) {
+      if (isCursorOnCustom) {
+        setEditingCustom(true);
+        return;
+      }
+      const opt = currentItem?.options[currentCursor];
+      if (opt) toggleOption(opt.label);
+      return;
+    }
+
+    const num = parseInt(key.name ?? "", 10);
+    if (num >= 1 && num <= (currentItem?.options.length ?? 0)) {
+      toggleOption(currentItem!.options[num - 1]!.label);
+    }
+  });
+
+  return (
+    <box flexDirection="column" width="100%" flexShrink={0} backgroundColor={COLORS.inputBackground} padding={1}>
+      {/* Tab bar */}
+      <box flexDirection="row" width="100%" paddingBottom={1}>
+        {items.map((item, idx) => {
+          const isActive = idx === activeStep;
+          const hasAnswer = (answers[idx] ?? []).length > 0;
+          const tabLabel = hasAnswer && !isActive ? "✓ " + item.title : item.title;
+          return (
+            <box key={idx} paddingRight={2}>
+              <text
+                fg={isActive ? COLORS.text : hasAnswer ? COLORS.green : COLORS.textMuted}
+                bg={isActive ? COLORS.purple : undefined}
+              >
+                {isActive ? " " + item.title + " " : tabLabel}
+              </text>
+            </box>
+          );
+        })}
+        <box>
+          <text
+            fg={isConfirmStep ? COLORS.text : COLORS.textMuted}
+            bg={isConfirmStep ? COLORS.purple : undefined}
+          >
+            {isConfirmStep ? " Confirm " : "Confirm"}
+          </text>
+        </box>
+      </box>
+
+      {isConfirmStep ? (
+        <box flexDirection="column" width="100%">
+          {items.map((item, idx) => {
+            const ans = answers[idx] ?? [];
+            return (
+              <box key={idx} flexDirection="column" width="100%" paddingBottom={1}>
+                <text fg={COLORS.textMuted}>{item.question}</text>
+                <text fg={ans.length > 0 ? COLORS.text : COLORS.textMuted}>
+                  <b>{formatAnswer(ans)}</b>
+                </text>
+              </box>
+            );
+          })}
+          <text>{""}</text>
+          <text fg={COLORS.textMuted}>
+            {"enter confirm  ← go back  esc dismiss"}
+          </text>
+        </box>
+      ) : currentItem ? (
+        <box flexDirection="column" width="100%">
+          <text fg={COLORS.text}>
+            <b>{currentItem.question + (isMultiple ? " (multiple)" : "")}</b>
+          </text>
+          <text>{""}</text>
+          {currentItem.options.map((opt, idx) => {
+            const isCursor = idx === currentCursor;
+            const isChecked = currentAnswers.includes(opt.label);
+            const checkbox = isMultiple
+              ? (isChecked ? "◉ " : "○ ")
+              : (isChecked ? "● " : "○ ");
+            const prefix = isCursor ? "→ " : "  ";
+            return (
+              <box key={idx} flexDirection="column" width="100%">
+                <text fg={isChecked ? COLORS.green : isCursor ? COLORS.text : COLORS.textSecondary}>
+                  {prefix + checkbox + (idx + 1) + ". " + opt.label}
+                </text>
+                {opt.description ? (
+                  <text fg={COLORS.textMuted}>{"       " + opt.description}</text>
+                ) : null}
+              </box>
+            );
+          })}
+          {/* Custom text option */}
+          {(() => {
+            const customText = customTexts[activeStep] ?? "";
+            const hasCustom = currentAnswers.some((a) => !currentItem.options.some((o) => o.label === a));
+            const checkbox = isMultiple
+              ? (hasCustom ? "◉ " : "○ ")
+              : (hasCustom ? "● " : "○ ");
+            const prefix = isCursorOnCustom ? "→ " : "  ";
+            return (
+              <box flexDirection="column" width="100%">
+                <text fg={hasCustom ? COLORS.green : isCursorOnCustom ? COLORS.text : COLORS.textSecondary}>
+                  {prefix + checkbox + "Other..." + (customText && !editingCustom ? " (" + customText + ")" : "")}
+                </text>
+              </box>
+            );
+          })()}
+          {editingCustom ? (
+            <box width="100%" height={2} paddingLeft={6} paddingTop={1}>
+              <textarea
+                ref={customInputRef}
+                initialValue={customTexts[activeStep] ?? ""}
+                placeholder="type your answer..."
+                fg={COLORS.text}
+                bg={COLORS.backgroundDeep}
+              />
+            </box>
+          ) : null}
+          <text>{""}</text>
+          <text fg={COLORS.textMuted}>
+            {editingCustom
+              ? "enter submit  esc cancel"
+              : isMultiple
+                ? "←→/tab navigate  ↑↓ move  enter/space toggle  esc dismiss"
+                : "←→/tab navigate  ↑↓ move  enter select  esc dismiss"}
+          </text>
+        </box>
+      ) : null}
+    </box>
+  );
+}
+
+function useIncrementalGrouping(messages: ChatMessage[]): RenderItem[] {
+  const cacheRef = useRef<{ length: number; items: RenderItem[] }>({ length: 0, items: [] });
+
+  return useMemo(() => {
+    const cached = cacheRef.current;
+
+    // Messages removed/replaced (clear, new thread) — recompute fully
+    if (messages.length < cached.length) {
+      const items = groupMessages(messages);
+      cacheRef.current = { length: messages.length, items };
+      return items;
+    }
+
+    // Nothing new — but check if last message changed (streaming updates content in place)
+    if (messages.length === cached.length) {
+      const lastMsg = messages[messages.length - 1];
+      const lastItem = cached.items[cached.items.length - 1];
+      if (lastMsg && lastItem) {
+        const lastCachedMsg = lastItem.type === "message" ? lastItem.message : lastItem.type === "tool" ? lastItem.result : undefined;
+        if (lastCachedMsg && lastCachedMsg.content !== lastMsg.content) {
+          const items = groupMessages(messages);
+          cacheRef.current = { length: messages.length, items };
+          return items;
+        }
+      }
+      return cached.items;
+    }
+
+    // New messages appended — only process the new ones
+    const newMessages = messages.slice(cached.length);
+    const newItems = groupMessages(newMessages);
+    const items = [...cached.items, ...newItems];
+    cacheRef.current = { length: messages.length, items };
+    return items;
+  }, [messages]);
+}
+
 function MessageList({ messages }: { messages: ChatMessage[] }) {
-  const items = useMemo(() => groupMessages(messages), [messages]);
+  const items = useIncrementalGrouping(messages);
 
   return (
     <box flexDirection="column" width="100%">
@@ -1064,7 +1590,18 @@ function MessageBubble({ message }: { message: ChatMessage }) {
     case "user":
       return (
         <LeftBorder color={COLORS.blue}>
-          <text fg={COLORS.text}><b>{message.content}</b></text>
+          <box flexDirection="column" width="100%">
+            <text fg={COLORS.text}><b>{message.content}</b></text>
+            {message.attachments?.map((att, idx) => (
+              <box key={idx} flexDirection="column" width="100%" paddingTop={1}>
+                {att.isImage ? (
+                  <InlineImagePreview path={att.path} name={att.name} />
+                ) : (
+                  <text fg={COLORS.textMuted}>{"📎 " + att.name}</text>
+                )}
+              </box>
+            ))}
+          </box>
         </LeftBorder>
       );
 
@@ -1121,6 +1658,28 @@ function parseImageResult(content: string): ImageResultData | null {
   }
 
   return null;
+}
+
+function InlineImagePreview({ path, name }: { path: string; name: string }) {
+  const preview = useMemo(() => loadImagePreview(path, 30), [path]);
+  const rows = useMemo(() => (preview ? generatePreviewRows(preview) : []), [preview]);
+
+  if (!preview || rows.length === 0) {
+    return <text fg={COLORS.textMuted}>{"🖼 " + name}</text>;
+  }
+
+  return (
+    <box flexDirection="column">
+      {rows.map((row, rowIndex) => (
+        <box flexDirection="row" key={rowIndex}>
+          {row.map((segment, segmentIndex) => (
+            <text key={segmentIndex} fg={segment.fg} bg={segment.bg}>{segment.text}</text>
+          ))}
+        </box>
+      ))}
+      <text fg={COLORS.textMuted}>{name + " · " + preview.originalWidth + "×" + preview.originalHeight}</text>
+    </box>
+  );
 }
 
 function ImageResultCard({ imageData }: { imageData: ImageResultData }) {
@@ -1283,17 +1842,51 @@ function ToolExpandedContent({ call, result, toolName }: { call: ChatMessage; re
   );
 }
 
+function QuestionResultBlock({ content }: { content: string }) {
+  const lines = content.split("\n");
+  const pairs: { question: string; answer: string }[] = [];
+  let i = 0;
+  // Skip "# Questions" header and blank lines
+  while (i < lines.length && (lines[i]!.trim() === "" || lines[i]!.startsWith("# "))) i++;
+  while (i < lines.length) {
+    const question = lines[i]!;
+    const answer = lines[i + 1] ?? "(no answer)";
+    if (question.trim()) pairs.push({ question: question.trim(), answer: answer.trim() });
+    i += 2;
+    // skip blank lines between pairs
+    while (i < lines.length && lines[i]!.trim() === "") i++;
+  }
+
+  return (
+    <box flexDirection="column" width="100%" backgroundColor={COLORS.inputBackground} padding={1} marginTop={1}>
+      <text fg={COLORS.textMuted}>{"# Questions"}</text>
+      {pairs.map((pair, idx) => (
+        <box key={idx} flexDirection="column" width="100%" paddingTop={1}>
+          <text fg={COLORS.textMuted}>{pair.question}</text>
+          <text fg={COLORS.text}><b>{pair.answer}</b></text>
+        </box>
+      ))}
+    </box>
+  );
+}
+
 function ToolAccordion({ call, result }: { call: ChatMessage; result?: ChatMessage }) {
   const toolName = call.toolName ?? "tool";
   const name = toolDisplayName(toolName);
   const hasResult = result !== undefined && result !== call;
   const succeeded = result?.toolSuccess ?? true;
-  const statusIcon = hasResult ? (succeeded ? "✓" : "✗") : "⋯";
+  const isInProgress = !hasResult;
+  const statusIcon = hasResult ? (succeeded ? "✓" : "✗") : "";
   const statusColor = hasResult ? (succeeded ? COLORS.green : COLORS.red) : COLORS.textMuted;
   const [expanded, setExpanded] = useState(toolName === "edit_file");
   const summary = buildToolSummary(call);
 
   const imageResult = hasResult && succeeded ? parseImageResult(result.content) : null;
+
+  // Special rendering for ask_question results
+  if (toolName === "ask_question" && hasResult && succeeded) {
+    return <QuestionResultBlock content={result.content} />;
+  }
 
   return (
     <box
@@ -1314,15 +1907,21 @@ function ToolAccordion({ call, result }: { call: ChatMessage; result?: ChatMessa
         ) : (
           <>
             <box flexDirection="row" width="100%">
-              <text fg={statusColor}>{statusIcon + " "}</text>
-              <text fg={COLORS.purple}>{name}</text>
+              {isInProgress ? (
+                <spinner name="dots" color={COLORS.purple} />
+              ) : (
+                <text fg={statusColor}>{statusIcon}</text>
+              )}
+              <text fg={COLORS.purple}>{" " + name}</text>
               {summary ? (
                 <text fg={COLORS.textMuted}>{"  " + summary}</text>
               ) : null}
             </box>
 
             {expanded ? (
-              <ToolExpandedContent call={call} result={result} toolName={toolName} />
+              <box backgroundColor={COLORS.backgroundDeep} width="100%" padding={1} marginTop={1}>
+                <ToolExpandedContent call={call} result={result} toolName={toolName} />
+              </box>
             ) : null}
           </>
         )}
@@ -1454,6 +2053,18 @@ function AssistantBubble({ message }: { message: ChatMessage }) {
                   <text fg={COLORS.textSecondary}>
                     <i>{cleaned}</i>
                   </text>
+                </box>
+              </box>
+            );
+          }
+
+          if (segment.type === "plan") {
+            const planMd = planToMarkdown(segment.content);
+            return (
+              <box flexDirection="row" width="100%" paddingTop={1} paddingBottom={1}>
+                <box flexShrink={0} width={1} backgroundColor={COLORS.green} />
+                <box flexGrow={1} paddingLeft={1} width="100%">
+                  <markdown content={planMd} syntaxStyle={syntaxStyle} conceal={true} streaming={false} width="100%" />
                 </box>
               </box>
             );
