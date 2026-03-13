@@ -65,7 +65,7 @@ export class AgentExecutionLoop {
       modelName: this.languageModelClient.getModel(),
     };
     const systemPrompt = buildSystemPrompt(this.toolRegistry.listTools(), { environmentContext });
-    const conversation = new ConversationHistory(systemPrompt);
+    const conversation = new ConversationHistory(systemPrompt, { maxMessages: 20 });
     const taskPrompt = buildTaskPrompt(task);
 
     this.languageModelClient.setNativeTools(toolsToNativeFormat(this.toolRegistry.listTools()));
@@ -107,6 +107,7 @@ export class AgentExecutionLoop {
 
         totalToolCalls += completionResult.toolCalls.length;
 
+        conversation.compactIfNeeded();
         const messages = conversation.getMessagesWithSystemPrompt();
         completionResult = await this.languageModelClient.complete(messages);
 

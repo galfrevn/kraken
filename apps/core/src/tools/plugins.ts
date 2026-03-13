@@ -27,6 +27,8 @@ export function createPluginManagerTool(dependencies: PluginManagerDependencies)
         "  - list: Show all installed plugins with their status and tools\n" +
         "  - store: Browse available plugins from the official registry\n" +
         "  - inspect <name>: Detailed info about a specific installed plugin\n" +
+        "  - check_updates: Check all installed plugins for available updates\n" +
+        "  - update <name>: Update a plugin to the latest version from the registry\n" +
         "  - install_from_store <name>: Download and install a plugin from the registry\n" +
         "  - install <path>: Load a plugin from a local path at runtime\n" +
         "  - uninstall <name>: Delete a plugin from disk and unload it [destructive]\n" +
@@ -39,7 +41,7 @@ export function createPluginManagerTool(dependencies: PluginManagerDependencies)
           name: "action",
           type: "string" as const,
           description:
-            "The action to perform: 'list', 'store', 'inspect', 'install_from_store', 'install', 'uninstall', 'disable', 'enable', 'remove'.",
+            "The action to perform: 'list', 'store', 'inspect', 'check_updates', 'update', 'install_from_store', 'install', 'uninstall', 'disable', 'enable', 'remove'.",
           required: true,
         },
         {
@@ -71,6 +73,17 @@ export function createPluginManagerTool(dependencies: PluginManagerDependencies)
           return handleStore(pluginRegistry);
         case "inspect":
           return handleInspect(pluginRegistry, pluginName);
+        case "check_updates":
+          return handleCheckUpdates(pluginRegistry);
+        case "update":
+          return handleUpdate(
+            pluginRegistry,
+            toolRegistry,
+            pluginName,
+            workingDirectory,
+            baseContext,
+            onToolDisplayNamesChanged,
+          );
         case "install_from_store":
           return handleInstallFromStore(
             pluginRegistry,
@@ -101,7 +114,7 @@ export function createPluginManagerTool(dependencies: PluginManagerDependencies)
           return {
             success: false,
             output: "",
-            error: `unknown action "${action}". Available: list, store, inspect, install_from_store, install, uninstall, disable, enable, remove`,
+            error: `unknown action "${action}". Available: list, store, inspect, check_updates, update, install_from_store, install, uninstall, disable, enable, remove`,
           };
       }
     },
@@ -460,5 +473,122 @@ async function handleUninstall(
   return {
     success: true,
     output: `Plugin "${name}" has been uninstalled and removed from ${pluginDirectory}`,
+  };
+}
+
+async function handleCheckUpdates(localRegistry: PluginRegistry): Promise<ToolResult> {
+  try {
+    const remoteRegistry = await fetchRegistry();
+    const loadedPlugins = localRegistry.getLoadedPlugins();
+
+    if (loadedPlugins.length === 0) {
+      return { success: true, output: "No plugins installed." };
+    }
+
+    const lines: string[] = [];
+    let updatesAvailable = 0;
+
+    for (const local of loadedPlugins) {
+      const remote = remoteRegistry.plugins.find((p) => p.name === local.plugin.name);
+      if (!remote) {
+        lines.push(`- ${local.plugin.name} v${local.plugin.version} (local only, not in registry)`);
+        continue;
+      }
+
+      if (remote.version !== local.plugin.version) {
+        lines.push(`- ${local.plugin.name}: v${local.plugin.version} → v${remote.version} (update available)`);
+        updatesAvailable++;
+      } else {
+        lines.push(`- ${local.plugin.name}: v${local.plugin.version} (up to date)`);
+      }
+    }
+
+    const summary = updatesAvailable > 0
+      ? `\n\n${updatesAvailable} update(s) available. Use action "update" with the plugin name to update.`
+      : "\n\nAll plugins are up to date.";
+
+    return { success: true, output: lines.join("\n") + summary };
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    return { success: false, output: "", error: `Failed to check for updates: ${message}` };
+  }
+}
+
+async function handleUpdate(
+  registry: PluginRegistry,
+  toolReg: ToolRegistry,
+  pluginName: string,
+  workingDirectory: string,
+  baseContext: Omit<PluginContext, "config">,
+  onToolDisplayNamesChanged?: (names: Record<string, string>) => void,
+): Promise<ToolResult> {
+  if (!pluginName) {
+    return { success: false, output: "", error: "plugin_name is required for update" };
+  }
+
+  const existing = registry.getPluginByName(pluginName);
+  if (!existing) {
+    return { success: false, output: "", error: `Plugin "${pluginName}" is not installed. Use install_from_store to install it.` };
+  }
+
+  const oldVersion = existing.plugin.version;
+
+  // Remove old tools from the tool registry
+  if (existing.plugin.tools) {
+    for (const tool of existing.plugin.tools) {
+      toolReg.unregister(tool.definition.name);
+    }
+  }
+
+  // Unload the plugin from the plugin registry
+  await registry.removePlugin(pluginName);
+
+  // Re-download from the store
+  const installResult = await installPluginFromRegistry(pluginName);
+  if (!installResult.success) {
+    return { success: false, output: "", error: `Failed to download update: ${installResult.error}` };
+  }
+
+  // Re-load the updated plugin
+  const loadResult = await registry.installPlugin(
+    installResult.installPath,
+    workingDirectory,
+    baseContext,
+  );
+
+  if (!loadResult.success) {
+    return {
+      success: false,
+      output: "",
+      error: `Downloaded update but failed to load: ${loadResult.error}`,
+    };
+  }
+
+  const plugin = loadResult.plugin;
+  if (plugin.tools) {
+    for (const tool of plugin.tools) {
+      try {
+        toolReg.register(tool);
+      } catch {
+        /* tool name collision */
+      }
+    }
+  }
+
+  if (onToolDisplayNamesChanged) {
+    onToolDisplayNamesChanged(registry.getToolDisplayNames());
+  }
+
+  const toolNames = plugin.tools?.map((t) => t.definition.name).join(", ") ?? "none";
+  const versionChange = oldVersion !== plugin.version
+    ? `v${oldVersion} → v${plugin.version}`
+    : `v${plugin.version} (re-installed)`;
+
+  return {
+    success: true,
+    output:
+      `Plugin "${plugin.name}" updated: ${versionChange}\n` +
+      `Tools registered: ${toolNames}\n` +
+      "The updated tools are available immediately.",
   };
 }

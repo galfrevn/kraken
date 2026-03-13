@@ -2,7 +2,13 @@ import { MESSAGE_ROLE, type ConversationMessage, type ToolCallEntry } from "@/la
 
 export interface ConversationHistoryOptions {
   maxMessages?: number;
+  /** Max characters for tool results kept in history. Default: 800 */
+  staleToolResultMaxChars?: number;
 }
+
+/** How many "turns" (assistant responses) a tool result stays at full size before truncation. */
+const TOOL_RESULT_FRESH_TURNS = 1;
+const DEFAULT_STALE_TOOL_MAX_CHARS = 800;
 
 export class ConversationHistory {
   private messages: ConversationMessage[] = [];
@@ -81,8 +87,42 @@ export class ConversationHistory {
     }
   }
 
+  /**
+   * Truncate tool results that the LLM has already seen and responded to.
+   * Keeps the most recent tool results at full size (within TOOL_RESULT_FRESH_TURNS
+   * assistant responses), and truncates older ones to save tokens.
+   */
+  truncateStaleToolResults(): number {
+    const maxChars = this.options.staleToolResultMaxChars ?? DEFAULT_STALE_TOOL_MAX_CHARS;
+    let assistantTurnsSeen = 0;
+    let truncatedCount = 0;
+
+    // Walk backwards: count assistant turns to determine freshness
+    for (let i = this.messages.length - 1; i >= 0; i--) {
+      const msg = this.messages[i]!;
+
+      if (msg.role === MESSAGE_ROLE.assistant) {
+        assistantTurnsSeen++;
+      }
+
+      if (msg.role === MESSAGE_ROLE.tool && assistantTurnsSeen > TOOL_RESULT_FRESH_TURNS) {
+        if (msg.content.length > maxChars) {
+          const head = msg.content.slice(0, maxChars / 2);
+          const tail = msg.content.slice(-maxChars / 4);
+          msg.content = `${head}\n\n... [truncated ${msg.content.length - maxChars} chars] ...\n\n${tail}`;
+          truncatedCount++;
+        }
+      }
+    }
+
+    return truncatedCount;
+  }
+
   compactIfNeeded(): { didCompact: boolean; removedCount: number } {
-    const limit = this.options.maxMessages ?? 40;
+    // Always truncate stale tool results first
+    this.truncateStaleToolResults();
+
+    const limit = this.options.maxMessages ?? 20;
     if (this.messages.length <= limit) return { didCompact: false, removedCount: 0 };
 
     const cutIndex = Math.floor(this.messages.length / 2);

@@ -29,7 +29,7 @@ function getGlobalConfigPath(): string {
   return join(KRAKEN_HOME, CONFIGURATION_FILE_NAME);
 }
 
-async function persistModelToConfiguration(newModel: string): Promise<string> {
+export async function persistModelToConfiguration(newModel: string): Promise<string> {
   const configurationPath = getGlobalConfigPath();
 
   if (!(await Bun.file(configurationPath).exists())) {
@@ -111,6 +111,33 @@ async function fetchOpenRouterModels(query?: string): Promise<string> {
     : `${models.length} models available${models.length > 50 ? " (showing first 50)" : ""}:`;
 
   return header + "\n" + lines.join("\n");
+}
+
+let cachedModelIds: string[] | null = null;
+let cacheTimestamp = 0;
+const MODEL_CACHE_TTL_MS = 5 * 60 * 1000; // 5 minutes
+
+export async function fetchOpenRouterModelIds(): Promise<string[]> {
+  const now = Date.now();
+  if (cachedModelIds && now - cacheTimestamp < MODEL_CACHE_TTL_MS) {
+    return cachedModelIds;
+  }
+
+  const apiKey = resolveOpenRouterApiKey();
+  const headers: Record<string, string> = { "Content-Type": "application/json" };
+  if (apiKey) {
+    headers["Authorization"] = `Bearer ${apiKey}`;
+  }
+
+  const response = await fetch(OPENROUTER_MODELS_ENDPOINT, { headers });
+  if (!response.ok) {
+    throw new Error(`OpenRouter returned ${response.status}`);
+  }
+
+  const payload = (await response.json()) as OpenRouterModelsResponse;
+  cachedModelIds = payload.data.map((m) => m.id).sort();
+  cacheTimestamp = now;
+  return cachedModelIds;
 }
 
 export function createModelListTool(): Tool {

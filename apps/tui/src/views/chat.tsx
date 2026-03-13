@@ -19,6 +19,7 @@ import {
 } from "@core/plugins/installer.ts";
 
 import { handleSlashCommand, ALL_COMMANDS, commandRequiresArguments, type SlashCommand, type CommandResult } from "@/commands.ts";
+import { fetchOpenRouterModelIds } from "@core/tools/model.ts";
 import { Avatar, type AvatarState } from "@/avatar.tsx";
 import { loadImagePreview, generatePreviewRows } from "@/images.ts";
 import { existsSync } from "node:fs";
@@ -341,6 +342,15 @@ export function ChatView({ threadManager, focused, onRequestFocus, onRequestBlur
   const historyDraftText = useRef("");
   const [commandFilter, setCommandFilter] = useState<string | null>(null);
   const [selectedCommandIndex, setSelectedCommandIndex] = useState(0);
+  const [modelFilter, setModelFilter] = useState<string | null>(null);
+  const [selectedModelIndex, setSelectedModelIndex] = useState(0);
+  const cachedModelIds = useRef<string[]>([]);
+  const modelFetchInFlight = useRef(false);
+  const autocompleteAccepted = useRef(false);
+  const commandFilterRef = useRef<string | null>(null);
+  const selectedCommandIndexRef = useRef(0);
+  const modelFilterRef = useRef<string | null>(null);
+  const selectedModelIndexRef = useRef(0);
 
   const filteredCommands = useMemo(() => {
     if (commandFilter === null) return [];
@@ -349,6 +359,25 @@ export function ChatView({ threadManager, focused, onRequestFocus, onRequestBlur
       cmd.name.startsWith(query) || cmd.aliases.some((a) => a.startsWith(query)),
     );
   }, [commandFilter]);
+
+  const filteredModels = useMemo(() => {
+    if (modelFilter === null) return [];
+    const query = modelFilter.toLowerCase();
+    if (!query) return cachedModelIds.current.slice(0, 20);
+    return cachedModelIds.current
+      .filter((id) => id.toLowerCase().includes(query))
+      .slice(0, 20);
+  }, [modelFilter]);
+
+  // Keep refs in sync for handleSubmit (avoids stale closure)
+  commandFilterRef.current = commandFilter;
+  selectedCommandIndexRef.current = selectedCommandIndex;
+  modelFilterRef.current = modelFilter;
+  selectedModelIndexRef.current = selectedModelIndex;
+  const filteredCommandsRef = useRef(filteredCommands);
+  filteredCommandsRef.current = filteredCommands;
+  const filteredModelsRef = useRef(filteredModels);
+  filteredModelsRef.current = filteredModels;
 
   const renderer = useRenderer();
   const dialog = useDialog();
@@ -429,9 +458,35 @@ export function ChatView({ threadManager, focused, onRequestFocus, onRequestBlur
   }, [dialog, executeCommandDirectly, onRequestFocus]);
 
   const updateCommandFilter = useCallback(() => {
+    if (autocompleteAccepted.current) {
+      autocompleteAccepted.current = false;
+      return;
+    }
     const textarea = textareaReference.current;
-    if (!textarea) { setCommandFilter(null); return; }
+    if (!textarea) { setCommandFilter(null); setModelFilter(null); return; }
     const text = textarea.plainText;
+
+    // Check for /model <partial> pattern
+    const modelMatch = text.match(/^\/(model|m)\s(.*)$/i);
+    if (modelMatch) {
+      setCommandFilter(null);
+      const partial = modelMatch[2] ?? "";
+      setModelFilter(partial);
+      setSelectedModelIndex(0);
+
+      // Fetch models if not cached
+      if (cachedModelIds.current.length === 0 && !modelFetchInFlight.current) {
+        modelFetchInFlight.current = true;
+        fetchOpenRouterModelIds()
+          .then((ids) => { cachedModelIds.current = ids; setModelFilter((prev) => prev); })
+          .catch(() => {})
+          .finally(() => { modelFetchInFlight.current = false; });
+      }
+      return;
+    }
+
+    setModelFilter(null);
+
     if (text.startsWith("/") && !text.includes(" ") && text.length >= 1) {
       setCommandFilter(text.slice(1));
       setSelectedCommandIndex(0);
@@ -444,11 +499,23 @@ export function ChatView({ threadManager, focused, onRequestFocus, onRequestBlur
     const textarea = textareaReference.current;
     if (!textarea) return;
     const needsArgs = command.usage.includes("<");
-    const replacement = "/" + command.name + (needsArgs ? " " : "");
+    const wantsModelAutocomplete = command.name === "model";
+    const replacement = "/" + command.name + (needsArgs || wantsModelAutocomplete ? " " : "");
+    autocompleteAccepted.current = true;
     textarea.selectAll();
     textarea.deleteChar();
     textarea.insertText(replacement);
     setCommandFilter(null);
+  }, []);
+
+  const acceptModel = useCallback((modelId: string) => {
+    const textarea = textareaReference.current;
+    if (!textarea) return;
+    autocompleteAccepted.current = true;
+    textarea.selectAll();
+    textarea.deleteChar();
+    textarea.insertText("/model " + modelId);
+    setModelFilter(null);
   }, []);
 
   useKeyboard((key) => {
@@ -485,8 +552,9 @@ export function ChatView({ threadManager, focused, onRequestFocus, onRequestBlur
       return;
     }
 
-    if (key.name === "escape" && commandFilter !== null) {
+    if (key.name === "escape" && (commandFilter !== null || modelFilter !== null)) {
       setCommandFilter(null);
+      setModelFilter(null);
       return;
     }
 
@@ -514,6 +582,23 @@ export function ChatView({ threadManager, focused, onRequestFocus, onRequestBlur
       if (key.name === "tab") {
         const selected = filteredCommands[selectedCommandIndex];
         if (selected) acceptCommand(selected);
+        return;
+      }
+    }
+
+    // Model autocomplete navigation
+    if (modelFilter !== null && filteredModels.length > 0) {
+      if (key.name === "up") {
+        setSelectedModelIndex((prev) => Math.max(0, prev - 1));
+        return;
+      }
+      if (key.name === "down") {
+        setSelectedModelIndex((prev) => Math.min(filteredModels.length - 1, prev + 1));
+        return;
+      }
+      if (key.name === "tab") {
+        const selected = filteredModels[selectedModelIndex];
+        if (selected) acceptModel(selected);
         return;
       }
     }
@@ -702,6 +787,18 @@ export function ChatView({ threadManager, focused, onRequestFocus, onRequestBlur
   }, [threadManager]);
 
   const handleSubmit = useCallback(async () => {
+    // If autocomplete is open, accept the selection instead of submitting
+    if (commandFilterRef.current !== null && filteredCommandsRef.current.length > 0) {
+      const selected = filteredCommandsRef.current[selectedCommandIndexRef.current];
+      if (selected) acceptCommand(selected);
+      return;
+    }
+    if (modelFilterRef.current !== null && filteredModelsRef.current.length > 0) {
+      const selected = filteredModelsRef.current[selectedModelIndexRef.current];
+      if (selected) acceptModel(selected);
+      return;
+    }
+
     const textarea = textareaReference.current;
     const currentText = textarea ? textarea.plainText : inputValue;
 
@@ -717,6 +814,7 @@ export function ChatView({ threadManager, focused, onRequestFocus, onRequestBlur
     }
     setInputValue("");
     setCommandFilter(null);
+    setModelFilter(null);
 
     const commandResult = await handleSlashCommand(currentText, threadManager);
     if (commandResult) {
@@ -808,6 +906,25 @@ export function ChatView({ threadManager, focused, onRequestFocus, onRequestBlur
                 >
                   <text fg={isSelected ? COLORS.background : COLORS.text}>
                     {cmdName + padding + cmd.description}
+                  </text>
+                </box>
+              );
+            })}
+          </box>
+        ) : modelFilter !== null && filteredModels.length > 0 ? (
+          <box flexDirection="column" width="100%" paddingBottom={1}>
+            {filteredModels.map((modelId, idx) => {
+              const isSelected = idx === selectedModelIndex;
+              return (
+                <box
+                  key={modelId}
+                  width="100%"
+                  height={1}
+                  backgroundColor={isSelected ? COLORS.cyan : undefined}
+                  onMouseUp={() => acceptModel(modelId)}
+                >
+                  <text fg={isSelected ? COLORS.background : COLORS.text}>
+                    {"  " + modelId}
                   </text>
                 </box>
               );
@@ -1528,16 +1645,19 @@ function QuestionPanel({
 }
 
 function useIncrementalGrouping(messages: ChatMessage[]): RenderItem[] {
-  const cacheRef = useRef<{ length: number; items: RenderItem[] }>({ length: 0, items: [] });
+  const cacheRef = useRef<{ length: number; items: RenderItem[]; boundaryMsg?: ChatMessage }>({ length: 0, items: [] });
 
   return useMemo(() => {
     const cached = cacheRef.current;
+    const recompute = () => {
+      const items = groupMessages(messages);
+      cacheRef.current = { length: messages.length, items, boundaryMsg: messages[messages.length - 1] };
+      return items;
+    };
 
     // Messages removed/replaced (clear, new thread) — recompute fully
     if (messages.length < cached.length) {
-      const items = groupMessages(messages);
-      cacheRef.current = { length: messages.length, items };
-      return items;
+      return recompute();
     }
 
     // Nothing new — but check if last message changed (streaming updates content in place)
@@ -1547,19 +1667,45 @@ function useIncrementalGrouping(messages: ChatMessage[]): RenderItem[] {
       if (lastMsg && lastItem) {
         const lastCachedMsg = lastItem.type === "message" ? lastItem.message : lastItem.type === "tool" ? lastItem.result : undefined;
         if (lastCachedMsg && lastCachedMsg.content !== lastMsg.content) {
-          const items = groupMessages(messages);
-          cacheRef.current = { length: messages.length, items };
-          return items;
+          return recompute();
         }
       }
       return cached.items;
     }
 
-    // New messages appended — only process the new ones
+    // Messages grew — check if boundary message changed (happens when messages are
+    // removed+replaced within a single debounce window, e.g. empty streaming assistant
+    // removed and replaced by tool_call). If boundary shifted, recompute fully.
+    if (cached.length > 0 && cached.boundaryMsg !== messages[cached.length - 1]) {
+      return recompute();
+    }
+
+    // New messages appended — try to merge into last incomplete tool group first
     const newMessages = messages.slice(cached.length);
+    const prevItems = [...cached.items];
+
+    // If the last cached item is a tool group missing its result,
+    // check if the first new message completes it
+    const lastItem = prevItems[prevItems.length - 1];
+    if (
+      lastItem &&
+      lastItem.type === "tool" &&
+      !lastItem.result &&
+      newMessages.length > 0 &&
+      newMessages[0]!.role === "tool_result" &&
+      newMessages[0]!.toolName === lastItem.call.toolName
+    ) {
+      prevItems[prevItems.length - 1] = { ...lastItem, result: newMessages[0]! };
+      const remaining = newMessages.slice(1);
+      const newItems = remaining.length > 0 ? groupMessages(remaining) : [];
+      const items = [...prevItems, ...newItems];
+      cacheRef.current = { length: messages.length, items, boundaryMsg: messages[messages.length - 1] };
+      return items;
+    }
+
     const newItems = groupMessages(newMessages);
-    const items = [...cached.items, ...newItems];
-    cacheRef.current = { length: messages.length, items };
+    const items = [...prevItems, ...newItems];
+    cacheRef.current = { length: messages.length, items, boundaryMsg: messages[messages.length - 1] };
     return items;
   }, [messages]);
 }

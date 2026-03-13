@@ -1,6 +1,7 @@
 import type { ThreadManager } from "@/threads.ts";
 import type { PluginRegistry } from "@core/plugins/registry.ts";
 import { fetchRegistry } from "@core/plugins/installer.ts";
+import { persistModelToConfiguration } from "@core/tools/model.ts";
 
 export interface CommandResult {
   output: string;
@@ -185,6 +186,31 @@ const continueCommand: SlashCommand = {
   },
 };
 
+const modelCommand: SlashCommand = {
+  name: "model",
+  aliases: ["m"],
+  description: "Show or switch the active LLM model",
+  usage: "/model [model-id]",
+  async execute(args, threadManager) {
+    const client = threadManager.getLanguageModelClient();
+    const trimmed = args.trim();
+
+    if (!trimmed) {
+      return { output: `active model: ${client.getModel()}` };
+    }
+
+    const previous = client.getModel();
+    client.setModel(trimmed);
+
+    try {
+      await persistModelToConfiguration(trimmed);
+      return { output: `model switched: ${previous} → ${trimmed}\nsaved to ~/.kraken/kraken.yml` };
+    } catch {
+      return { output: `model switched: ${previous} → ${trimmed} (runtime only, config save failed)` };
+    }
+  },
+};
+
 const exitCommand: SlashCommand = {
   name: "exit",
   aliases: ["quit", "q"],
@@ -218,6 +244,7 @@ export const ALL_COMMANDS: SlashCommand[] = [
   deleteThreadCommand,
   renameCommand,
   continueCommand,
+  modelCommand,
   purgeCommand,
   exitCommand,
 ];

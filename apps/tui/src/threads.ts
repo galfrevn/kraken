@@ -142,6 +142,10 @@ export class ThreadManager {
     };
   }
 
+  getLanguageModelClient(): LanguageModelClient {
+    return this.languageModelClient;
+  }
+
   isActiveThreadEmpty(): boolean {
     const engine = this.threads.get(this.activeThreadIdentifier);
     if (!engine) return true;

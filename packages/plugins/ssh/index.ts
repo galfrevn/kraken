@@ -466,8 +466,8 @@ const sshConfigListTool: Tool = {
         const match = line.match(/^(\S+)\s+(.+)$/);
         if (!match) continue;
 
-        const key = match[1].toLowerCase();
-        const value = match[2].trim();
+        const key = match[1]!.toLowerCase();
+        const value = match[2]!.trim();
 
         if (key === "host") {
           if (current) hosts.push(current);

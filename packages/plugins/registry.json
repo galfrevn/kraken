@@ -84,12 +84,30 @@
     },
     {
       "name": "cryptofinance",
-      "version": "0.2.0",
-      "description": "Cryptocurrency prices and exchange rates using free public APIs. No API keys needed.",
+      "version": "0.3.0",
+      "description": "Cryptocurrency prices, exchange rates, and historical charts using free public APIs. No API keys needed.",
       "author": "kraken",
-      "tools": ["crypto_list", "crypto_price", "exchange_rate", "exchange_convert"],
+      "tools": ["crypto_list", "crypto_price", "crypto_chart", "exchange_rate", "exchange_convert"],
       "requires": [],
       "directory": "cryptofinance"
+    },
+    {
+      "name": "notifications",
+      "version": "0.1.0",
+      "description": "Send notifications to Slack, Discord, and Telegram. All platforms are optional — configure the ones you use.",
+      "author": "kraken",
+      "tools": ["notify_send"],
+      "requires": [],
+      "directory": "notifications"
+    },
+    {
+      "name": "email",
+      "version": "0.1.0",
+      "description": "Send and list emails via the Resend API.",
+      "author": "kraken",
+      "tools": ["email_send", "email_list"],
+      "requires": [],
+      "directory": "email"
     }
   ]
 }

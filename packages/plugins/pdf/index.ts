@@ -24,7 +24,7 @@ function resolvePath(path: string, workingDirectory: string): string {
 
 async function tryLoadPdfParse(): Promise<boolean> {
   try {
-    pdfParseModule = await import("pdf-parse");
+    pdfParseModule = await import("pdf-parse" as string);
     pdfParseAvailable = true;
     return true;
   } catch {
@@ -47,7 +47,7 @@ function extractTextFallback(buffer: Buffer): string {
   const parenRegex = /\(([^)\\]*(?:\\.[^)\\]*)*)\)/g;
   let match: RegExpExecArray | null;
   while ((match = parenRegex.exec(raw)) !== null) {
-    const str = match[1]
+    const str = match[1]!
       .replace(/\\n/g, "\n")
       .replace(/\\r/g, "\r")
       .replace(/\\t/g, "\t")
@@ -64,7 +64,7 @@ function extractTextFallback(buffer: Buffer): string {
   // Extract hex strings between angle brackets
   const hexRegex = /<([0-9A-Fa-f\s]+)>/g;
   while ((match = hexRegex.exec(raw)) !== null) {
-    const hex = match[1].replace(/\s/g, "");
+    const hex = match[1]!.replace(/\s/g, "");
     if (hex.length >= 4 && hex.length % 2 === 0) {
       let decoded = "";
       for (let i = 0; i < hex.length; i += 2) {
@@ -111,14 +111,14 @@ function extractMetadataFallback(buffer: Buffer): Record<string, string> {
     const regex = new RegExp(`/${field}\\s*\\(([^)]*?)\\)`);
     const m = raw.match(regex);
     if (m) {
-      meta[field.toLowerCase()] = m[1];
+      meta[field.toLowerCase()] = m[1]!;
     }
   }
 
   // PDF version from header
   const versionMatch = raw.match(/%PDF-(\d+\.\d+)/);
   if (versionMatch) {
-    meta["pdf_version"] = versionMatch[1];
+    meta["pdf_version"] = versionMatch[1]!;
   }
 
   return meta;
@@ -175,7 +175,7 @@ const pdfReadTool: Tool = {
             // Parse page range
             const rangeMatch = pagesParam.match(/^(\d+)(?:-(\d+))?$/);
             if (rangeMatch) {
-              const start = parseInt(rangeMatch[1], 10);
+              const start = parseInt(rangeMatch[1]!, 10);
               const end = rangeMatch[2] ? parseInt(rangeMatch[2], 10) : start;
               options.max = end;
               options.pagerender = function (pageData: any) {

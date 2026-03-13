@@ -11,14 +11,14 @@ const IS_WINDOWS = process.platform === "win32";
 // Playwright session — lazy-loaded to avoid import errors when not installed
 // ---------------------------------------------------------------------------
 
-let pw: typeof import("playwright") | null = null;
-let browserInstance: import("playwright").Browser | null = null;
-let currentPage: import("playwright").Page | null = null;
+let pw: any = null;
+let browserInstance: any = null;
+let currentPage: any = null;
 
-async function loadPlaywright(): Promise<typeof import("playwright")> {
+async function loadPlaywright(): Promise<any> {
   if (pw) return pw;
   try {
-    pw = await import("playwright");
+    pw = await import("playwright" as string);
     return pw;
   } catch {
     throw new Error(
@@ -27,7 +27,7 @@ async function loadPlaywright(): Promise<typeof import("playwright")> {
   }
 }
 
-async function ensurePage(): Promise<import("playwright").Page> {
+async function ensurePage(): Promise<any> {
   if (currentPage && !currentPage.isClosed()) return currentPage;
 
   const playwright = await loadPlaywright();
@@ -55,7 +55,7 @@ interface SnapshotEntry {
   children?: SnapshotEntry[];
 }
 
-let refMap: Map<string, import("playwright").Locator> = new Map();
+let refMap: Map<string, any> = new Map();
 let refCounter = 0;
 
 function isInteractive(role: string): boolean {
@@ -80,7 +80,7 @@ type AXNode = {
 };
 
 async function buildSnapshot(
-  page: import("playwright").Page,
+  page: any,
   interactiveOnly: boolean,
 ): Promise<string> {
   refMap.clear();
@@ -135,7 +135,7 @@ async function buildSnapshot(
   return lines.length > 0 ? lines.join("\n") : "(no matching elements found)";
 }
 
-function getLocator(ref: string): import("playwright").Locator | undefined {
+function getLocator(ref: string): any {
   const normalized = ref.startsWith("@") ? ref : `@${ref}`;
   return refMap.get(normalized);
 }
