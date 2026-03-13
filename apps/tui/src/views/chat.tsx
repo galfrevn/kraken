@@ -336,7 +336,12 @@ export function ChatView({ threadManager, focused, onRequestFocus, onRequestBlur
 
   useEffect(() => {
     const sb = scrollboxRef.current;
-    if (sb) sb.focusable = !pendingQuestions && !pendingConfirmation && !pendingSetup;
+    if (!sb) return;
+    const blocked = !!(pendingQuestions || pendingConfirmation || pendingSetup);
+    sb.focusable = !blocked;
+    if (blocked && typeof sb.blur === "function") {
+      sb.blur();
+    }
   }, [pendingQuestions, pendingConfirmation, pendingSetup]);
 
   const lastEscapeTimestamp = useRef(0);
@@ -1000,9 +1005,11 @@ export function ChatView({ threadManager, focused, onRequestFocus, onRequestBlur
             <box flexShrink={0} width={1} height={6} backgroundColor={modeColor} />
             <box
               flexGrow={1}
+              flexShrink={1}
               height={6}
               backgroundColor={COLORS.inputBackground}
               padding={1}
+              overflow="scroll"
               onMouseUp={onRequestFocus}
             >
               <textarea
@@ -1022,7 +1029,7 @@ export function ChatView({ threadManager, focused, onRequestFocus, onRequestBlur
                 placeholderColor={COLORS.textMuted}
                 backgroundColor={COLORS.inputBackground}
                 textColor={COLORS.text}
-                width="100%"
+                width="90%"
                 height="100%"
                 wrapMode="word"
                 focused={focused && !dialogIsOpen}

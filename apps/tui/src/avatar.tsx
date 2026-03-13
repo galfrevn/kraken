@@ -279,6 +279,10 @@ export function Avatar({ state }: AvatarProps) {
   }, [state]);
 
   useEffect(() => {
+    // Idle animation is subtle (just an eye blink) — skip the timer to avoid
+    // re-renders that cause the nearby textarea cursor to flicker.
+    if (state === "idle") return;
+
     const speed = ANIMATION_SPEED_MILLISECONDS[state];
     const timer = setInterval(() => {
       setFrameIndex((previous) => previous + 1);

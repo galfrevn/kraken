@@ -67,7 +67,6 @@ export class ThreadManager {
   private promptExtensionsGetter: (() => string[]) | null = null;
   private hookDispatcher?: HookDispatcher;
   private pluginContext?: PluginContext;
-
   constructor(
     languageModelClient: LanguageModelClient,
     toolRegistry: ToolRegistry,
@@ -82,6 +81,14 @@ export class ThreadManager {
 
   setPluginPromptExtensions(getter: () => string[]): void {
     this.promptExtensionsGetter = getter;
+  }
+
+  refreshPluginPromptExtensions(): void {
+    const extensions = this.promptExtensionsGetter?.() ?? [];
+    try {
+      const engine = this.getActiveEngine();
+      engine.updatePluginPromptExtensions(extensions);
+    } catch { /* no active thread yet */ }
   }
 
   setPluginHooks(dispatcher: HookDispatcher, context: PluginContext): void {
