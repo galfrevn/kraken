@@ -2,6 +2,8 @@ import { spawn, type Subprocess } from "bun";
 import { existsSync } from "node:fs";
 import { join } from "node:path";
 import { KRAKEN_ROOT, KRAKEN_HOME } from "@/constants.ts";
+import { loadConfiguration } from "@core/configuration/loader.ts";
+import type { AgentConfiguration } from "@core/configuration/schema.ts";
 
 const childProcesses: Subprocess[] = [];
 let shuttingDown = false;
@@ -49,10 +51,53 @@ function spawnScheduler(dev: boolean): Subprocess {
   return spawn({ cmd: ["cargo", "run", "--quiet"], cwd: schedulerDirectory, stdout: "ignore", stderr: "ignore" });
 }
 
-function spawnGateway(dev: boolean): Subprocess {
+function buildGatewayEnv(configuration: AgentConfiguration): Record<string, string | undefined> {
+  const envVars: Record<string, string | undefined> = {
+    ...process.env,
+    DOTENV_PATH: join(KRAKEN_HOME, ".env"),
+    LLM_PROVIDER: configuration.languageModel.provider,
+  };
+
+  const apiKey = configuration.languageModel.apiKey;
+  if (apiKey) {
+    switch (configuration.languageModel.provider) {
+      case "openrouter":
+        envVars.OPENROUTER_API_KEY = apiKey;
+        break;
+      case "openai":
+        envVars.OPENAI_API_KEY = apiKey;
+        break;
+      case "anthropic":
+        envVars.ANTHROPIC_API_KEY = apiKey;
+        break;
+    }
+  }
+
+  const baseUrl = configuration.languageModel.baseUrl;
+  if (baseUrl) {
+    switch (configuration.languageModel.provider) {
+      case "openrouter":
+        envVars.OPENROUTER_BASE_URL = baseUrl;
+        break;
+      case "openai":
+        envVars.OPENAI_BASE_URL = baseUrl;
+        break;
+      case "anthropic":
+        envVars.ANTHROPIC_BASE_URL = baseUrl;
+        break;
+      case "ollama":
+        envVars.OLLAMA_BASE_URL = baseUrl;
+        break;
+    }
+  }
+
+  return envVars;
+}
+
+function spawnGateway(dev: boolean, configuration: AgentConfiguration): Subprocess {
   const builtBinary = join(KRAKEN_ROOT, "apps", "gateway", "bin", "gateway");
   const gatewayDirectory = join(KRAKEN_ROOT, "apps", "gateway");
-  const envVars = { ...process.env, DOTENV_PATH: join(KRAKEN_HOME, ".env") };
+  const envVars = buildGatewayEnv(configuration);
 
   if (!dev && existsSync(builtBinary)) {
     return spawn({ cmd: [builtBinary], cwd: gatewayDirectory, stdout: "ignore", stderr: "ignore", env: envVars });
@@ -63,6 +108,7 @@ function spawnGateway(dev: boolean): Subprocess {
 
 export async function execute(args: string[]): Promise<void> {
   const flags = parseStartFlags(args);
+  const configuration = await loadConfiguration();
 
   process.on("SIGINT", () => { killAllChildren(); process.exit(0); });
   process.on("SIGTERM", () => { killAllChildren(); process.exit(0); });
@@ -73,7 +119,7 @@ export async function execute(args: string[]): Promise<void> {
   }
 
   if (!flags.noGateway) {
-    childProcesses.push(spawnGateway(flags.dev));
+    childProcesses.push(spawnGateway(flags.dev, configuration));
   }
 
   // @ts-expect-error -- dynamic cross-package import resolved by Bun at runtime

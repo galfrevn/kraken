@@ -8,8 +8,9 @@
     "allowImportingTsExtensions": true,
     "noEmit": true,
     "paths": {
-      "@/*": ["./src/*"]
+      "@/*": ["./src/*", "../core/src/*"],
+      "@core/*": ["../core/src/*"]
     }
   },
-  "include": ["src/**/*.ts"]
+  "include": ["src/**/*.ts", "../core/src/configuration/**/*.ts"]
 }
