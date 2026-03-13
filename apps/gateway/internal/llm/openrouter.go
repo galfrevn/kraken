@@ -67,11 +67,18 @@ type CompletionUsage struct {
 	CompletionTokens int32 `json:"completion_tokens"`
 }
 
+type CompletionError struct {
+	Message string `json:"message"`
+	Type    string `json:"type"`
+	Code    any    `json:"code"`
+}
+
 type CompletionResponse struct {
 	ID      string             `json:"id"`
 	Model   string             `json:"model"`
 	Choices []CompletionChoice `json:"choices"`
 	Usage   CompletionUsage    `json:"usage"`
+	Error   *CompletionError   `json:"error,omitempty"`
 }
 
 type Client struct {
@@ -147,7 +154,11 @@ func (c *Client) Complete(ctx context.Context, req CompletionRequest) (*Completi
 
 	var completionResp CompletionResponse
 	if err := json.Unmarshal(respBody, &completionResp); err != nil {
-		return nil, fmt.Errorf("failed to unmarshal response: %w", err)
+		return nil, fmt.Errorf("failed to unmarshal response: %w (body: %.500s)", err, string(respBody))
+	}
+
+	if completionResp.Error != nil {
+		return nil, fmt.Errorf("provider error: %s (type=%s, code=%v)", completionResp.Error.Message, completionResp.Error.Type, completionResp.Error.Code)
 	}
 
 	return &completionResp, nil
@@ -224,6 +235,9 @@ func (c *Client) StreamComplete(ctx context.Context, req CompletionRequest, call
 	}
 
 	scanner := bufio.NewScanner(resp.Body)
+	chunksReceived := 0
+	receivedDone := false
+
 	for scanner.Scan() {
 		line := scanner.Text()
 
@@ -233,7 +247,20 @@ func (c *Client) StreamComplete(ctx context.Context, req CompletionRequest, call
 
 		data := strings.TrimPrefix(line, "data: ")
 		if data == "[DONE]" {
+			receivedDone = true
 			break
+		}
+
+		// Check for error responses embedded in stream
+		var rawMsg map[string]json.RawMessage
+		if err := json.Unmarshal([]byte(data), &rawMsg); err != nil {
+			continue
+		}
+		if errField, ok := rawMsg["error"]; ok {
+			var streamErr CompletionError
+			if json.Unmarshal(errField, &streamErr) == nil && streamErr.Message != "" {
+				return fmt.Errorf("provider stream error: %s (type=%s, code=%v)", streamErr.Message, streamErr.Type, streamErr.Code)
+			}
 		}
 
 		var chunk StreamChunk
@@ -241,10 +268,20 @@ func (c *Client) StreamComplete(ctx context.Context, req CompletionRequest, call
 			continue
 		}
 
+		chunksReceived++
+
 		if err := callback(chunk); err != nil {
 			return err
 		}
 	}
 
-	return scanner.Err()
+	if err := scanner.Err(); err != nil {
+		return fmt.Errorf("stream read error after %d chunks: %w", chunksReceived, err)
+	}
+
+	if !receivedDone && chunksReceived == 0 {
+		return fmt.Errorf("stream ended without data (no chunks received, no [DONE] marker)")
+	}
+
+	return nil
 }

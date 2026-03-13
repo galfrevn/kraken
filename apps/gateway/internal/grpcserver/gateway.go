@@ -147,10 +147,17 @@ func (s *GatewayServer) Complete(
 	}
 
 	if len(result.Choices) == 0 {
-		return nil, connect.NewError(connect.CodeInternal, fmt.Errorf("no choices in response"))
+		s.logger.Error("no choices in response", "model", req.Msg.Model, "response_id", result.ID, "response_model", result.Model, "prompt_tokens", result.Usage.PromptTokens, "completion_tokens", result.Usage.CompletionTokens)
+		return nil, connect.NewError(connect.CodeInternal, fmt.Errorf("no choices in response (model=%s, id=%s)", req.Msg.Model, result.ID))
 	}
 
 	choice := result.Choices[0]
+
+	// Detect empty responses: no content, no tool calls, no finish reason
+	if choice.Message.Content == "" && len(choice.Message.ToolCalls) == 0 && choice.FinishReason == "" {
+		s.logger.Error("empty response from provider", "model", req.Msg.Model, "response_id", result.ID, "prompt_tokens", result.Usage.PromptTokens, "completion_tokens", result.Usage.CompletionTokens, "finish_reason", choice.FinishReason)
+		return nil, connect.NewError(connect.CodeInternal, fmt.Errorf("empty response from provider (model=%s, id=%s, promptTokens=%d, completionTokens=%d)", req.Msg.Model, result.ID, result.Usage.PromptTokens, result.Usage.CompletionTokens))
+	}
 
 	resp := &agentv1.CompleteResponse{
 		Id:    result.ID,
@@ -270,8 +277,8 @@ func (s *GatewayServer) StreamComplete(
 	})
 
 	if err != nil {
-		s.logger.Error("stream complete failed", "error", err)
-		return connect.NewError(connect.CodeInternal, fmt.Errorf("stream complete failed: %w", err))
+		s.logger.Error("stream complete failed", "model", req.Msg.Model, "messages", len(req.Msg.Messages), "error", err)
+		return connect.NewError(connect.CodeInternal, fmt.Errorf("stream complete failed (model=%s): %w", req.Msg.Model, err))
 	}
 
 	return nil
