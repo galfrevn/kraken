@@ -20,6 +20,14 @@ export interface TaskSummary {
   awaitingReview: number;
 }
 
+export interface ScheduledItem {
+  id: string;
+  title: string;
+  type: "timer" | "cron";
+  detail: string; // remaining time for timers, cron expression for crons
+  enabled?: boolean;
+}
+
 export class TuiStore {
   readonly database: AgentDatabase;
   readonly taskQueueManager: TaskQueueManager;
@@ -87,6 +95,39 @@ export class TuiStore {
 
   fetchPendingTimers(): TimerSummary[] {
     return this.timerManager.list();
+  }
+
+  async fetchScheduledItems(): Promise<ScheduledItem[]> {
+    const items: ScheduledItem[] = [];
+
+    // Local one-shot timers
+    for (const timer of this.timerManager.list()) {
+      const mins = Math.ceil(timer.remainingMs / 60_000);
+      items.push({
+        id: timer.id,
+        title: timer.title,
+        type: "timer",
+        detail: mins < 60 ? `${mins}m` : `${Math.floor(mins / 60)}h ${mins % 60}m`,
+      });
+    }
+
+    // Recurring crons from scheduler service
+    try {
+      const response = await this.schedulerClient.listCrons({});
+      for (const cron of response.crons) {
+        items.push({
+          id: cron.cronId,
+          title: cron.name,
+          type: "cron",
+          detail: cron.cronExpression,
+          enabled: cron.enabled,
+        });
+      }
+    } catch {
+      // Scheduler offline — skip crons silently
+    }
+
+    return items;
   }
 
   fetchRecentTasks(limit: number = 20): TaskRow[] {

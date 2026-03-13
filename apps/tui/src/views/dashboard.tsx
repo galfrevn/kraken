@@ -1,22 +1,11 @@
 import { useState, useEffect } from "react";
 import { COLORS, STATUS_ICONS, STATUS_COLORS } from "@/theme.ts";
-import type { TuiStore, ServiceHealth, TaskSummary } from "@/store.ts";
+import type { TuiStore, ServiceHealth, TaskSummary, ScheduledItem } from "@/store.ts";
 import type { TaskRow } from "@core/storage/database.ts";
-import type { TimerSummary } from "@core/scheduling/timers.ts";
 import type { PluginRegistry } from "@core/plugins/registry.ts";
 import { Avatar } from "@/avatar.tsx";
 
 const REFRESH_INTERVAL_MILLISECONDS = 3_000;
-
-function formatRemainingTime(milliseconds: number): string {
-  const totalMinutes = Math.ceil(milliseconds / 60_000);
-  if (totalMinutes < 60) return `${totalMinutes}m`;
-  const hours = Math.floor(totalMinutes / 60);
-  const minutes = totalMinutes % 60;
-  if (hours < 24) return `${hours}h ${minutes}m`;
-  const days = Math.floor(hours / 24);
-  return `${days}d ${hours % 24}h`;
-}
 
 interface DashboardViewProps {
   store: TuiStore;
@@ -39,16 +28,19 @@ export function DashboardView({ store, pluginRegistry }: DashboardViewProps) {
     awaitingReview: 0,
   });
   const [recentTasks, setRecentTasks] = useState<TaskRow[]>([]);
-  const [pendingTimers, setPendingTimers] = useState<TimerSummary[]>([]);
+  const [scheduledItems, setScheduledItems] = useState<ScheduledItem[]>([]);
   const plugins = pluginRegistry.getLoadedPlugins();
 
   useEffect(() => {
     const refresh = async () => {
-      const [fetchedHealth] = await Promise.all([store.fetchServiceHealth()]);
+      const [fetchedHealth, fetchedItems] = await Promise.all([
+        store.fetchServiceHealth(),
+        store.fetchScheduledItems(),
+      ]);
       setHealth(fetchedHealth);
       setSummary(store.fetchTaskSummary());
       setRecentTasks(store.fetchRecentTasks(8));
-      setPendingTimers(store.fetchPendingTimers());
+      setScheduledItems(fetchedItems);
     };
 
     refresh();
@@ -160,20 +152,19 @@ export function DashboardView({ store, pluginRegistry }: DashboardViewProps) {
           padding={1}
           flexGrow={1}
         >
-          <text fg={COLORS.textSecondary}>scheduled timers</text>
-          {pendingTimers.length === 0 ? (
-            <text fg={COLORS.textMuted}>{"  no timers scheduled"}</text>
+          <text fg={COLORS.textSecondary}>schedules</text>
+          {scheduledItems.length === 0 ? (
+            <text fg={COLORS.textMuted}>{"  no schedules active"}</text>
           ) : (
-            pendingTimers.map((timer) => (
-              <text key={timer.id} fg={COLORS.cyan}>
-                {"  ◷ " +
-                  timer.title +
-                  "  " +
-                  formatRemainingTime(timer.remainingMs) +
-                  "  " +
-                  timer.id.slice(0, 8)}
-              </text>
-            ))
+            scheduledItems.map((item) => {
+              const icon = item.type === "cron" ? "↻" : "◷";
+              const color = item.enabled === false ? COLORS.textMuted : COLORS.cyan;
+              return (
+                <text key={item.id} fg={color}>
+                  {"  " + icon + " " + item.title + "  " + item.detail + "  " + item.id.slice(0, 8)}
+                </text>
+              );
+            })
           )}
         </box>
       </box>
