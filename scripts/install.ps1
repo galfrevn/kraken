@@ -29,6 +29,7 @@ function Prompt-YesNo($question, $default = "y") {
 $KrakenHome = Join-Path $env:USERPROFILE ".kraken"
 $KrakenBin  = Join-Path $KrakenHome "bin"
 $KrakenLib  = Join-Path $KrakenHome "lib"
+$KrakenSrc  = Join-Path $KrakenLib "tui"
 $GitHubRepo = "galfrevn/kraken"
 $GitHubUrl  = "https://github.com/$GitHubRepo"
 
@@ -62,7 +63,7 @@ $Platform = "windows-$Arch"
 Success "detected platform: $Platform"
 
 # -------------------------------------------------------------------
-# 2. Check / install Bun
+# 2. Check / install Bun (the only hard requirement)
 # -------------------------------------------------------------------
 Step "checking bun"
 
@@ -97,31 +98,62 @@ if (Get-Command bun -ErrorAction SilentlyContinue) {
 # -------------------------------------------------------------------
 Step "preparing installation"
 
-New-Item -ItemType Directory -Force -Path $KrakenBin  | Out-Null
-New-Item -ItemType Directory -Force -Path $KrakenLib  | Out-Null
+New-Item -ItemType Directory -Force -Path $KrakenBin | Out-Null
+New-Item -ItemType Directory -Force -Path $KrakenLib | Out-Null
 New-Item -ItemType Directory -Force -Path (Join-Path $KrakenHome "config") | Out-Null
 
-$TuiDir = Join-Path $KrakenLib "tui"
-
-if (Test-Path $TuiDir) {
+if (Test-Path $KrakenSrc) {
     Warn "existing installation found, updating..."
 }
 
 # -------------------------------------------------------------------
-# 4. Try downloading pre-built release
+# 4. Clone / update the repository (always needed for TypeScript code)
 # -------------------------------------------------------------------
-Step "downloading kraken"
+Step "fetching kraken source"
+
+if (-not (Get-Command git -ErrorAction SilentlyContinue)) {
+    Fail "git is required. Install it: https://git-scm.com"
+}
+
+$TuiGit = Join-Path $KrakenSrc ".git"
+if (Test-Path $TuiGit) {
+    Push-Location $KrakenSrc
+    git pull --rebase --quiet
+    Pop-Location
+    Success "updated source code"
+} else {
+    if (Test-Path $KrakenSrc) { Remove-Item $KrakenSrc -Recurse -Force }
+    git clone --depth 1 "$GitHubUrl.git" $KrakenSrc
+    Success "cloned repository"
+}
+
+# -------------------------------------------------------------------
+# 5. Install TypeScript dependencies
+# -------------------------------------------------------------------
+Step "installing dependencies"
+Push-Location $KrakenSrc
+try {
+    bun install --frozen-lockfile 2>$null
+} catch {
+    bun install
+}
+Pop-Location
+Success "dependencies installed"
+
+# -------------------------------------------------------------------
+# 6. Get scheduler & gateway binaries (pre-built or build from source)
+# -------------------------------------------------------------------
+Step "setting up native binaries"
 
 $PrebuiltOk = $false
 $ReleaseTag = $null
 
+# Try downloading pre-built binaries from the latest release
 try {
     $Release = Invoke-RestMethod -Uri "https://api.github.com/repos/$GitHubRepo/releases/latest" -ErrorAction Stop
     $ReleaseTag = $Release.tag_name
 
     if ($ReleaseTag) {
-        # Note: Windows releases would need to be added to the release workflow.
-        # For now, we check for a windows asset; if not found, fall back to source.
         $AssetName = "kraken-$Platform.tar.gz"
         $DownloadUrl = "$GitHubUrl/releases/download/$ReleaseTag/$AssetName"
 
@@ -130,25 +162,21 @@ try {
         $TempFile = Join-Path $env:TEMP $AssetName
         try {
             Invoke-WebRequest -Uri $DownloadUrl -OutFile $TempFile -ErrorAction Stop
-
-            # Extract tar.gz
             tar -xzf $TempFile -C $KrakenLib 2>$null
             $PrebuiltOk = $true
             Remove-Item $TempFile -Force -ErrorAction SilentlyContinue
             Success "downloaded pre-built binaries ($ReleaseTag)"
         } catch {
-            # No pre-built binary available for Windows, fall through to source build
+            # No pre-built binary available for this platform
         }
     }
 } catch {
-    # No releases yet, fall through
+    # No releases yet
 }
 
-# -------------------------------------------------------------------
-# 5. Fallback: build from source
-# -------------------------------------------------------------------
+# Fallback: build from source if pre-built binaries are not available
 if (-not $PrebuiltOk) {
-    Warn "no pre-built release available for Windows, building from source"
+    Warn "no pre-built binaries available, trying to build from source"
 
     $HasCargo = [bool](Get-Command cargo -ErrorAction SilentlyContinue)
     $HasGo    = [bool](Get-Command go -ErrorAction SilentlyContinue)
@@ -156,42 +184,14 @@ if (-not $PrebuiltOk) {
     if ($HasCargo) {
         Success "cargo found: $((cargo --version) -replace 'cargo ','')"
     } else {
-        Warn "cargo not found -- scheduler won't be built (https://rustup.rs)"
+        Warn "cargo not found -- scheduler won't be available (https://rustup.rs)"
     }
 
     if ($HasGo) {
         Success "go found: $((go version) -replace 'go version go' -replace ' .*','')"
     } else {
-        Warn "go not found -- gateway won't be built (https://go.dev/dl)"
+        Warn "go not found -- gateway won't be available (https://go.dev/dl)"
     }
-
-    # Check for git
-    if (-not (Get-Command git -ErrorAction SilentlyContinue)) {
-        Fail "git is required to build from source. Install it: https://git-scm.com"
-    }
-
-    Step "cloning repository"
-
-    $TuiGit = Join-Path $TuiDir ".git"
-    if (Test-Path $TuiGit) {
-        Push-Location $TuiDir
-        git pull --rebase --quiet
-        Pop-Location
-        Success "updated source code"
-    } else {
-        if (Test-Path $TuiDir) { Remove-Item $TuiDir -Recurse -Force }
-        git clone --depth 1 "$GitHubUrl.git" $TuiDir
-        Success "cloned repository"
-    }
-
-    Step "installing dependencies"
-    Push-Location $TuiDir
-    try {
-        bun install --frozen-lockfile 2>$null
-    } catch {
-        bun install
-    }
-    Success "dependencies installed"
 
     # Check / setup protoc for Rust build
     $ProtocDir = "C:\protoc"
@@ -222,9 +222,9 @@ if (-not $PrebuiltOk) {
         }
 
         Step "building scheduler (rust)"
-        Push-Location (Join-Path $TuiDir "apps\scheduler")
+        Push-Location (Join-Path $KrakenSrc "apps\scheduler")
         cargo build --release
-        $SchedulerExe = Join-Path $TuiDir "apps\scheduler\target\release\scheduler.exe"
+        $SchedulerExe = Join-Path $KrakenSrc "apps\scheduler\target\release\scheduler.exe"
         if (Test-Path $SchedulerExe) {
             Copy-Item $SchedulerExe (Join-Path $KrakenLib "scheduler.exe") -Force
         }
@@ -234,7 +234,7 @@ if (-not $PrebuiltOk) {
 
     if ($HasGo) {
         Step "building gateway (go)"
-        Push-Location (Join-Path $TuiDir "apps\gateway")
+        Push-Location (Join-Path $KrakenSrc "apps\gateway")
         go build -o gateway.exe ./cmd/gateway
         if (Test-Path "gateway.exe") {
             Copy-Item "gateway.exe" (Join-Path $KrakenLib "gateway.exe") -Force
@@ -242,12 +242,10 @@ if (-not $PrebuiltOk) {
         Pop-Location
         Success "gateway built"
     }
-
-    Pop-Location  # Back from $TuiDir
 }
 
 # -------------------------------------------------------------------
-# 6. Create CLI shim
+# 7. Create CLI shim
 # -------------------------------------------------------------------
 Step "creating CLI"
 
@@ -269,11 +267,11 @@ Set-Content -Path $Ps1ShimPath -Value $Ps1ShimContent -Encoding UTF8
 Success "created $ShimPath"
 
 # -------------------------------------------------------------------
-# 7. Copy config templates
+# 8. Copy config templates
 # -------------------------------------------------------------------
 Step "setting up configuration"
 
-$TemplatesDir = Join-Path $TuiDir "apps\cli\templates"
+$TemplatesDir = Join-Path $KrakenSrc "apps\cli\templates"
 $ConfigDir = Join-Path $KrakenHome "config"
 
 if (Test-Path $TemplatesDir) {
@@ -290,7 +288,7 @@ if (Test-Path $TemplatesDir) {
 }
 
 # -------------------------------------------------------------------
-# 8. Write version marker
+# 9. Write version marker
 # -------------------------------------------------------------------
 
 if ($ReleaseTag) {
@@ -300,7 +298,7 @@ if ($ReleaseTag) {
 }
 
 # -------------------------------------------------------------------
-# 9. Add to PATH
+# 10. Add to PATH
 # -------------------------------------------------------------------
 Step "configuring PATH"
 
@@ -318,7 +316,7 @@ if ($UserPath -notlike "*$KrakenBin*") {
 }
 
 # -------------------------------------------------------------------
-# 10. Verify
+# 11. Verify
 # -------------------------------------------------------------------
 Step "verifying installation"
 

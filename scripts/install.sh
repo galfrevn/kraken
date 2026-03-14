@@ -15,6 +15,8 @@ RESET="\033[0m"
 
 KRAKEN_HOME="$HOME/.kraken"
 KRAKEN_BIN="$KRAKEN_HOME/bin"
+KRAKEN_LIB="$KRAKEN_HOME/lib"
+KRAKEN_SRC="$KRAKEN_LIB/tui"
 GITHUB_REPO="galfrevn/kraken"
 GITHUB_URL="https://github.com/$GITHUB_REPO"
 
@@ -73,7 +75,7 @@ PLATFORM=$(detect_platform)
 success "detected platform: $PLATFORM"
 
 # -------------------------------------------------------------------
-# 1. Check / install Bun
+# 1. Check / install Bun (the only hard requirement)
 # -------------------------------------------------------------------
 step "checking bun"
 
@@ -106,23 +108,50 @@ fi
 step "preparing installation"
 
 mkdir -p "$KRAKEN_BIN"
-mkdir -p "$KRAKEN_HOME/lib"
+mkdir -p "$KRAKEN_LIB"
 mkdir -p "$KRAKEN_HOME/config"
 
-if [ -d "$KRAKEN_HOME/lib/tui" ]; then
+if [ -d "$KRAKEN_SRC" ]; then
   warn "existing installation found, updating..."
-  UPDATING=true
-else
-  UPDATING=false
 fi
 
 # -------------------------------------------------------------------
-# 3. Try downloading pre-built release
+# 3. Clone / update the repository (always needed for TypeScript code)
 # -------------------------------------------------------------------
-step "downloading kraken"
+step "fetching kraken source"
+
+if ! command -v git &>/dev/null; then
+  fail "git is required. Install it: https://git-scm.com"
+fi
+
+if [ -d "$KRAKEN_SRC/.git" ]; then
+  cd "$KRAKEN_SRC"
+  git pull --rebase --quiet
+  success "updated source code"
+else
+  rm -rf "$KRAKEN_SRC"
+  git clone --depth 1 "$GITHUB_URL.git" "$KRAKEN_SRC"
+  success "cloned repository"
+fi
+
+cd "$KRAKEN_SRC"
+
+# -------------------------------------------------------------------
+# 4. Install TypeScript dependencies
+# -------------------------------------------------------------------
+step "installing dependencies"
+bun install --frozen-lockfile 2>/dev/null || bun install
+success "dependencies installed"
+
+# -------------------------------------------------------------------
+# 5. Get scheduler & gateway binaries (pre-built or build from source)
+# -------------------------------------------------------------------
+step "setting up native binaries"
 
 PREBUILT_OK=false
+RELEASE_TAG=""
 
+# Try downloading pre-built binaries from the latest release
 if command -v curl &>/dev/null; then
   LATEST_RELEASE=$(curl -fsSL "https://api.github.com/repos/$GITHUB_REPO/releases/latest" 2>/dev/null || echo "")
 
@@ -136,7 +165,7 @@ if command -v curl &>/dev/null; then
       echo -e "  ${DIM}trying $DOWNLOAD_URL${RESET}"
 
       if curl -fsSL -o "/tmp/$ASSET_NAME" "$DOWNLOAD_URL" 2>/dev/null; then
-        tar -xzf "/tmp/$ASSET_NAME" -C "$KRAKEN_HOME/lib/" 2>/dev/null && PREBUILT_OK=true
+        tar -xzf "/tmp/$ASSET_NAME" -C "$KRAKEN_LIB/" 2>/dev/null && PREBUILT_OK=true
         rm -f "/tmp/$ASSET_NAME"
 
         if [ "$PREBUILT_OK" = true ]; then
@@ -147,68 +176,37 @@ if command -v curl &>/dev/null; then
   fi
 fi
 
-# -------------------------------------------------------------------
-# 4. Fallback: build from source
-# -------------------------------------------------------------------
+# Fallback: build from source if pre-built binaries are not available
 if [ "$PREBUILT_OK" = false ]; then
-  warn "no pre-built release available, building from source"
-
-  HAS_CARGO=false
-  HAS_GO=false
+  warn "no pre-built binaries available, trying to build from source"
 
   if command -v cargo &>/dev/null; then
-    HAS_CARGO=true
     success "cargo found: $(cargo --version | awk '{print $2}')"
-  else
-    warn "cargo not found -- scheduler won't be pre-built (https://rustup.rs)"
-  fi
-
-  if command -v go &>/dev/null; then
-    HAS_GO=true
-    success "go found: $(go version | awk '{print $3}' | sed 's/go//')"
-  else
-    warn "go not found -- gateway won't be pre-built (https://go.dev/dl)"
-  fi
-
-  step "cloning repository"
-
-  if [ -d "$KRAKEN_HOME/lib/tui/.git" ]; then
-    cd "$KRAKEN_HOME/lib/tui"
-    git pull --rebase --quiet
-    success "updated source code"
-  else
-    rm -rf "$KRAKEN_HOME/lib/tui"
-    git clone --depth 1 "$GITHUB_URL.git" "$KRAKEN_HOME/lib/tui"
-    success "cloned repository"
-  fi
-
-  cd "$KRAKEN_HOME/lib/tui"
-
-  step "installing dependencies"
-  bun install --frozen-lockfile 2>/dev/null || bun install
-  success "dependencies installed"
-
-  if [ "$HAS_CARGO" = true ]; then
     step "building scheduler (rust)"
     cd apps/scheduler
     cargo build --release 2>&1 | tail -1
-    cp target/release/scheduler "$KRAKEN_HOME/lib/scheduler" 2>/dev/null || true
+    cp target/release/scheduler "$KRAKEN_LIB/scheduler" 2>/dev/null || true
     success "scheduler built"
-    cd "$KRAKEN_HOME/lib/tui"
+    cd "$KRAKEN_SRC"
+  else
+    warn "cargo not found -- scheduler won't be available (https://rustup.rs)"
   fi
 
-  if [ "$HAS_GO" = true ]; then
+  if command -v go &>/dev/null; then
+    success "go found: $(go version | awk '{print $3}' | sed 's/go//')"
     step "building gateway (go)"
     cd apps/gateway
     go build -o ./bin/gateway ./cmd/gateway
-    cp bin/gateway "$KRAKEN_HOME/lib/gateway" 2>/dev/null || true
+    cp bin/gateway "$KRAKEN_LIB/gateway" 2>/dev/null || true
     success "gateway built"
-    cd "$KRAKEN_HOME/lib/tui"
+    cd "$KRAKEN_SRC"
+  else
+    warn "go not found -- gateway won't be available (https://go.dev/dl)"
   fi
 fi
 
 # -------------------------------------------------------------------
-# 5. Create CLI shim
+# 6. Create CLI shim
 # -------------------------------------------------------------------
 step "creating CLI"
 
@@ -221,18 +219,18 @@ chmod +x "$KRAKEN_BIN/kraken"
 success "created $KRAKEN_BIN/kraken"
 
 # -------------------------------------------------------------------
-# 6. Copy config templates
+# 7. Copy config templates
 # -------------------------------------------------------------------
 step "setting up configuration"
 
-if [ -d "$KRAKEN_HOME/lib/tui/apps/cli/templates" ]; then
-  cp -n "$KRAKEN_HOME/lib/tui/apps/cli/templates/env.example" "$KRAKEN_HOME/config/.env.example" 2>/dev/null || true
-  cp -n "$KRAKEN_HOME/lib/tui/apps/cli/templates/kraken.example.yml" "$KRAKEN_HOME/config/kraken.example.yml" 2>/dev/null || true
+if [ -d "$KRAKEN_SRC/apps/cli/templates" ]; then
+  cp -n "$KRAKEN_SRC/apps/cli/templates/env.example" "$KRAKEN_HOME/config/.env.example" 2>/dev/null || true
+  cp -n "$KRAKEN_SRC/apps/cli/templates/kraken.example.yml" "$KRAKEN_HOME/config/kraken.example.yml" 2>/dev/null || true
   success "config templates copied"
 fi
 
 # -------------------------------------------------------------------
-# 7. Write version marker
+# 8. Write version marker
 # -------------------------------------------------------------------
 if [ -n "${RELEASE_TAG:-}" ]; then
   echo "$RELEASE_TAG" > "$KRAKEN_HOME/version"
@@ -241,7 +239,7 @@ else
 fi
 
 # -------------------------------------------------------------------
-# 8. Add to PATH
+# 9. Add to PATH
 # -------------------------------------------------------------------
 step "configuring PATH"
 
@@ -298,7 +296,7 @@ fi
 export PATH="$KRAKEN_BIN:$PATH"
 
 # -------------------------------------------------------------------
-# 9. Verify
+# 10. Verify
 # -------------------------------------------------------------------
 step "verifying installation"
 
@@ -309,19 +307,11 @@ else
 fi
 
 # -------------------------------------------------------------------
-# Done
+# Done — run init
 # -------------------------------------------------------------------
 echo ""
 echo -e "${GREEN}${BOLD}  Installation complete!${RESET}"
 echo ""
-echo -e "  ${BOLD}Get started:${RESET}"
-echo ""
-echo -e "    ${CYAN}kraken init${RESET}      setup kraken in your project"
-echo -e "    ${CYAN}kraken${RESET}           start the agent"
-echo -e "    ${CYAN}kraken doctor${RESET}    check system health"
-echo -e "    ${CYAN}kraken help${RESET}      see all commands"
-echo ""
-if [ "$PATH_ADDED" = true ]; then
-  echo -e "  ${YELLOW}Restart your terminal${RESET} or run: ${CYAN}source ~/.${CURRENT_SHELL}rc${RESET}"
-  echo ""
-fi
+
+step "running kraken init"
+"$KRAKEN_BIN/kraken" init
