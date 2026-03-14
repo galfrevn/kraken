@@ -19,8 +19,8 @@ import {
   type PluginRegistryManifest,
 } from "@core/plugins/installer.ts";
 
-import { handleSlashCommand, ALL_COMMANDS, commandRequiresArguments, type SlashCommand, type CommandResult } from "@/commands.ts";
-import { fetchOpenRouterModelIds } from "@core/tools/model.ts";
+import { handleSlashCommand, ALL_COMMANDS, commandRequiresArguments, setPendingProviderSwitch, type SlashCommand, type CommandResult } from "@/commands.ts";
+import { fetchAllAvailableModels, type ProviderModel } from "@core/tools/model.ts";
 import { Avatar, type AvatarState } from "@/avatar.tsx";
 import { loadImagePreview, generatePreviewRows } from "@/images.ts";
 import { SetupPanel } from "@/views/setup.tsx";
@@ -353,7 +353,7 @@ export function ChatView({ threadManager, focused, onRequestFocus, onRequestBlur
   const [selectedCommandIndex, setSelectedCommandIndex] = useState(0);
   const [modelFilter, setModelFilter] = useState<string | null>(null);
   const [selectedModelIndex, setSelectedModelIndex] = useState(0);
-  const cachedModelIds = useRef<string[]>([]);
+  const cachedModelIds = useRef<ProviderModel[]>([]);
   const modelFetchInFlight = useRef(false);
   const autocompleteAccepted = useRef(false);
   const commandFilterRef = useRef<string | null>(null);
@@ -374,7 +374,7 @@ export function ChatView({ threadManager, focused, onRequestFocus, onRequestBlur
     const query = modelFilter.toLowerCase();
     if (!query) return cachedModelIds.current.slice(0, 20);
     return cachedModelIds.current
-      .filter((id) => id.toLowerCase().includes(query))
+      .filter((m) => m.modelId.toLowerCase().includes(query))
       .slice(0, 20);
   }, [modelFilter]);
 
@@ -487,8 +487,8 @@ export function ChatView({ threadManager, focused, onRequestFocus, onRequestBlur
       // Fetch models if not cached
       if (cachedModelIds.current.length === 0 && !modelFetchInFlight.current) {
         modelFetchInFlight.current = true;
-        fetchOpenRouterModelIds()
-          .then((ids) => { cachedModelIds.current = ids; setModelFilter((prev) => prev); })
+        fetchAllAvailableModels()
+          .then((models) => { cachedModelIds.current = models; setModelFilter((prev) => prev); })
           .catch(() => {})
           .finally(() => { modelFetchInFlight.current = false; });
       }
@@ -518,13 +518,14 @@ export function ChatView({ threadManager, focused, onRequestFocus, onRequestBlur
     setCommandFilter(null);
   }, []);
 
-  const acceptModel = useCallback((modelId: string) => {
+  const acceptModel = useCallback((model: ProviderModel) => {
     const textarea = textareaReference.current;
     if (!textarea) return;
     autocompleteAccepted.current = true;
+    setPendingProviderSwitch(model.provider);
     textarea.selectAll();
     textarea.deleteChar();
-    textarea.insertText("/model " + modelId);
+    textarea.insertText("/model " + model.modelId);
     setModelFilter(null);
   }, []);
 
@@ -943,18 +944,22 @@ export function ChatView({ threadManager, focused, onRequestFocus, onRequestBlur
           </box>
         ) : modelFilter !== null && filteredModels.length > 0 ? (
           <box flexDirection="column" width="100%" paddingBottom={1}>
-            {filteredModels.map((modelId, idx) => {
+            {filteredModels.map((model, idx) => {
               const isSelected = idx === selectedModelIndex;
+              const tag = `[${model.provider}]`.padEnd(14);
               return (
                 <box
-                  key={modelId}
+                  key={`${model.provider}:${model.modelId}`}
                   width="100%"
                   height={1}
                   backgroundColor={isSelected ? COLORS.cyan : undefined}
-                  onMouseUp={() => acceptModel(modelId)}
+                  onMouseUp={() => acceptModel(model)}
                 >
+                  <text fg={isSelected ? COLORS.background : COLORS.textMuted}>
+                    {"  " + tag}
+                  </text>
                   <text fg={isSelected ? COLORS.background : COLORS.text}>
-                    {"  " + modelId}
+                    {model.modelId}
                   </text>
                 </box>
               );

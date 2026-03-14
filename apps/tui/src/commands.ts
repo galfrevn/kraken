@@ -1,7 +1,13 @@
 import type { ThreadManager } from "@/threads.ts";
 import type { PluginRegistry } from "@core/plugins/registry.ts";
 import { fetchRegistry } from "@core/plugins/installer.ts";
-import { persistModelToConfiguration } from "@core/tools/model.ts";
+import { persistModelToConfiguration, persistProviderAndModel } from "@core/tools/model.ts";
+
+let pendingProviderSwitch: string | null = null;
+
+export function setPendingProviderSwitch(provider: string | null): void {
+  pendingProviderSwitch = provider;
+}
 
 export interface CommandResult {
   output: string;
@@ -202,12 +208,64 @@ const modelCommand: SlashCommand = {
     const previous = client.getModel();
     client.setModel(trimmed);
 
+    const provider = pendingProviderSwitch;
+    pendingProviderSwitch = null;
+
     try {
-      await persistModelToConfiguration(trimmed);
-      return { output: `model switched: ${previous} → ${trimmed}\nsaved to ~/.kraken/kraken.yml` };
+      if (provider) {
+        await persistProviderAndModel(provider, trimmed);
+        return { output: `model switched: ${previous} → ${trimmed}\nprovider: ${provider}\nsaved to ~/.kraken/kraken.yml` };
+      } else {
+        await persistModelToConfiguration(trimmed);
+        return { output: `model switched: ${previous} → ${trimmed}\nsaved to ~/.kraken/kraken.yml` };
+      }
     } catch {
       return { output: `model switched: ${previous} → ${trimmed} (runtime only, config save failed)` };
     }
+  },
+};
+
+const KNOWN_PROVIDERS: { name: string; envVar: string; label: string }[] = [
+  { name: "openrouter", envVar: "OPENROUTER_API_KEY", label: "OpenRouter" },
+  { name: "anthropic", envVar: "ANTHROPIC_API_KEY", label: "Anthropic" },
+  { name: "openai", envVar: "OPENAI_API_KEY", label: "OpenAI" },
+];
+
+const setupCommand: SlashCommand = {
+  name: "setup",
+  aliases: [],
+  description: "Configure LLM providers and API keys",
+  usage: "/setup provider",
+  execute(args, threadManager) {
+    const subcommand = args.trim().toLowerCase();
+
+    if (subcommand !== "provider" && subcommand !== "p" && subcommand !== "") {
+      return { output: "usage: /setup provider" };
+    }
+
+    const unconfigured = KNOWN_PROVIDERS.filter((p) => !process.env[p.envVar]);
+
+    if (unconfigured.length === 0) {
+      return { output: "all providers configured", displayMode: "toast" };
+    }
+
+    const engine = threadManager.getActiveEngine();
+    engine.handleSetupRequired({
+      id: `setup-provider-${Date.now()}`,
+      fields: unconfigured.map((p) => ({
+        pluginName: "Provider Setup",
+        fieldName: p.name,
+        field: {
+          type: "string" as const,
+          description: `${p.label} API key`,
+          envVar: p.envVar,
+          required: true,
+        },
+      })),
+      resolve: () => {},
+    });
+
+    return { output: "" };
   },
 };
 
@@ -245,6 +303,7 @@ export const ALL_COMMANDS: SlashCommand[] = [
   renameCommand,
   continueCommand,
   modelCommand,
+  setupCommand,
   purgeCommand,
   exitCommand,
 ];
