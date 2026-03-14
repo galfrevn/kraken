@@ -32,13 +32,13 @@ bun run dev
 
 Kraken is a monorepo with three core services:
 
-| App | Language | Purpose |
-|-----|----------|---------|
-| `apps/cli` | TypeScript | CLI entry point and process orchestration |
-| `apps/core` | TypeScript | Agent brain — execution loop, tools, storage, plugins |
-| `apps/gateway` | Go | LLM proxy and webhook receiver (ConnectRPC) |
-| `apps/scheduler` | Rust | Cron engine and file watcher (gRPC via tonic) |
-| `apps/tui` | TypeScript/React | Terminal UI (OpenTUI) |
+| App              | Language         | Purpose                                               |
+| ---------------- | ---------------- | ----------------------------------------------------- |
+| `apps/cli`       | TypeScript       | CLI entry point and process orchestration             |
+| `apps/core`      | TypeScript       | Agent brain — execution loop, tools, storage, plugins |
+| `apps/gateway`   | Go               | LLM proxy and webhook receiver (ConnectRPC)           |
+| `apps/scheduler` | Rust             | Cron engine and file watcher (gRPC via tonic)         |
+| `apps/tui`       | TypeScript/React | Terminal UI (OpenTUI)                                 |
 
 Shared packages live in `packages/` and protobuf definitions in `proto/agent/v1/`.
 
