@@ -18,85 +18,39 @@
 
 ---
 
+## Motivation
+
+Kraken was born from a simple observation: tools like [Claude Code](https://github.com/anthropics/claude-code), [OpenCode](https://github.com/anomalyco/opencode), and [OpenClaw](https://github.com/clawbot) have demonstrated that LLM-powered agents can become genuine companions for software developers — not just chat interfaces that answer questions, but systems capable of navigating codebases, executing multi-step plans, and operating with meaningful autonomy. These projects proved that the gap between "AI assistant" and "AI collaborator" is smaller than it seems, and that the terminal is the right environment to close it.
+
+However, most existing tools focus on a single interaction model: the developer asks, the agent responds. Kraken takes this further by introducing persistent autonomy. Rather than waiting for human input, Kraken can monitor file changes, respond to webhooks, execute scheduled tasks, and delegate work to sub-agents — all while maintaining a rich terminal interface for real-time collaboration. The goal is not to replace the developer but to act as a tireless companion that handles the repetitive, the mechanical, and the tedious, freeing the developer to focus on design, architecture, and the problems that actually require human judgment.
+
+This project is also an exercise in polyglot systems design. By combining Rust (for low-latency scheduling and OS-level file watching), Go (for high-throughput HTTP proxying and webhook handling), and TypeScript (for the agent brain, plugin system, and terminal UI), Kraken explores how each language's strengths can be composed into a cohesive whole through protobuf-defined contracts and local RPC.
+
+---
+
 ## What is Kraken?
 
-Kraken is an AI-powered autonomous agent with a **three-process architecture**: a Rust scheduler, a Go gateway, and a TypeScript TUI — all orchestrated from a single CLI command. It doesn't just answer questions — it monitors, schedules, reacts, and executes.
+Kraken is an AI-powered autonomous agent built on a **three-process architecture**: a Rust scheduler, a Go gateway, and a TypeScript TUI, all orchestrated from a single CLI command. Unlike traditional coding assistants that operate in a request-response loop, Kraken is designed to run continuously — monitoring your project, reacting to external events, and executing tasks on your behalf without requiring constant supervision.
+
+At its core, Kraken treats the development environment as an event-driven system. File changes, cron triggers, and incoming webhooks are all normalized into a unified event stream that feeds into the agent's execution loop. The agent then decides how to respond: running tests after a source file changes, reviewing a pull request when a GitHub webhook arrives, or executing a scheduled code quality scan. Each of these behaviors is configurable through a declarative YAML file, and the agent's capabilities can be extended at runtime through a plugin system.
+
+The terminal interface is built with OpenTUI, a React-based framework for terminal applications. This provides a rich, interactive experience — syntax-highlighted diffs, real-time streaming of LLM responses, and a conversational interface — while keeping everything inside the terminal where developers already work.
 
 <p align="center">
   <img src="docs/assets/architecture.png" alt="Architecture overview" width="700" />
 </p>
 
-### Key capabilities
-
-- **Autonomous execution** — Kraken runs tasks, commits code, manages PRs, and responds to events without manual intervention
-- **Cron scheduling** — Define recurring jobs (review PRs, run tests, sync repos) with standard cron expressions
-- **File watching** — Monitor directories and trigger actions on changes with configurable debounce and ignore patterns
-- **Webhook ingestion** — Receive GitHub/GitLab webhooks with signature validation and route events to tasks
-- **Plugin system** — Extend functionality with plugins that register tools, hook into the agent lifecycle, and declare config schemas
-- **Multi-provider LLM support** — Works with OpenRouter, Anthropic, and OpenAI out of the box
-- **Terminal UI** — A rich React-based TUI for real-time interaction, built with OpenTUI
-
----
-
-## Get started
-
-### Prerequisites
-
-- [Bun](https://bun.sh) 1.3.10+
-- [Go](https://go.dev) 1.26+
-- [Rust](https://rustup.rs) (edition 2024)
-- [Buf CLI](https://buf.build/docs/installation) (for protobuf generation)
-
-### Quick setup
-
-```bash
-git clone https://github.com/valentin-galfre/kraken.git
-cd kraken
-bash scripts/setup.sh
-```
-
-The setup script installs dependencies, generates protobuf code, builds the Rust and Go services, and links the CLI.
-
-### Manual setup
-
-```bash
-# Install dependencies
-bun install
-
-# Generate protobuf code
-bun run generate
-
-# Build all services
-bun run build
-
-# Start in dev mode
-bun run dev
-```
-
-### Configuration
-
-Kraken uses a layered configuration system:
-
-```
-~/.kraken/.env          → Environment variables
-~/.kraken/kraken.yml    → Main configuration
-ENV overrides           → Runtime overrides
-```
-
-Set your LLM provider key:
-
-```bash
-# Any of these work
-export ANTHROPIC_API_KEY="sk-..."
-export OPENAI_API_KEY="sk-..."
-export KRAKEN_OPENROUTER_API_KEY="sk-..."
-```
-
 ---
 
 ## Architecture
 
-Kraken runs as three cooperating processes on localhost, communicating over ConnectRPC:
+Kraken's architecture is intentionally distributed across three cooperating processes, each written in the language best suited for its responsibilities. The processes communicate over ConnectRPC on localhost, using protobuf-defined contracts as the single source of truth for all cross-language interfaces.
+
+The **Scheduler** is written in Rust and handles two performance-sensitive tasks: cron-based job scheduling and OS-level file system watching. Rust was chosen here because both operations require low-latency event processing and direct interaction with operating system APIs. The scheduler uses `tokio` for async execution and `notify` for cross-platform file watching, streaming events to the TUI process via gRPC.
+
+The **Gateway** is written in Go and serves as the LLM proxy and webhook ingestion point. It normalizes requests across multiple LLM providers (OpenRouter, Anthropic, OpenAI), handles streaming responses, and validates incoming webhook signatures from GitHub and GitLab. Go's strengths in HTTP handling, concurrency, and deployment simplicity make it a natural fit for this role.
+
+The **TUI** is written in TypeScript and contains the agent brain — the execution loop, tool registry, conversation history, persistent memory, plugin system, and SQLite storage layer. It renders a terminal interface using OpenTUI and orchestrates all interactions between the user, the LLM, and the supporting services.
 
 | Service | Language | Port | Role |
 |---------|----------|------|------|
@@ -123,11 +77,67 @@ Kraken runs as three cooperating processes on localhost, communicating over Conn
 
 ---
 
+## Get started
+
+### Prerequisites
+
+Kraken requires a modern development environment with support for three language runtimes. The setup script automates most of the installation, but the following tools must be available on your system:
+
+- [Bun](https://bun.sh) 1.3.10+ (TypeScript runtime and package manager)
+- [Go](https://go.dev) 1.26+ (gateway compilation)
+- [Rust](https://rustup.rs) with the 2024 edition (scheduler compilation)
+- [Buf CLI](https://buf.build/docs/installation) (protobuf code generation)
+
+### Quick setup
+
+```bash
+git clone https://github.com/valentin-galfre/kraken.git
+cd kraken
+bash scripts/setup.sh
+```
+
+The setup script installs all workspace dependencies, generates TypeScript and Go code from the protobuf definitions, compiles the Rust scheduler and Go gateway, and links the CLI binary so that `kraken` is available globally.
+
+### Manual setup
+
+For more control over the build process, each step can be run individually:
+
+```bash
+# Install dependencies
+bun install
+
+# Generate protobuf code
+bun run generate
+
+# Build all services
+bun run build
+
+# Start in dev mode
+bun run dev
+```
+
+### Configuration
+
+Kraken uses a layered configuration system that merges values from multiple sources. Environment variables defined in `~/.kraken/.env` are loaded first, followed by the main configuration file at `~/.kraken/kraken.yml`, and finally any runtime environment variable overrides. This design allows sensitive values like API keys to be stored outside the repository while keeping project-specific settings in a version-controlled YAML file.
+
+To get started, set your LLM provider key:
+
+```bash
+# Any of these work — Kraken auto-detects the provider
+export ANTHROPIC_API_KEY="sk-..."
+export OPENAI_API_KEY="sk-..."
+export KRAKEN_OPENROUTER_API_KEY="sk-..."
+```
+
+---
+
 ## Scheduling & automation
+
+One of Kraken's distinguishing features is its ability to operate without direct human interaction. Through the scheduler service, developers can define recurring jobs and file watchers that trigger autonomous agent actions. This transforms Kraken from a reactive assistant into a proactive development companion.
 
 ### Cron jobs
 
-Define recurring tasks in `kraken.yml`:
+Recurring tasks are defined declaratively in `kraken.yml` using standard cron expressions. Each job specifies a task template that the agent executes when the schedule fires. The scheduler validates expressions at registration time and tracks the next execution timestamp, ensuring that jobs fire exactly once per scheduled interval even under system load.
 
 ```yaml
 scheduler:
@@ -145,7 +155,7 @@ scheduler:
 
 ### File watchers
 
-Monitor directories and react to changes:
+File watchers monitor directories for changes and trigger agent actions with configurable debounce intervals and ignore patterns. The watcher engine uses OS-native file system notifications (via Rust's `notify` crate) for low-latency detection, and each watcher operates independently — registering multiple watchers no longer overwrites previous ones, as each is stored and managed by its unique identifier.
 
 ```yaml
 scheduler:
@@ -158,7 +168,7 @@ scheduler:
 
 ### Webhooks
 
-Receive events from GitHub, GitLab, or custom sources with HMAC signature validation:
+Kraken can receive and process webhooks from external services such as GitHub and GitLab. Each webhook registration includes a provider identifier and an optional secret for signature validation. GitHub webhooks are verified using HMAC-SHA256, and GitLab webhooks use constant-time token comparison, ensuring that only authenticated payloads are processed.
 
 ```yaml
 webhooks:
@@ -172,7 +182,9 @@ webhooks:
 
 ## Plugin system
 
-Extend Kraken with plugins that hook into the agent lifecycle:
+Kraken's functionality is designed to be extended at runtime through a plugin system. Plugins can register new tools that the agent can invoke, hook into lifecycle events such as tool calls and conversation boundaries, extend the system prompt with domain-specific instructions, and declare configuration schemas that are validated on load.
+
+The plugin API is intentionally minimal. A plugin is a JavaScript or TypeScript module that exports a `KrakenPlugin` object, typically constructed with the `definePlugin` helper from the SDK. Plugins are loaded dynamically via `await import()` and can be installed from the built-in plugin store, a local path, or a remote URL.
 
 ```typescript
 import { definePlugin } from "@kraken/sdk";
@@ -204,7 +216,7 @@ export default definePlugin({
 
 ## Built-in tools
 
-Kraken comes with a comprehensive set of tools the agent can use autonomously:
+Kraken ships with over 30 built-in tools that the agent can invoke autonomously during task execution. These tools cover the most common operations a developer performs: reading and writing files, navigating codebases, running shell commands, interacting with git, searching the web, and managing scheduled work. Each tool includes input validation, cross-platform support (Windows, macOS, and Linux), and security checks where appropriate.
 
 | Category | Tools |
 |----------|-------|
@@ -221,6 +233,8 @@ Kraken comes with a comprehensive set of tools the agent can use autonomously:
 ---
 
 ## Development
+
+The project uses Turborepo to orchestrate builds, typechecks, and linting across all workspaces. Individual services can also be built and tested independently using their native toolchains.
 
 ```bash
 # Run all services in dev mode
@@ -249,6 +263,8 @@ cd apps/gateway && go build -o ./bin/gateway ./cmd/gateway
 
 ## Project structure
 
+The repository is organized as a monorepo with five applications, three shared packages, and a protobuf directory that serves as the canonical API contract between all services.
+
 ```
 apps/
   cli/            TypeScript — CLI entry point, process orchestration
@@ -270,15 +286,19 @@ gen/
 
 ## Tech stack
 
-- **Monorepo**: Turborepo + Bun
-- **TypeScript**: ESNext, strict mode, `verbatimModuleSyntax`
-- **TUI**: OpenTUI (`@opentui/react`)
-- **Go**: 1.26 (gateway)
-- **Rust**: Edition 2024, tokio async (scheduler)
-- **RPC**: ConnectRPC, protobuf
-- **Database**: SQLite via `bun:sqlite` (WAL mode)
-- **Linting**: oxlint
-- **Formatting**: oxfmt
+Kraken deliberately combines multiple language ecosystems, selecting each for the specific strengths it brings to the system. TypeScript provides the flexibility and ecosystem needed for the agent brain, plugin system, and terminal UI. Go offers the concurrency model and HTTP primitives required for a high-throughput LLM proxy. Rust delivers the performance guarantees necessary for real-time scheduling and file system monitoring. Protobuf and ConnectRPC bind them together with type-safe, language-agnostic contracts.
+
+| Layer | Technology |
+|-------|-----------|
+| Monorepo | Turborepo + Bun |
+| TypeScript | ESNext, strict mode, `verbatimModuleSyntax` |
+| TUI framework | OpenTUI (`@opentui/react`) |
+| Gateway | Go 1.26 |
+| Scheduler | Rust (edition 2024), tokio async |
+| RPC | ConnectRPC, protobuf |
+| Database | SQLite via `bun:sqlite` (WAL mode) |
+| Linting | oxlint |
+| Formatting | oxfmt |
 
 ---
 
