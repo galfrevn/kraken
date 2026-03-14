@@ -52,9 +52,9 @@ Write-Host @"
 # 1. Detect platform
 # -------------------------------------------------------------------
 
-$Arch = switch ([System.Runtime.InteropServices.RuntimeInformation]::OSArchitecture) {
-    "X64"   { "x64" }
-    "Arm64" { "arm64" }
+$Arch = switch ($env:PROCESSOR_ARCHITECTURE) {
+    "AMD64" { "x64" }
+    "ARM64" { "arm64" }
     default { Fail "unsupported architecture: $_" }
 }
 
