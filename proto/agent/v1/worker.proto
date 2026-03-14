@@ -1,0 +1,67 @@
+syntax = "proto3";
+
+package agent.v1;
+
+import "agent/v1/gateway.proto";
+
+message Artifact {
+  string type = 1;
+  string url = 2;
+  string name = 3;
+}
+
+message GetTaskRequest {
+  string task_id = 1;
+}
+
+message GetTaskResponse {
+  string task_id = 1;
+  string name = 2;
+  string description = 3;
+  string working_dir = 4;
+  string retry_context = 5;
+  int32 attempt = 6;
+}
+
+message ReportProgressRequest {
+  string task_id = 1;
+  string activity = 2;
+  float progress_pct = 3;
+}
+
+message ReportProgressResponse {}
+
+message WriteLogRequest {
+  string task_id = 1;
+  string level = 2;
+  string message = 3;
+}
+
+message WriteLogResponse {}
+
+message ReportResultRequest {
+  string task_id = 1;
+  int32 exit_code = 2;
+  string output = 3;
+  string error_message = 4;
+  repeated Artifact artifacts = 5;
+}
+
+message ReportResultResponse {}
+
+message HeartbeatRequest {
+  string task_id = 1;
+  int64 memory_bytes = 2;
+}
+
+message HeartbeatResponse {}
+
+service WorkerService {
+  rpc GetTask(GetTaskRequest) returns (GetTaskResponse);
+  rpc Complete(CompleteRequest) returns (CompleteResponse);
+  rpc StreamComplete(StreamCompleteRequest) returns (stream StreamCompleteResponse);
+  rpc ReportProgress(ReportProgressRequest) returns (ReportProgressResponse);
+  rpc WriteLog(WriteLogRequest) returns (WriteLogResponse);
+  rpc ReportResult(ReportResultRequest) returns (ReportResultResponse);
+  rpc Heartbeat(HeartbeatRequest) returns (HeartbeatResponse);
+}
