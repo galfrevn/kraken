@@ -1,4 +1,4 @@
-import { existsSync, readFileSync, writeFileSync, rmSync } from "node:fs";
+import { existsSync, readFileSync, writeFileSync, rmSync, readdirSync } from "node:fs";
 import { join } from "node:path";
 import { homedir } from "node:os";
 import * as p from "@clack/prompts";
@@ -7,7 +7,7 @@ import { KRAKEN_HOME } from "@/constants.ts";
 function tryRemove(filePath: string, deferred: string[]): void {
   if (!existsSync(filePath)) return;
   try {
-    rmSync(filePath, { force: true });
+    rmSync(filePath, { recursive: true, force: true });
   } catch {
     deferred.push(filePath);
   }
@@ -52,14 +52,21 @@ export async function execute(_args: string[]): Promise<void> {
   const spinnerInstance = p.spinner();
   spinnerInstance.start("Removing kraken");
 
+  // Collect paths that couldn't be deleted (e.g. the running process on Windows)
+  const deferredDeletes: string[] = [];
+
+  // Delete contents of KRAKEN_HOME one-by-one instead of the root directory,
+  // because the running process lives inside ~/.kraken/lib/ and the OS will
+  // block deletion of a directory that contains a running executable.
   if (existsSync(KRAKEN_HOME)) {
-    rmSync(KRAKEN_HOME, { recursive: true, force: true });
+    for (const entry of readdirSync(KRAKEN_HOME)) {
+      tryRemove(join(KRAKEN_HOME, entry), deferredDeletes);
+    }
+    // Try removing the now-empty directory; if still locked, defer it
+    tryRemove(KRAKEN_HOME, deferredDeletes);
   }
 
   const home = homedir();
-
-  // Collect paths that couldn't be deleted (e.g. locked .exe on Windows)
-  const deferredDeletes: string[] = [];
 
   const bunBinKraken = join(home, ".bun", "bin", "kraken");
   tryRemove(bunBinKraken, deferredDeletes);
@@ -83,9 +90,28 @@ export async function execute(_args: string[]): Promise<void> {
     removeFromShellConfig(rcFile, pathMarker);
   }
 
-  // On Windows the running .exe can't delete itself — schedule deletion after exit.
+  // On Windows, also remove ~/.kraken/bin from the user PATH env variable
+  if (process.platform === "win32") {
+    const krakenBin = join(KRAKEN_HOME, "bin");
+    const userPath = Bun.env.PATH ?? "";
+    const filtered = userPath
+      .split(";")
+      .filter((p) => p !== krakenBin)
+      .join(";");
+    Bun.spawnSync([
+      "powershell",
+      "-Command",
+      `[Environment]::SetEnvironmentVariable("PATH","${filtered.replaceAll('"', '`"')}","User")`,
+    ]);
+  }
+
+  // On Windows the running process locks files — schedule deletion after exit.
   // We use a PowerShell loop that retries until the files are unlocked.
   if (deferredDeletes.length > 0 && process.platform === "win32") {
+    // Always try cleaning the root directory last
+    if (!deferredDeletes.includes(KRAKEN_HOME)) {
+      deferredDeletes.push(KRAKEN_HOME);
+    }
     const psCommands = deferredDeletes
       .map(
         (f) =>
