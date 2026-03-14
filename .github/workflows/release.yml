@@ -25,7 +25,7 @@ jobs:
             rust_target: aarch64-apple-darwin
             go_os: darwin
             go_arch: arm64
-          - os: macos-13
+          - os: macos-latest
             platform: darwin-x64
             rust_target: x86_64-apple-darwin
             go_os: darwin

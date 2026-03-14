@@ -216,11 +216,14 @@ export async function main(): Promise<void> {
     10 * 60 * 1000,
   );
 
+  process.stdout.write("\x1B]0;Kraken\x07");
+
   const renderer = await createCliRenderer({
     exitOnCtrlC: false,
   });
 
   const shutdown = async () => {
+    process.stdout.write("\x1B]0;\x07");
     daemon.stop();
     timerManager.cancelAll();
     threadManager.saveNow();
