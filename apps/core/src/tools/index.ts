@@ -35,6 +35,7 @@ export {
   createScheduleCronTool,
   createListSchedulesTool,
   createDeleteScheduleTool,
+  createListWatchersTool,
   createScheduleWatcherTool,
   createDeleteWatcherTool,
 } from "@/tools/scheduler.ts";
@@ -88,6 +89,7 @@ import {
   createScheduleCronTool,
   createListSchedulesTool,
   createDeleteScheduleTool,
+  createListWatchersTool,
   createScheduleWatcherTool,
   createDeleteWatcherTool,
 } from "@/tools/scheduler.ts";
@@ -186,6 +188,7 @@ export function createDefaultToolRegistry(options?: ToolRegistryOptions): ToolRe
       registry.register(createScheduleCronTool(options.schedulerClient));
       registry.register(createListSchedulesTool(options.schedulerClient));
       registry.register(createDeleteScheduleTool(options.schedulerClient));
+      registry.register(createListWatchersTool(options.schedulerClient));
       registry.register(createScheduleWatcherTool(options.schedulerClient));
       registry.register(createDeleteWatcherTool(options.schedulerClient));
     }

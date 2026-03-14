@@ -21,7 +21,7 @@ pub struct WatcherEntry {
 pub struct FileWatcherEngine {
     entries: Arc<DashMap<String, WatcherEntry>>,
     event_sender: broadcast::Sender<SchedulerEvent>,
-    _watcher: Option<RecommendedWatcher>,
+    watchers: Arc<DashMap<String, RecommendedWatcher>>,
 }
 
 impl FileWatcherEngine {
@@ -29,12 +29,12 @@ impl FileWatcherEngine {
         Self {
             entries: Arc::new(DashMap::new()),
             event_sender,
-            _watcher: None,
+            watchers: Arc::new(DashMap::new()),
         }
     }
 
     pub fn register(
-        &mut self,
+        &self,
         name: String,
         paths: Vec<String>,
         ignore_patterns: Vec<String>,
@@ -119,13 +119,26 @@ impl FileWatcherEngine {
             },
         );
 
-        self._watcher = Some(watcher);
+        self.watchers.insert(id.clone(), watcher);
 
         info!(watcher_id = %id, "registered file watcher");
         Ok(id)
     }
 
     pub fn unregister(&self, watcher_id: &str) -> bool {
+        self.watchers.remove(watcher_id);
         self.entries.remove(watcher_id).is_some()
+    }
+
+    pub fn list(&self) -> Vec<crate::proto::agent::v1::WatcherEntry> {
+        self.entries.iter().map(|entry| {
+            crate::proto::agent::v1::WatcherEntry {
+                watcher_id: entry.id.clone(),
+                name: entry.name.clone(),
+                paths: entry.paths.clone(),
+                ignore_patterns: entry.ignore_patterns.clone(),
+                debounce_ms: entry.debounce_ms,
+            }
+        }).collect()
     }
 }

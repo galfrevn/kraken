@@ -54,6 +54,20 @@ message UnregisterWatcherRequest {
 
 message UnregisterWatcherResponse {}
 
+message ListWatchersRequest {}
+
+message WatcherEntry {
+  string watcher_id = 1;
+  string name = 2;
+  repeated string paths = 3;
+  repeated string ignore_patterns = 4;
+  uint32 debounce_ms = 5;
+}
+
+message ListWatchersResponse {
+  repeated WatcherEntry watchers = 1;
+}
+
 message StreamEventsRequest {}
 
 message StreamEventsResponse {
@@ -66,5 +80,6 @@ service SchedulerService {
   rpc ListCrons(ListCronsRequest) returns (ListCronsResponse);
   rpc RegisterWatcher(RegisterWatcherRequest) returns (RegisterWatcherResponse);
   rpc UnregisterWatcher(UnregisterWatcherRequest) returns (UnregisterWatcherResponse);
+  rpc ListWatchers(ListWatchersRequest) returns (ListWatchersResponse);
   rpc StreamEvents(StreamEventsRequest) returns (stream StreamEventsResponse);
 }

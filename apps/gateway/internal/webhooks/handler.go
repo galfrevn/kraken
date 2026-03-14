@@ -1,6 +1,11 @@
 package webhooks
 
 import (
+	"crypto/hmac"
+	"crypto/sha256"
+	"crypto/subtle"
+	"encoding/hex"
+	"fmt"
 	"io"
 	"log/slog"
 	"net/http"
@@ -31,6 +36,12 @@ func NewHandler(store *Store, eventChannel EventChannel, logger *slog.Logger) ht
 			return
 		}
 		defer r.Body.Close()
+
+		if err := validateSignature(body, registration, r.Header); err != nil {
+			logger.Warn("webhook signature validation failed", "webhook_id", webhookID, "provider", registration.Provider, "error", err)
+			http.Error(w, "signature validation failed", http.StatusUnauthorized)
+			return
+		}
 
 		eventType := detectEventType(r, registration.Provider)
 		headers := extractRelevantHeaders(r)
@@ -90,4 +101,51 @@ func extractRelevantHeaders(r *http.Request) map[string]string {
 		}
 	}
 	return headers
+}
+
+func validateSignature(body []byte, registration *Registration, headers http.Header) error {
+	if registration.Secret == "" {
+		return nil
+	}
+	switch registration.Provider {
+	case "github":
+		return validateGitHubSignature(body, registration.Secret, headers)
+	case "gitlab":
+		return validateGitLabToken(registration.Secret, headers)
+	default:
+		return nil
+	}
+}
+
+func validateGitHubSignature(body []byte, secret string, headers http.Header) error {
+	sigHeader := headers.Get("X-Hub-Signature-256")
+	if sigHeader == "" {
+		return fmt.Errorf("missing X-Hub-Signature-256 header")
+	}
+	if !strings.HasPrefix(sigHeader, "sha256=") {
+		return fmt.Errorf("invalid signature format: expected sha256= prefix")
+	}
+	sigHex := strings.TrimPrefix(sigHeader, "sha256=")
+	sig, err := hex.DecodeString(sigHex)
+	if err != nil {
+		return fmt.Errorf("invalid signature hex encoding: %w", err)
+	}
+	mac := hmac.New(sha256.New, []byte(secret))
+	mac.Write(body)
+	expected := mac.Sum(nil)
+	if !hmac.Equal(sig, expected) {
+		return fmt.Errorf("signature mismatch")
+	}
+	return nil
+}
+
+func validateGitLabToken(secret string, headers http.Header) error {
+	token := headers.Get("X-Gitlab-Token")
+	if token == "" {
+		return fmt.Errorf("missing X-Gitlab-Token header")
+	}
+	if subtle.ConstantTimeCompare([]byte(token), []byte(secret)) != 1 {
+		return fmt.Errorf("token mismatch")
+	}
+	return nil
 }

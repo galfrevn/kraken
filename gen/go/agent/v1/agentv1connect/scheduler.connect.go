@@ -48,6 +48,9 @@ const (
 	// SchedulerServiceUnregisterWatcherProcedure is the fully-qualified name of the SchedulerService's
 	// UnregisterWatcher RPC.
 	SchedulerServiceUnregisterWatcherProcedure = "/agent.v1.SchedulerService/UnregisterWatcher"
+	// SchedulerServiceListWatchersProcedure is the fully-qualified name of the SchedulerService's
+	// ListWatchers RPC.
+	SchedulerServiceListWatchersProcedure = "/agent.v1.SchedulerService/ListWatchers"
 	// SchedulerServiceStreamEventsProcedure is the fully-qualified name of the SchedulerService's
 	// StreamEvents RPC.
 	SchedulerServiceStreamEventsProcedure = "/agent.v1.SchedulerService/StreamEvents"
@@ -60,6 +63,7 @@ type SchedulerServiceClient interface {
 	ListCrons(context.Context, *connect.Request[v1.ListCronsRequest]) (*connect.Response[v1.ListCronsResponse], error)
 	RegisterWatcher(context.Context, *connect.Request[v1.RegisterWatcherRequest]) (*connect.Response[v1.RegisterWatcherResponse], error)
 	UnregisterWatcher(context.Context, *connect.Request[v1.UnregisterWatcherRequest]) (*connect.Response[v1.UnregisterWatcherResponse], error)
+	ListWatchers(context.Context, *connect.Request[v1.ListWatchersRequest]) (*connect.Response[v1.ListWatchersResponse], error)
 	StreamEvents(context.Context, *connect.Request[v1.StreamEventsRequest]) (*connect.ServerStreamForClient[v1.StreamEventsResponse], error)
 }
 
@@ -104,6 +108,12 @@ func NewSchedulerServiceClient(httpClient connect.HTTPClient, baseURL string, op
 			connect.WithSchema(schedulerServiceMethods.ByName("UnregisterWatcher")),
 			connect.WithClientOptions(opts...),
 		),
+		listWatchers: connect.NewClient[v1.ListWatchersRequest, v1.ListWatchersResponse](
+			httpClient,
+			baseURL+SchedulerServiceListWatchersProcedure,
+			connect.WithSchema(schedulerServiceMethods.ByName("ListWatchers")),
+			connect.WithClientOptions(opts...),
+		),
 		streamEvents: connect.NewClient[v1.StreamEventsRequest, v1.StreamEventsResponse](
 			httpClient,
 			baseURL+SchedulerServiceStreamEventsProcedure,
@@ -120,6 +130,7 @@ type schedulerServiceClient struct {
 	listCrons         *connect.Client[v1.ListCronsRequest, v1.ListCronsResponse]
 	registerWatcher   *connect.Client[v1.RegisterWatcherRequest, v1.RegisterWatcherResponse]
 	unregisterWatcher *connect.Client[v1.UnregisterWatcherRequest, v1.UnregisterWatcherResponse]
+	listWatchers      *connect.Client[v1.ListWatchersRequest, v1.ListWatchersResponse]
 	streamEvents      *connect.Client[v1.StreamEventsRequest, v1.StreamEventsResponse]
 }
 
@@ -148,6 +159,11 @@ func (c *schedulerServiceClient) UnregisterWatcher(ctx context.Context, req *con
 	return c.unregisterWatcher.CallUnary(ctx, req)
 }
 
+// ListWatchers calls agent.v1.SchedulerService.ListWatchers.
+func (c *schedulerServiceClient) ListWatchers(ctx context.Context, req *connect.Request[v1.ListWatchersRequest]) (*connect.Response[v1.ListWatchersResponse], error) {
+	return c.listWatchers.CallUnary(ctx, req)
+}
+
 // StreamEvents calls agent.v1.SchedulerService.StreamEvents.
 func (c *schedulerServiceClient) StreamEvents(ctx context.Context, req *connect.Request[v1.StreamEventsRequest]) (*connect.ServerStreamForClient[v1.StreamEventsResponse], error) {
 	return c.streamEvents.CallServerStream(ctx, req)
@@ -160,6 +176,7 @@ type SchedulerServiceHandler interface {
 	ListCrons(context.Context, *connect.Request[v1.ListCronsRequest]) (*connect.Response[v1.ListCronsResponse], error)
 	RegisterWatcher(context.Context, *connect.Request[v1.RegisterWatcherRequest]) (*connect.Response[v1.RegisterWatcherResponse], error)
 	UnregisterWatcher(context.Context, *connect.Request[v1.UnregisterWatcherRequest]) (*connect.Response[v1.UnregisterWatcherResponse], error)
+	ListWatchers(context.Context, *connect.Request[v1.ListWatchersRequest]) (*connect.Response[v1.ListWatchersResponse], error)
 	StreamEvents(context.Context, *connect.Request[v1.StreamEventsRequest], *connect.ServerStream[v1.StreamEventsResponse]) error
 }
 
@@ -200,6 +217,12 @@ func NewSchedulerServiceHandler(svc SchedulerServiceHandler, opts ...connect.Han
 		connect.WithSchema(schedulerServiceMethods.ByName("UnregisterWatcher")),
 		connect.WithHandlerOptions(opts...),
 	)
+	schedulerServiceListWatchersHandler := connect.NewUnaryHandler(
+		SchedulerServiceListWatchersProcedure,
+		svc.ListWatchers,
+		connect.WithSchema(schedulerServiceMethods.ByName("ListWatchers")),
+		connect.WithHandlerOptions(opts...),
+	)
 	schedulerServiceStreamEventsHandler := connect.NewServerStreamHandler(
 		SchedulerServiceStreamEventsProcedure,
 		svc.StreamEvents,
@@ -218,6 +241,8 @@ func NewSchedulerServiceHandler(svc SchedulerServiceHandler, opts ...connect.Han
 			schedulerServiceRegisterWatcherHandler.ServeHTTP(w, r)
 		case SchedulerServiceUnregisterWatcherProcedure:
 			schedulerServiceUnregisterWatcherHandler.ServeHTTP(w, r)
+		case SchedulerServiceListWatchersProcedure:
+			schedulerServiceListWatchersHandler.ServeHTTP(w, r)
 		case SchedulerServiceStreamEventsProcedure:
 			schedulerServiceStreamEventsHandler.ServeHTTP(w, r)
 		default:
@@ -247,6 +272,10 @@ func (UnimplementedSchedulerServiceHandler) RegisterWatcher(context.Context, *co
 
 func (UnimplementedSchedulerServiceHandler) UnregisterWatcher(context.Context, *connect.Request[v1.UnregisterWatcherRequest]) (*connect.Response[v1.UnregisterWatcherResponse], error) {
 	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("agent.v1.SchedulerService.UnregisterWatcher is not implemented"))
+}
+
+func (UnimplementedSchedulerServiceHandler) ListWatchers(context.Context, *connect.Request[v1.ListWatchersRequest]) (*connect.Response[v1.ListWatchersResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("agent.v1.SchedulerService.ListWatchers is not implemented"))
 }
 
 func (UnimplementedSchedulerServiceHandler) StreamEvents(context.Context, *connect.Request[v1.StreamEventsRequest], *connect.ServerStream[v1.StreamEventsResponse]) error {

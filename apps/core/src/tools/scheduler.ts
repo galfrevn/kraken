@@ -146,6 +146,44 @@ export function createDeleteScheduleTool(schedulerClient: SchedulerClient): Tool
   };
 }
 
+export function createListWatchersTool(schedulerClient: SchedulerClient): Tool {
+  return {
+    definition: {
+      name: "list_watchers",
+      description: "List all registered file watchers.",
+      parameters: [],
+    },
+
+    async execute(): Promise<ToolResult> {
+      try {
+        const response = await schedulerClient.listWatchers({});
+        const watchers = response.watchers;
+
+        if (watchers.length === 0) {
+          return { success: true, output: "no registered file watchers" };
+        }
+
+        const lines = watchers.map((w, index) => {
+          return (
+            `${index + 1}. ${w.name}\n` +
+            `   id: ${w.watcherId}\n` +
+            `   paths: ${w.paths.join(", ")}\n` +
+            `   debounce: ${w.debounceMs}ms`
+          );
+        });
+
+        return {
+          success: true,
+          output: `${watchers.length} registered file watchers:\n\n${lines.join("\n\n")}`,
+        };
+      } catch (error) {
+        const message = error instanceof Error ? error.message : String(error);
+        return { success: false, output: "", error: `failed to list watchers: ${message}` };
+      }
+    },
+  };
+}
+
 export function createScheduleWatcherTool(schedulerClient: SchedulerClient): Tool {
   return {
     definition: {

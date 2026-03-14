@@ -4,7 +4,7 @@ mod watcher;
 mod grpc;
 
 use std::sync::Arc;
-use tokio::sync::{broadcast, Mutex};
+use tokio::sync::broadcast;
 use tokio::signal;
 use tonic::transport::Server;
 use tracing::info;
@@ -32,7 +32,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let cron_engine = Arc::new(cron::CronEngine::new(event_tx.clone()));
     cron_engine.start();
 
-    let watcher_engine = Arc::new(Mutex::new(watcher::FileWatcherEngine::new(event_tx.clone())));
+    let watcher_engine = Arc::new(watcher::FileWatcherEngine::new(event_tx.clone()));
 
     let scheduler_server = grpc::SchedulerServer::new(
         cron_engine.clone(),

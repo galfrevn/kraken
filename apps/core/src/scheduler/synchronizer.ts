@@ -51,6 +51,11 @@ export async function synchronizeWatchers(
   schedulerClient: SchedulerClient,
   schedulerConfiguration: SchedulerConfiguration,
 ): Promise<RegisteredWatcher[]> {
+  const existingWatchers = await schedulerClient.listWatchers({});
+  for (const w of existingWatchers.watchers) {
+    await schedulerClient.unregisterWatcher({ watcherId: w.watcherId });
+  }
+
   const registeredWatchers: RegisteredWatcher[] = [];
 
   for (const watcherConfiguration of schedulerConfiguration.watchers) {

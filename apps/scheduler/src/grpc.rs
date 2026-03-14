@@ -1,5 +1,5 @@
 use std::sync::Arc;
-use tokio::sync::{broadcast, Mutex};
+use tokio::sync::broadcast;
 use tonic::{Request, Response, Status};
 use tokio_stream::wrappers::BroadcastStream;
 use tokio_stream::StreamExt;
@@ -13,20 +13,21 @@ use crate::proto::agent::v1::{
     ListCronsRequest, ListCronsResponse,
     RegisterWatcherRequest, RegisterWatcherResponse,
     UnregisterWatcherRequest, UnregisterWatcherResponse,
+    ListWatchersRequest, ListWatchersResponse,
     StreamEventsRequest, StreamEventsResponse,
     SchedulerEvent,
 };
 
 pub struct SchedulerServer {
     cron_engine: Arc<CronEngine>,
-    watcher_engine: Arc<Mutex<FileWatcherEngine>>,
+    watcher_engine: Arc<FileWatcherEngine>,
     event_sender: broadcast::Sender<SchedulerEvent>,
 }
 
 impl SchedulerServer {
     pub fn new(
         cron_engine: Arc<CronEngine>,
-        watcher_engine: Arc<Mutex<FileWatcherEngine>>,
+        watcher_engine: Arc<FileWatcherEngine>,
         event_sender: broadcast::Sender<SchedulerEvent>,
     ) -> Self {
         Self {
@@ -77,9 +78,8 @@ impl SchedulerService for SchedulerServer {
         request: Request<RegisterWatcherRequest>,
     ) -> Result<Response<RegisterWatcherResponse>, Status> {
         let req = request.into_inner();
-        let mut watcher = self.watcher_engine.lock().await;
 
-        match watcher.register(req.name, req.paths, req.ignore_patterns, req.debounce_ms) {
+        match self.watcher_engine.register(req.name, req.paths, req.ignore_patterns, req.debounce_ms) {
             Ok(watcher_id) => Ok(Response::new(RegisterWatcherResponse { watcher_id })),
             Err(e) => Err(Status::internal(e)),
         }
@@ -90,12 +90,19 @@ impl SchedulerService for SchedulerServer {
         request: Request<UnregisterWatcherRequest>,
     ) -> Result<Response<UnregisterWatcherResponse>, Status> {
         let req = request.into_inner();
-        let watcher = self.watcher_engine.lock().await;
-        if watcher.unregister(&req.watcher_id) {
+        if self.watcher_engine.unregister(&req.watcher_id) {
             Ok(Response::new(UnregisterWatcherResponse {}))
         } else {
             Err(Status::not_found("watcher not found"))
         }
+    }
+
+    async fn list_watchers(
+        &self,
+        _request: Request<ListWatchersRequest>,
+    ) -> Result<Response<ListWatchersResponse>, Status> {
+        let watchers = self.watcher_engine.list();
+        Ok(Response::new(ListWatchersResponse { watchers }))
     }
 
     type StreamEventsStream = std::pin::Pin<

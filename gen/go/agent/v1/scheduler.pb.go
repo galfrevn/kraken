@@ -577,6 +577,162 @@ func (*UnregisterWatcherResponse) Descriptor() ([]byte, []int) {
 	return file_agent_v1_scheduler_proto_rawDescGZIP(), []int{10}
 }
 
+type ListWatchersRequest struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *ListWatchersRequest) Reset() {
+	*x = ListWatchersRequest{}
+	mi := &file_agent_v1_scheduler_proto_msgTypes[11]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ListWatchersRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ListWatchersRequest) ProtoMessage() {}
+
+func (x *ListWatchersRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_agent_v1_scheduler_proto_msgTypes[11]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ListWatchersRequest.ProtoReflect.Descriptor instead.
+func (*ListWatchersRequest) Descriptor() ([]byte, []int) {
+	return file_agent_v1_scheduler_proto_rawDescGZIP(), []int{11}
+}
+
+type WatcherEntry struct {
+	state          protoimpl.MessageState `protogen:"open.v1"`
+	WatcherId      string                 `protobuf:"bytes,1,opt,name=watcher_id,json=watcherId,proto3" json:"watcher_id,omitempty"`
+	Name           string                 `protobuf:"bytes,2,opt,name=name,proto3" json:"name,omitempty"`
+	Paths          []string               `protobuf:"bytes,3,rep,name=paths,proto3" json:"paths,omitempty"`
+	IgnorePatterns []string               `protobuf:"bytes,4,rep,name=ignore_patterns,json=ignorePatterns,proto3" json:"ignore_patterns,omitempty"`
+	DebounceMs     uint32                 `protobuf:"varint,5,opt,name=debounce_ms,json=debounceMs,proto3" json:"debounce_ms,omitempty"`
+	unknownFields  protoimpl.UnknownFields
+	sizeCache      protoimpl.SizeCache
+}
+
+func (x *WatcherEntry) Reset() {
+	*x = WatcherEntry{}
+	mi := &file_agent_v1_scheduler_proto_msgTypes[12]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *WatcherEntry) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*WatcherEntry) ProtoMessage() {}
+
+func (x *WatcherEntry) ProtoReflect() protoreflect.Message {
+	mi := &file_agent_v1_scheduler_proto_msgTypes[12]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use WatcherEntry.ProtoReflect.Descriptor instead.
+func (*WatcherEntry) Descriptor() ([]byte, []int) {
+	return file_agent_v1_scheduler_proto_rawDescGZIP(), []int{12}
+}
+
+func (x *WatcherEntry) GetWatcherId() string {
+	if x != nil {
+		return x.WatcherId
+	}
+	return ""
+}
+
+func (x *WatcherEntry) GetName() string {
+	if x != nil {
+		return x.Name
+	}
+	return ""
+}
+
+func (x *WatcherEntry) GetPaths() []string {
+	if x != nil {
+		return x.Paths
+	}
+	return nil
+}
+
+func (x *WatcherEntry) GetIgnorePatterns() []string {
+	if x != nil {
+		return x.IgnorePatterns
+	}
+	return nil
+}
+
+func (x *WatcherEntry) GetDebounceMs() uint32 {
+	if x != nil {
+		return x.DebounceMs
+	}
+	return 0
+}
+
+type ListWatchersResponse struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Watchers      []*WatcherEntry        `protobuf:"bytes,1,rep,name=watchers,proto3" json:"watchers,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *ListWatchersResponse) Reset() {
+	*x = ListWatchersResponse{}
+	mi := &file_agent_v1_scheduler_proto_msgTypes[13]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ListWatchersResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ListWatchersResponse) ProtoMessage() {}
+
+func (x *ListWatchersResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_agent_v1_scheduler_proto_msgTypes[13]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ListWatchersResponse.ProtoReflect.Descriptor instead.
+func (*ListWatchersResponse) Descriptor() ([]byte, []int) {
+	return file_agent_v1_scheduler_proto_rawDescGZIP(), []int{13}
+}
+
+func (x *ListWatchersResponse) GetWatchers() []*WatcherEntry {
+	if x != nil {
+		return x.Watchers
+	}
+	return nil
+}
+
 type StreamEventsRequest struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	unknownFields protoimpl.UnknownFields
@@ -585,7 +741,7 @@ type StreamEventsRequest struct {
 
 func (x *StreamEventsRequest) Reset() {
 	*x = StreamEventsRequest{}
-	mi := &file_agent_v1_scheduler_proto_msgTypes[11]
+	mi := &file_agent_v1_scheduler_proto_msgTypes[14]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -597,7 +753,7 @@ func (x *StreamEventsRequest) String() string {
 func (*StreamEventsRequest) ProtoMessage() {}
 
 func (x *StreamEventsRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_agent_v1_scheduler_proto_msgTypes[11]
+	mi := &file_agent_v1_scheduler_proto_msgTypes[14]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -610,7 +766,7 @@ func (x *StreamEventsRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use StreamEventsRequest.ProtoReflect.Descriptor instead.
 func (*StreamEventsRequest) Descriptor() ([]byte, []int) {
-	return file_agent_v1_scheduler_proto_rawDescGZIP(), []int{11}
+	return file_agent_v1_scheduler_proto_rawDescGZIP(), []int{14}
 }
 
 type StreamEventsResponse struct {
@@ -622,7 +778,7 @@ type StreamEventsResponse struct {
 
 func (x *StreamEventsResponse) Reset() {
 	*x = StreamEventsResponse{}
-	mi := &file_agent_v1_scheduler_proto_msgTypes[12]
+	mi := &file_agent_v1_scheduler_proto_msgTypes[15]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -634,7 +790,7 @@ func (x *StreamEventsResponse) String() string {
 func (*StreamEventsResponse) ProtoMessage() {}
 
 func (x *StreamEventsResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_agent_v1_scheduler_proto_msgTypes[12]
+	mi := &file_agent_v1_scheduler_proto_msgTypes[15]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -647,7 +803,7 @@ func (x *StreamEventsResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use StreamEventsResponse.ProtoReflect.Descriptor instead.
 func (*StreamEventsResponse) Descriptor() ([]byte, []int) {
-	return file_agent_v1_scheduler_proto_rawDescGZIP(), []int{12}
+	return file_agent_v1_scheduler_proto_rawDescGZIP(), []int{15}
 }
 
 func (x *StreamEventsResponse) GetEvent() *SchedulerEvent {
@@ -701,15 +857,27 @@ const file_agent_v1_scheduler_proto_rawDesc = "" +
 	"\n" +
 	"watcher_id\x18\x01 \x01(\tR\twatcherId\"\x1b\n" +
 	"\x19UnregisterWatcherResponse\"\x15\n" +
+	"\x13ListWatchersRequest\"\xa1\x01\n" +
+	"\fWatcherEntry\x12\x1d\n" +
+	"\n" +
+	"watcher_id\x18\x01 \x01(\tR\twatcherId\x12\x12\n" +
+	"\x04name\x18\x02 \x01(\tR\x04name\x12\x14\n" +
+	"\x05paths\x18\x03 \x03(\tR\x05paths\x12'\n" +
+	"\x0fignore_patterns\x18\x04 \x03(\tR\x0eignorePatterns\x12\x1f\n" +
+	"\vdebounce_ms\x18\x05 \x01(\rR\n" +
+	"debounceMs\"J\n" +
+	"\x14ListWatchersResponse\x122\n" +
+	"\bwatchers\x18\x01 \x03(\v2\x16.agent.v1.WatcherEntryR\bwatchers\"\x15\n" +
 	"\x13StreamEventsRequest\"F\n" +
 	"\x14StreamEventsResponse\x12.\n" +
-	"\x05event\x18\x01 \x01(\v2\x18.agent.v1.SchedulerEventR\x05event2\x83\x04\n" +
+	"\x05event\x18\x01 \x01(\v2\x18.agent.v1.SchedulerEventR\x05event2\xd2\x04\n" +
 	"\x10SchedulerService\x12M\n" +
 	"\fRegisterCron\x12\x1d.agent.v1.RegisterCronRequest\x1a\x1e.agent.v1.RegisterCronResponse\x12S\n" +
 	"\x0eUnregisterCron\x12\x1f.agent.v1.UnregisterCronRequest\x1a .agent.v1.UnregisterCronResponse\x12D\n" +
 	"\tListCrons\x12\x1a.agent.v1.ListCronsRequest\x1a\x1b.agent.v1.ListCronsResponse\x12V\n" +
 	"\x0fRegisterWatcher\x12 .agent.v1.RegisterWatcherRequest\x1a!.agent.v1.RegisterWatcherResponse\x12\\\n" +
-	"\x11UnregisterWatcher\x12\".agent.v1.UnregisterWatcherRequest\x1a#.agent.v1.UnregisterWatcherResponse\x12O\n" +
+	"\x11UnregisterWatcher\x12\".agent.v1.UnregisterWatcherRequest\x1a#.agent.v1.UnregisterWatcherResponse\x12M\n" +
+	"\fListWatchers\x12\x1d.agent.v1.ListWatchersRequest\x1a\x1e.agent.v1.ListWatchersResponse\x12O\n" +
 	"\fStreamEvents\x12\x1d.agent.v1.StreamEventsRequest\x1a\x1e.agent.v1.StreamEventsResponse0\x01B\x7f\n" +
 	"\fcom.agent.v1B\x0eSchedulerProtoP\x01Z\x1ekraken/gen/go/agent/v1;agentv1\xa2\x02\x03AXX\xaa\x02\bAgent.V1\xca\x02\bAgent\\V1\xe2\x02\x14Agent\\V1\\GPBMetadata\xea\x02\tAgent::V1b\x06proto3"
 
@@ -725,7 +893,7 @@ func file_agent_v1_scheduler_proto_rawDescGZIP() []byte {
 	return file_agent_v1_scheduler_proto_rawDescData
 }
 
-var file_agent_v1_scheduler_proto_msgTypes = make([]protoimpl.MessageInfo, 14)
+var file_agent_v1_scheduler_proto_msgTypes = make([]protoimpl.MessageInfo, 17)
 var file_agent_v1_scheduler_proto_goTypes = []any{
 	(*RegisterCronRequest)(nil),       // 0: agent.v1.RegisterCronRequest
 	(*RegisterCronResponse)(nil),      // 1: agent.v1.RegisterCronResponse
@@ -738,32 +906,38 @@ var file_agent_v1_scheduler_proto_goTypes = []any{
 	(*RegisterWatcherResponse)(nil),   // 8: agent.v1.RegisterWatcherResponse
 	(*UnregisterWatcherRequest)(nil),  // 9: agent.v1.UnregisterWatcherRequest
 	(*UnregisterWatcherResponse)(nil), // 10: agent.v1.UnregisterWatcherResponse
-	(*StreamEventsRequest)(nil),       // 11: agent.v1.StreamEventsRequest
-	(*StreamEventsResponse)(nil),      // 12: agent.v1.StreamEventsResponse
-	nil,                               // 13: agent.v1.RegisterCronRequest.ParametersEntry
-	(*SchedulerEvent)(nil),            // 14: agent.v1.SchedulerEvent
+	(*ListWatchersRequest)(nil),       // 11: agent.v1.ListWatchersRequest
+	(*WatcherEntry)(nil),              // 12: agent.v1.WatcherEntry
+	(*ListWatchersResponse)(nil),      // 13: agent.v1.ListWatchersResponse
+	(*StreamEventsRequest)(nil),       // 14: agent.v1.StreamEventsRequest
+	(*StreamEventsResponse)(nil),      // 15: agent.v1.StreamEventsResponse
+	nil,                               // 16: agent.v1.RegisterCronRequest.ParametersEntry
+	(*SchedulerEvent)(nil),            // 17: agent.v1.SchedulerEvent
 }
 var file_agent_v1_scheduler_proto_depIdxs = []int32{
-	13, // 0: agent.v1.RegisterCronRequest.parameters:type_name -> agent.v1.RegisterCronRequest.ParametersEntry
+	16, // 0: agent.v1.RegisterCronRequest.parameters:type_name -> agent.v1.RegisterCronRequest.ParametersEntry
 	5,  // 1: agent.v1.ListCronsResponse.crons:type_name -> agent.v1.CronEntry
-	14, // 2: agent.v1.StreamEventsResponse.event:type_name -> agent.v1.SchedulerEvent
-	0,  // 3: agent.v1.SchedulerService.RegisterCron:input_type -> agent.v1.RegisterCronRequest
-	2,  // 4: agent.v1.SchedulerService.UnregisterCron:input_type -> agent.v1.UnregisterCronRequest
-	4,  // 5: agent.v1.SchedulerService.ListCrons:input_type -> agent.v1.ListCronsRequest
-	7,  // 6: agent.v1.SchedulerService.RegisterWatcher:input_type -> agent.v1.RegisterWatcherRequest
-	9,  // 7: agent.v1.SchedulerService.UnregisterWatcher:input_type -> agent.v1.UnregisterWatcherRequest
-	11, // 8: agent.v1.SchedulerService.StreamEvents:input_type -> agent.v1.StreamEventsRequest
-	1,  // 9: agent.v1.SchedulerService.RegisterCron:output_type -> agent.v1.RegisterCronResponse
-	3,  // 10: agent.v1.SchedulerService.UnregisterCron:output_type -> agent.v1.UnregisterCronResponse
-	6,  // 11: agent.v1.SchedulerService.ListCrons:output_type -> agent.v1.ListCronsResponse
-	8,  // 12: agent.v1.SchedulerService.RegisterWatcher:output_type -> agent.v1.RegisterWatcherResponse
-	10, // 13: agent.v1.SchedulerService.UnregisterWatcher:output_type -> agent.v1.UnregisterWatcherResponse
-	12, // 14: agent.v1.SchedulerService.StreamEvents:output_type -> agent.v1.StreamEventsResponse
-	9,  // [9:15] is the sub-list for method output_type
-	3,  // [3:9] is the sub-list for method input_type
-	3,  // [3:3] is the sub-list for extension type_name
-	3,  // [3:3] is the sub-list for extension extendee
-	0,  // [0:3] is the sub-list for field type_name
+	12, // 2: agent.v1.ListWatchersResponse.watchers:type_name -> agent.v1.WatcherEntry
+	17, // 3: agent.v1.StreamEventsResponse.event:type_name -> agent.v1.SchedulerEvent
+	0,  // 4: agent.v1.SchedulerService.RegisterCron:input_type -> agent.v1.RegisterCronRequest
+	2,  // 5: agent.v1.SchedulerService.UnregisterCron:input_type -> agent.v1.UnregisterCronRequest
+	4,  // 6: agent.v1.SchedulerService.ListCrons:input_type -> agent.v1.ListCronsRequest
+	7,  // 7: agent.v1.SchedulerService.RegisterWatcher:input_type -> agent.v1.RegisterWatcherRequest
+	9,  // 8: agent.v1.SchedulerService.UnregisterWatcher:input_type -> agent.v1.UnregisterWatcherRequest
+	11, // 9: agent.v1.SchedulerService.ListWatchers:input_type -> agent.v1.ListWatchersRequest
+	14, // 10: agent.v1.SchedulerService.StreamEvents:input_type -> agent.v1.StreamEventsRequest
+	1,  // 11: agent.v1.SchedulerService.RegisterCron:output_type -> agent.v1.RegisterCronResponse
+	3,  // 12: agent.v1.SchedulerService.UnregisterCron:output_type -> agent.v1.UnregisterCronResponse
+	6,  // 13: agent.v1.SchedulerService.ListCrons:output_type -> agent.v1.ListCronsResponse
+	8,  // 14: agent.v1.SchedulerService.RegisterWatcher:output_type -> agent.v1.RegisterWatcherResponse
+	10, // 15: agent.v1.SchedulerService.UnregisterWatcher:output_type -> agent.v1.UnregisterWatcherResponse
+	13, // 16: agent.v1.SchedulerService.ListWatchers:output_type -> agent.v1.ListWatchersResponse
+	15, // 17: agent.v1.SchedulerService.StreamEvents:output_type -> agent.v1.StreamEventsResponse
+	11, // [11:18] is the sub-list for method output_type
+	4,  // [4:11] is the sub-list for method input_type
+	4,  // [4:4] is the sub-list for extension type_name
+	4,  // [4:4] is the sub-list for extension extendee
+	0,  // [0:4] is the sub-list for field type_name
 }
 
 func init() { file_agent_v1_scheduler_proto_init() }
@@ -778,7 +952,7 @@ func file_agent_v1_scheduler_proto_init() {
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_agent_v1_scheduler_proto_rawDesc), len(file_agent_v1_scheduler_proto_rawDesc)),
 			NumEnums:      0,
-			NumMessages:   14,
+			NumMessages:   17,
 			NumExtensions: 0,
 			NumServices:   1,
 		},
