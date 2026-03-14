@@ -50,6 +50,28 @@ export async function persistModelToConfiguration(newModel: string): Promise<str
   return configurationPath;
 }
 
+export async function persistProviderAndModel(provider: string, newModel: string): Promise<string> {
+  const configurationPath = getGlobalConfigPath();
+
+  if (!(await Bun.file(configurationPath).exists())) {
+    const minimal = { languageModel: { provider, model: newModel } };
+    await Bun.write(configurationPath, stringifyYaml(minimal));
+    return configurationPath;
+  }
+
+  const fileContents = await Bun.file(configurationPath).text();
+  const parsed = parseYaml(fileContents) ?? {};
+
+  if (!parsed.languageModel || typeof parsed.languageModel !== "object") {
+    parsed.languageModel = {};
+  }
+  parsed.languageModel.provider = provider;
+  parsed.languageModel.model = newModel;
+
+  await Bun.write(configurationPath, stringifyYaml(parsed));
+  return configurationPath;
+}
+
 function resolveOpenRouterApiKey(): string | undefined {
   return Bun.env["OPENROUTER_API_KEY"] ?? Bun.env["KRAKEN_OPENROUTER_API_KEY"] ?? undefined;
 }
@@ -138,6 +160,135 @@ export async function fetchOpenRouterModelIds(): Promise<string[]> {
   cachedModelIds = payload.data.map((m) => m.id).sort();
   cacheTimestamp = now;
   return cachedModelIds;
+}
+
+const OPENAI_MODELS_ENDPOINT = "https://api.openai.com/v1/models";
+
+const OPENAI_CHAT_PREFIXES = ["gpt-", "o1-", "o3-", "o4-", "chatgpt-"];
+
+interface OpenAIModel {
+  id: string;
+  object: string;
+  owned_by: string;
+}
+
+interface OpenAIModelsResponse {
+  data: OpenAIModel[];
+}
+
+let cachedOpenAIModelIds: string[] | null = null;
+let openAICacheTimestamp = 0;
+
+export async function fetchOpenAIModelIds(apiKey: string): Promise<string[]> {
+  const now = Date.now();
+  if (cachedOpenAIModelIds && now - openAICacheTimestamp < MODEL_CACHE_TTL_MS) {
+    return cachedOpenAIModelIds;
+  }
+
+  const response = await fetch(OPENAI_MODELS_ENDPOINT, {
+    headers: {
+      "Authorization": `Bearer ${apiKey}`,
+      "Content-Type": "application/json",
+    },
+  });
+
+  if (!response.ok) {
+    throw new Error(`OpenAI returned ${response.status}`);
+  }
+
+  const payload = (await response.json()) as OpenAIModelsResponse;
+  cachedOpenAIModelIds = payload.data
+    .filter((m) => OPENAI_CHAT_PREFIXES.some((p) => m.id.startsWith(p)))
+    .map((m) => m.id)
+    .sort();
+  openAICacheTimestamp = now;
+  return cachedOpenAIModelIds;
+}
+
+const ANTHROPIC_MODELS_ENDPOINT = "https://api.anthropic.com/v1/models";
+const ANTHROPIC_API_VERSION = "2023-06-01";
+
+interface AnthropicModel {
+  id: string;
+  display_name: string;
+  type: string;
+}
+
+interface AnthropicModelsResponse {
+  data: AnthropicModel[];
+}
+
+let cachedAnthropicModelIds: string[] | null = null;
+let anthropicCacheTimestamp = 0;
+
+export async function fetchAnthropicModelIds(apiKey: string): Promise<string[]> {
+  const now = Date.now();
+  if (cachedAnthropicModelIds && now - anthropicCacheTimestamp < MODEL_CACHE_TTL_MS) {
+    return cachedAnthropicModelIds;
+  }
+
+  const response = await fetch(ANTHROPIC_MODELS_ENDPOINT, {
+    headers: {
+      "x-api-key": apiKey,
+      "anthropic-version": ANTHROPIC_API_VERSION,
+      "Content-Type": "application/json",
+    },
+  });
+
+  if (!response.ok) {
+    throw new Error(`Anthropic returned ${response.status}`);
+  }
+
+  const payload = (await response.json()) as AnthropicModelsResponse;
+  cachedAnthropicModelIds = payload.data
+    .map((m) => m.id)
+    .sort();
+  anthropicCacheTimestamp = now;
+  return cachedAnthropicModelIds;
+}
+
+export interface ProviderModel {
+  provider: string;
+  modelId: string;
+}
+
+export async function fetchAllAvailableModels(): Promise<ProviderModel[]> {
+  const fetches: Promise<ProviderModel[]>[] = [];
+
+  const openrouterKey = Bun.env["OPENROUTER_API_KEY"] ?? Bun.env["KRAKEN_OPENROUTER_API_KEY"];
+  if (openrouterKey) {
+    fetches.push(
+      fetchOpenRouterModelIds()
+        .then((ids) => ids.map((id) => ({ provider: "openrouter", modelId: id })))
+    );
+  }
+
+  const openaiKey = Bun.env["OPENAI_API_KEY"];
+  if (openaiKey) {
+    fetches.push(
+      fetchOpenAIModelIds(openaiKey)
+        .then((ids) => ids.map((id) => ({ provider: "openai", modelId: id })))
+    );
+  }
+
+  const anthropicKey = Bun.env["ANTHROPIC_API_KEY"];
+  if (anthropicKey) {
+    fetches.push(
+      fetchAnthropicModelIds(anthropicKey)
+        .then((ids) => ids.map((id) => ({ provider: "anthropic", modelId: id })))
+    );
+  }
+
+  const results = await Promise.allSettled(fetches);
+  const models: ProviderModel[] = [];
+
+  for (const result of results) {
+    if (result.status === "fulfilled") {
+      models.push(...result.value);
+    }
+  }
+
+  return models;
 }
 
 export function createModelListTool(): Tool {
