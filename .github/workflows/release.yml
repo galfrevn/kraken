@@ -25,21 +25,31 @@ jobs:
             rust_target: aarch64-apple-darwin
             go_os: darwin
             go_arch: arm64
+            ext: ""
           - os: macos-latest
             platform: darwin-x64
             rust_target: x86_64-apple-darwin
             go_os: darwin
             go_arch: amd64
+            ext: ""
           - os: ubuntu-latest
             platform: linux-x64
             rust_target: x86_64-unknown-linux-gnu
             go_os: linux
             go_arch: amd64
+            ext: ""
           - os: ubuntu-24.04-arm
             platform: linux-arm64
             rust_target: aarch64-unknown-linux-gnu
             go_os: linux
             go_arch: arm64
+            ext: ""
+          - os: windows-latest
+            platform: windows-x64
+            rust_target: x86_64-pc-windows-msvc
+            go_os: windows
+            go_arch: amd64
+            ext: ".exe"
 
     runs-on: ${{ matrix.os }}
 
@@ -84,14 +94,24 @@ jobs:
           GOOS: ${{ matrix.go_os }}
           GOARCH: ${{ matrix.go_arch }}
           CGO_ENABLED: "0"
-        run: go build -o gateway ./cmd/gateway
+        run: go build -o gateway${{ matrix.ext }} ./cmd/gateway
 
-      - name: 📦 Package release artifacts
+      - name: 📦 Package release artifacts (Unix)
+        if: runner.os != 'Windows'
         run: |
           mkdir -p release
           cp apps/scheduler/target/${{ matrix.rust_target }}/release/scheduler release/
           cp apps/gateway/gateway release/
           tar -czf kraken-${{ matrix.platform }}.tar.gz -C release .
+
+      - name: 📦 Package release artifacts (Windows)
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Force -Path release | Out-Null
+          Copy-Item "apps/scheduler/target/${{ matrix.rust_target }}/release/scheduler.exe" "release/"
+          Copy-Item "apps/gateway/gateway.exe" "release/"
+          tar -czf "kraken-${{ matrix.platform }}.tar.gz" -C release .
 
       - name: ☁️ Upload artifact
         uses: actions/upload-artifact@v4
