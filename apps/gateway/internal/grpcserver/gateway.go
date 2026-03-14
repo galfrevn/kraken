@@ -69,8 +69,23 @@ func protoToolsToLLM(protoTools []*agentv1.Tool) []llm.Tool {
 }
 
 func protoMessagesToLLM(protoMsgs []*agentv1.ChatMessage) []llm.ChatMessage {
-	msgs := make([]llm.ChatMessage, len(protoMsgs))
-	for i, msg := range protoMsgs {
+	msgs := make([]llm.ChatMessage, 0, len(protoMsgs))
+	for _, msg := range protoMsgs {
+		// Tool result messages without a tool_call_id are invalid for all providers
+		// (Anthropic, OpenAI, OpenRouter all require it). Convert to a plain user
+		// message so the conversation history remains usable.
+		if msg.Role == "tool" && msg.ToolCallId == "" {
+			content := msg.Content
+			if msg.Name != nil && *msg.Name != "" {
+				content = "[" + *msg.Name + "] " + content
+			}
+			msgs = append(msgs, llm.ChatMessage{
+				Role:    "user",
+				Content: content,
+			})
+			continue
+		}
+
 		m := llm.ChatMessage{
 			Role:       msg.Role,
 			Content:    msg.Content,
@@ -94,7 +109,7 @@ func protoMessagesToLLM(protoMsgs []*agentv1.ChatMessage) []llm.ChatMessage {
 				}
 			}
 		}
-		msgs[i] = m
+		msgs = append(msgs, m)
 	}
 	return msgs
 }
