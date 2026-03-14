@@ -139,6 +139,15 @@ let cachedModelIds: string[] | null = null;
 let cacheTimestamp = 0;
 const MODEL_CACHE_TTL_MS = 5 * 60 * 1000; // 5 minutes
 
+export function clearModelCaches(): void {
+  cachedModelIds = null;
+  cacheTimestamp = 0;
+  cachedOpenAIModelIds = null;
+  openAICacheTimestamp = 0;
+  cachedAnthropicModelIds = null;
+  anthropicCacheTimestamp = 0;
+}
+
 export async function fetchOpenRouterModelIds(): Promise<string[]> {
   const now = Date.now();
   if (cachedModelIds && now - cacheTimestamp < MODEL_CACHE_TTL_MS) {

@@ -17,6 +17,7 @@ export type ClientLogCallback = (level: "info" | "warn" | "error", message: stri
 export class LanguageModelClient {
   private gatewayClient: GatewayClient;
   private model: string;
+  private provider: string;
   private defaultTemperature: number;
   private defaultMaxTokens: number;
   private tokenUsage: TokenUsageSummary;
@@ -26,6 +27,7 @@ export class LanguageModelClient {
   constructor(gatewayUrl: string, languageModelConfiguration: LanguageModelConfiguration) {
     this.gatewayClient = createGatewayClient(gatewayUrl);
     this.model = languageModelConfiguration.model;
+    this.provider = languageModelConfiguration.provider;
     this.defaultTemperature = languageModelConfiguration.temperature;
     this.defaultMaxTokens = languageModelConfiguration.maxTokens;
     this.tokenUsage = {
@@ -159,6 +161,7 @@ export class LanguageModelClient {
       maxTokens: options?.maxTokens ?? this.defaultMaxTokens,
       systemPrompt,
       tools: options?.noTools ? [] : (this.buildGatewayTools() ?? []),
+      provider: this.provider,
     });
 
     this.tokenUsage.totalPromptTokens += response.promptTokens;
@@ -273,6 +276,7 @@ export class LanguageModelClient {
         maxTokens: options?.maxTokens ?? this.defaultMaxTokens,
         systemPrompt,
         tools: this.buildGatewayTools() ?? [],
+        provider: this.provider,
       },
       signal ? { signal } : undefined,
     );
@@ -410,6 +414,14 @@ export class LanguageModelClient {
 
   setModel(model: string): void {
     this.model = model;
+  }
+
+  getProvider(): string {
+    return this.provider;
+  }
+
+  setProvider(provider: string): void {
+    this.provider = provider;
   }
 
   getTokenUsage(): TokenUsageSummary {

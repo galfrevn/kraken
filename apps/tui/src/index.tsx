@@ -267,6 +267,16 @@ export async function main(): Promise<void> {
       onSetupComplete={handleSetupComplete}
     />,
   );
+
+  // Force SIGWINCH pulses so OpenTUI re-reads the real terminal dimensions.
+  // On Windows the initial stdout.columns/rows can be stale, causing a
+  // broken layout until the user manually resizes the window.
+  // Multiple pulses ensure the React tree is fully mounted before the fix.
+  for (const delay of [50, 150, 300]) {
+    setTimeout(() => {
+      process.emit("SIGWINCH");
+    }, delay);
+  }
 }
 
 if (import.meta.main) {

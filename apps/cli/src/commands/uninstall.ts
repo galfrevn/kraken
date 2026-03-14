@@ -1,6 +1,6 @@
-import { existsSync, readFileSync, writeFileSync, rmSync, readdirSync } from "node:fs";
+import { existsSync, readFileSync, writeFileSync, rmSync, readdirSync, mkdtempSync } from "node:fs";
 import { join } from "node:path";
-import { homedir } from "node:os";
+import { homedir, tmpdir } from "node:os";
 import * as p from "@clack/prompts";
 import { KRAKEN_HOME } from "@/constants.ts";
 
@@ -90,7 +90,9 @@ export async function execute(_args: string[]): Promise<void> {
     removeFromShellConfig(rcFile, pathMarker);
   }
 
-  // On Windows, also remove ~/.kraken/bin from the user PATH env variable
+  // On Windows, also remove ~/.kraken/bin from the user PATH env variable.
+  // Use reg.exe instead of PowerShell to avoid the terminal-minimize bug
+  // caused by PowerShell's -WindowStyle Hidden.
   if (process.platform === "win32") {
     const krakenBin = join(KRAKEN_HOME, "bin");
     const userPath = Bun.env.PATH ?? "";
@@ -99,26 +101,44 @@ export async function execute(_args: string[]): Promise<void> {
       .filter((p) => p !== krakenBin)
       .join(";");
     Bun.spawnSync([
-      "powershell",
-      "-Command",
-      `[Environment]::SetEnvironmentVariable("PATH","${filtered.replaceAll('"', '`"')}","User")`,
-    ]);
+      "reg",
+      "add",
+      "HKCU\\Environment",
+      "/v",
+      "PATH",
+      "/t",
+      "REG_EXPAND_SZ",
+      "/d",
+      filtered,
+      "/f",
+    ], { stdio: ["ignore", "ignore", "ignore"] });
   }
 
   // On Windows the running process locks files — schedule deletion after exit.
-  // We use a PowerShell loop that retries until the files are unlocked.
+  // Write a temporary batch script that retries deletion, avoiding PowerShell
+  // which can minimize the caller's terminal window.
   if (deferredDeletes.length > 0 && process.platform === "win32") {
-    // Always try cleaning the root directory last
     if (!deferredDeletes.includes(KRAKEN_HOME)) {
       deferredDeletes.push(KRAKEN_HOME);
     }
-    const psCommands = deferredDeletes
-      .map(
-        (f) =>
-          `$p='${f.replaceAll("'", "''")}';for($i=0;$i -lt 10;$i++){Start-Sleep -Seconds 1;if(Test-Path $p){Remove-Item -Force -Recurse $p -ErrorAction SilentlyContinue}else{break}}`,
-      )
-      .join(";");
-    Bun.spawn(["powershell", "-WindowStyle", "Hidden", "-Command", psCommands], {
+    const batchLines = ["@echo off"];
+    for (const f of deferredDeletes) {
+      const escaped = f.replaceAll("/", "\\");
+      batchLines.push(
+        `for /L %%i in (1,1,10) do (`,
+        `  if not exist "${escaped}" goto :next_${batchLines.length}`,
+        `  timeout /t 1 /nobreak >nul`,
+        `  rmdir /s /q "${escaped}" 2>nul`,
+        `  del /f /q "${escaped}" 2>nul`,
+        `)`,
+        `:next_${batchLines.length}`,
+      );
+    }
+    batchLines.push(`del "%~f0"`); // self-delete the batch file
+    const tempDir = mkdtempSync(join(tmpdir(), "kraken-uninstall-"));
+    const batchPath = join(tempDir, "cleanup.cmd");
+    writeFileSync(batchPath, batchLines.join("\r\n"));
+    Bun.spawn(["cmd", "/c", "start", "/b", batchPath], {
       stdio: ["ignore", "ignore", "ignore"],
     });
   }

@@ -213,6 +213,7 @@ const modelCommand: SlashCommand = {
 
     try {
       if (provider) {
+        client.setProvider(provider);
         await persistProviderAndModel(provider, trimmed);
         return {
           output: `model switched: ${previous} → ${trimmed}\nprovider: ${provider}\nsaved to ~/.kraken/kraken.yml`,

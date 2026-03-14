@@ -24,7 +24,7 @@ import {
   type SlashCommand,
   type CommandResult,
 } from "@/commands.ts";
-import { fetchAllAvailableModels, type ProviderModel } from "@core/tools/model.ts";
+import { fetchAllAvailableModels, clearModelCaches, type ProviderModel } from "@core/tools/model.ts";
 import { Avatar, type AvatarState } from "@/avatar.tsx";
 import { loadImagePreview, generatePreviewRows } from "@/images.ts";
 import { SetupPanel } from "@/views/setup.tsx";
@@ -1023,6 +1023,9 @@ export function ChatView({
             onComplete={(configured) => {
               setProviderSetupData(null);
               if (configured) {
+                // Invalidate model caches so the new provider's models appear
+                cachedModelIds.current = [];
+                clearModelCaches();
                 toast.success(`${configured.label} configured — models now available via /model`);
               }
             }}

@@ -136,7 +136,11 @@ func (s *GatewayServer) Complete(
 	ctx context.Context,
 	req *connect.Request[agentv1.CompleteRequest],
 ) (*connect.Response[agentv1.CompleteResponse], error) {
-	s.logger.Info("complete request", "model", req.Msg.Model, "messages", len(req.Msg.Messages))
+	provider := ""
+	if req.Msg.Provider != nil {
+		provider = *req.Msg.Provider
+	}
+	s.logger.Info("complete request", "model", req.Msg.Model, "provider", provider, "messages", len(req.Msg.Messages))
 
 	messages := protoMessagesToLLM(req.Msg.Messages)
 
@@ -153,6 +157,7 @@ func (s *GatewayServer) Complete(
 		Temperature: req.Msg.Temperature,
 		MaxTokens:   req.Msg.MaxTokens,
 		Tools:       protoToolsToLLM(req.Msg.Tools),
+		Provider:    provider,
 	}
 
 	result, err := s.llmClient.Complete(ctx, llmReq)
@@ -195,7 +200,11 @@ func (s *GatewayServer) StreamComplete(
 	req *connect.Request[agentv1.StreamCompleteRequest],
 	stream *connect.ServerStream[agentv1.StreamCompleteResponse],
 ) error {
-	s.logger.Info("stream complete request", "model", req.Msg.Model, "messages", len(req.Msg.Messages))
+	streamProvider := ""
+	if req.Msg.Provider != nil {
+		streamProvider = *req.Msg.Provider
+	}
+	s.logger.Info("stream complete request", "model", req.Msg.Model, "provider", streamProvider, "messages", len(req.Msg.Messages))
 
 	messages := protoMessagesToLLM(req.Msg.Messages)
 
@@ -212,6 +221,7 @@ func (s *GatewayServer) StreamComplete(
 		Temperature: req.Msg.Temperature,
 		MaxTokens:   req.Msg.MaxTokens,
 		Tools:       protoToolsToLLM(req.Msg.Tools),
+		Provider:    streamProvider,
 	}
 
 	var streamID string

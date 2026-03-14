@@ -53,6 +53,7 @@ type CompletionRequest struct {
 	Stream           bool          `json:"stream"`
 	Tools            []Tool        `json:"tools,omitempty"`
 	IncludeReasoning bool          `json:"include_reasoning"`
+	Provider         string        `json:"-"` // routing hint, not sent to API
 }
 
 type CompletionChoice struct {

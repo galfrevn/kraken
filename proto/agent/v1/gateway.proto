@@ -45,6 +45,7 @@ message CompleteRequest {
   optional int32 max_tokens = 4;
   optional string system_prompt = 5;
   repeated Tool tools = 6;
+  optional string provider = 7;
 }
 
 message CompleteResponse {
@@ -64,6 +65,7 @@ message StreamCompleteRequest {
   optional int32 max_tokens = 4;
   optional string system_prompt = 5;
   repeated Tool tools = 6;
+  optional string provider = 7;
 }
 
 message StreamCompleteResponse {

@@ -26,12 +26,12 @@ func main() {
 		port = "50052"
 	}
 
-	llmClient, err := llm.NewClientFromEnv()
+	llmClient, err := llm.NewProviderRouterFromEnv()
 	if err != nil {
 		logger.Error("failed to create LLM client", "error", err)
 		os.Exit(1)
 	}
-	logger.Info("LLM provider initialized", "provider", os.Getenv("LLM_PROVIDER"))
+	logger.Info("LLM provider router initialized", "default_provider", os.Getenv("LLM_PROVIDER"))
 
 	webhookStore := webhooks.NewStore()
 	webhookEventChannel := make(webhooks.EventChannel, 256)

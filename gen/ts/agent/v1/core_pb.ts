@@ -4,24 +4,15 @@
 
 import type { GenFile, GenMessage, GenService } from "@bufbuild/protobuf/codegenv2";
 import { fileDesc, messageDesc, serviceDesc } from "@bufbuild/protobuf/codegenv2";
-import type {
-  ApprovalPolicy,
-  LogEntry,
-  Task,
-  TaskPriority,
-  TaskStatus,
-  TriggerType,
-} from "./common_pb";
+import type { ApprovalPolicy, LogEntry, Task, TaskPriority, TaskStatus, TriggerType } from "./common_pb";
 import { file_agent_v1_common } from "./common_pb";
 import type { Message } from "@bufbuild/protobuf";
 
 /**
  * Describes the file agent/v1/core.proto.
  */
-export const file_agent_v1_core: GenFile /*@__PURE__*/ = fileDesc(
-  "ChNhZ2VudC92MS9jb3JlLnByb3RvEghhZ2VudC52MSK0AgoRU3VibWl0VGFza1JlcXVlc3QSDAoEbmFtZRgBIAEoCRITCgtkZXNjcmlwdGlvbhgCIAEoCRIoCghwcmlvcml0eRgDIAEoDjIWLmFnZW50LnYxLlRhc2tQcmlvcml0eRIrCgx0cmlnZ2VyX3R5cGUYBCABKA4yFS5hZ2VudC52MS5UcmlnZ2VyVHlwZRIxCg9hcHByb3ZhbF9wb2xpY3kYBSABKA4yGC5hZ2VudC52MS5BcHByb3ZhbFBvbGljeRI/CgpwYXJhbWV0ZXJzGAYgAygLMisuYWdlbnQudjEuU3VibWl0VGFza1JlcXVlc3QuUGFyYW1ldGVyc0VudHJ5GjEKD1BhcmFtZXRlcnNFbnRyeRILCgNrZXkYASABKAkSDQoFdmFsdWUYAiABKAk6AjgBIjIKElN1Ym1pdFRhc2tSZXNwb25zZRIcCgR0YXNrGAEgASgLMg4uYWdlbnQudjEuVGFzayInChRHZXRUYXNrU3RhdHVzUmVxdWVzdBIPCgd0YXNrX2lkGAEgASgJIjUKFUdldFRhc2tTdGF0dXNSZXNwb25zZRIcCgR0YXNrGAEgASgLMg4uYWdlbnQudjEuVGFzayK8AQoQTGlzdFRhc2tzUmVxdWVzdBIwCg1zdGF0dXNfZmlsdGVyGAEgASgOMhQuYWdlbnQudjEuVGFza1N0YXR1c0gAiAEBEjIKDnRyaWdnZXJfZmlsdGVyGAIgASgOMhUuYWdlbnQudjEuVHJpZ2dlclR5cGVIAYgBARINCgVsaW1pdBgDIAEoBRIOCgZvZmZzZXQYBCABKAVCEAoOX3N0YXR1c19maWx0ZXJCEQoPX3RyaWdnZXJfZmlsdGVyIkcKEUxpc3RUYXNrc1Jlc3BvbnNlEh0KBXRhc2tzGAEgAygLMg4uYWdlbnQudjEuVGFzaxITCgt0b3RhbF9jb3VudBgCIAEoBSIkChFDYW5jZWxUYXNrUmVxdWVzdBIPCgd0YXNrX2lkGAEgASgJIjIKEkNhbmNlbFRhc2tSZXNwb25zZRIcCgR0YXNrGAEgASgLMg4uYWdlbnQudjEuVGFzayI0ChFTdHJlYW1Mb2dzUmVxdWVzdBIPCgd0YXNrX2lkGAEgASgJEg4KBmZvbGxvdxgCIAEoCCI3ChJTdHJlYW1Mb2dzUmVzcG9uc2USIQoFZW50cnkYASABKAsyEi5hZ2VudC52MS5Mb2dFbnRyeTKCAwoLQ29yZVNlcnZpY2USRwoKU3VibWl0VGFzaxIbLmFnZW50LnYxLlN1Ym1pdFRhc2tSZXF1ZXN0GhwuYWdlbnQudjEuU3VibWl0VGFza1Jlc3BvbnNlElAKDUdldFRhc2tTdGF0dXMSHi5hZ2VudC52MS5HZXRUYXNrU3RhdHVzUmVxdWVzdBofLmFnZW50LnYxLkdldFRhc2tTdGF0dXNSZXNwb25zZRJECglMaXN0VGFza3MSGi5hZ2VudC52MS5MaXN0VGFza3NSZXF1ZXN0GhsuYWdlbnQudjEuTGlzdFRhc2tzUmVzcG9uc2USRwoKQ2FuY2VsVGFzaxIbLmFnZW50LnYxLkNhbmNlbFRhc2tSZXF1ZXN0GhwuYWdlbnQudjEuQ2FuY2VsVGFza1Jlc3BvbnNlEkkKClN0cmVhbUxvZ3MSGy5hZ2VudC52MS5TdHJlYW1Mb2dzUmVxdWVzdBocLmFnZW50LnYxLlN0cmVhbUxvZ3NSZXNwb25zZTABQnoKDGNvbS5hZ2VudC52MUIJQ29yZVByb3RvUAFaHmtyYWtlbi9nZW4vZ28vYWdlbnQvdjE7YWdlbnR2MaICA0FYWKoCCEFnZW50LlYxygIIQWdlbnRcVjHiAhRBZ2VudFxWMVxHUEJNZXRhZGF0YeoCCUFnZW50OjpWMWIGcHJvdG8z",
-  [file_agent_v1_common],
-);
+export const file_agent_v1_core: GenFile = /*@__PURE__*/
+  fileDesc("ChNhZ2VudC92MS9jb3JlLnByb3RvEghhZ2VudC52MSK0AgoRU3VibWl0VGFza1JlcXVlc3QSDAoEbmFtZRgBIAEoCRITCgtkZXNjcmlwdGlvbhgCIAEoCRIoCghwcmlvcml0eRgDIAEoDjIWLmFnZW50LnYxLlRhc2tQcmlvcml0eRIrCgx0cmlnZ2VyX3R5cGUYBCABKA4yFS5hZ2VudC52MS5UcmlnZ2VyVHlwZRIxCg9hcHByb3ZhbF9wb2xpY3kYBSABKA4yGC5hZ2VudC52MS5BcHByb3ZhbFBvbGljeRI/CgpwYXJhbWV0ZXJzGAYgAygLMisuYWdlbnQudjEuU3VibWl0VGFza1JlcXVlc3QuUGFyYW1ldGVyc0VudHJ5GjEKD1BhcmFtZXRlcnNFbnRyeRILCgNrZXkYASABKAkSDQoFdmFsdWUYAiABKAk6AjgBIjIKElN1Ym1pdFRhc2tSZXNwb25zZRIcCgR0YXNrGAEgASgLMg4uYWdlbnQudjEuVGFzayInChRHZXRUYXNrU3RhdHVzUmVxdWVzdBIPCgd0YXNrX2lkGAEgASgJIjUKFUdldFRhc2tTdGF0dXNSZXNwb25zZRIcCgR0YXNrGAEgASgLMg4uYWdlbnQudjEuVGFzayK8AQoQTGlzdFRhc2tzUmVxdWVzdBIwCg1zdGF0dXNfZmlsdGVyGAEgASgOMhQuYWdlbnQudjEuVGFza1N0YXR1c0gAiAEBEjIKDnRyaWdnZXJfZmlsdGVyGAIgASgOMhUuYWdlbnQudjEuVHJpZ2dlclR5cGVIAYgBARINCgVsaW1pdBgDIAEoBRIOCgZvZmZzZXQYBCABKAVCEAoOX3N0YXR1c19maWx0ZXJCEQoPX3RyaWdnZXJfZmlsdGVyIkcKEUxpc3RUYXNrc1Jlc3BvbnNlEh0KBXRhc2tzGAEgAygLMg4uYWdlbnQudjEuVGFzaxITCgt0b3RhbF9jb3VudBgCIAEoBSIkChFDYW5jZWxUYXNrUmVxdWVzdBIPCgd0YXNrX2lkGAEgASgJIjIKEkNhbmNlbFRhc2tSZXNwb25zZRIcCgR0YXNrGAEgASgLMg4uYWdlbnQudjEuVGFzayI0ChFTdHJlYW1Mb2dzUmVxdWVzdBIPCgd0YXNrX2lkGAEgASgJEg4KBmZvbGxvdxgCIAEoCCI3ChJTdHJlYW1Mb2dzUmVzcG9uc2USIQoFZW50cnkYASABKAsyEi5hZ2VudC52MS5Mb2dFbnRyeTKCAwoLQ29yZVNlcnZpY2USRwoKU3VibWl0VGFzaxIbLmFnZW50LnYxLlN1Ym1pdFRhc2tSZXF1ZXN0GhwuYWdlbnQudjEuU3VibWl0VGFza1Jlc3BvbnNlElAKDUdldFRhc2tTdGF0dXMSHi5hZ2VudC52MS5HZXRUYXNrU3RhdHVzUmVxdWVzdBofLmFnZW50LnYxLkdldFRhc2tTdGF0dXNSZXNwb25zZRJECglMaXN0VGFza3MSGi5hZ2VudC52MS5MaXN0VGFza3NSZXF1ZXN0GhsuYWdlbnQudjEuTGlzdFRhc2tzUmVzcG9uc2USRwoKQ2FuY2VsVGFzaxIbLmFnZW50LnYxLkNhbmNlbFRhc2tSZXF1ZXN0GhwuYWdlbnQudjEuQ2FuY2VsVGFza1Jlc3BvbnNlEkkKClN0cmVhbUxvZ3MSGy5hZ2VudC52MS5TdHJlYW1Mb2dzUmVxdWVzdBocLmFnZW50LnYxLlN0cmVhbUxvZ3NSZXNwb25zZTABQnoKDGNvbS5hZ2VudC52MUIJQ29yZVByb3RvUAFaHmtyYWtlbi9nZW4vZ28vYWdlbnQvdjE7YWdlbnR2MaICA0FYWKoCCEFnZW50LlYxygIIQWdlbnRcVjHiAhRBZ2VudFxWMVxHUEJNZXRhZGF0YeoCCUFnZW50OjpWMWIGcHJvdG8z", [file_agent_v1_common]);
 
 /**
  * @generated from message agent.v1.SubmitTaskRequest
@@ -62,10 +53,8 @@ export type SubmitTaskRequest = Message<"agent.v1.SubmitTaskRequest"> & {
  * Describes the message agent.v1.SubmitTaskRequest.
  * Use `create(SubmitTaskRequestSchema)` to create a new message.
  */
-export const SubmitTaskRequestSchema: GenMessage<SubmitTaskRequest> /*@__PURE__*/ = messageDesc(
-  file_agent_v1_core,
-  0,
-);
+export const SubmitTaskRequestSchema: GenMessage<SubmitTaskRequest> = /*@__PURE__*/
+  messageDesc(file_agent_v1_core, 0);
 
 /**
  * @generated from message agent.v1.SubmitTaskResponse
@@ -81,10 +70,8 @@ export type SubmitTaskResponse = Message<"agent.v1.SubmitTaskResponse"> & {
  * Describes the message agent.v1.SubmitTaskResponse.
  * Use `create(SubmitTaskResponseSchema)` to create a new message.
  */
-export const SubmitTaskResponseSchema: GenMessage<SubmitTaskResponse> /*@__PURE__*/ = messageDesc(
-  file_agent_v1_core,
-  1,
-);
+export const SubmitTaskResponseSchema: GenMessage<SubmitTaskResponse> = /*@__PURE__*/
+  messageDesc(file_agent_v1_core, 1);
 
 /**
  * @generated from message agent.v1.GetTaskStatusRequest
@@ -100,7 +87,7 @@ export type GetTaskStatusRequest = Message<"agent.v1.GetTaskStatusRequest"> & {
  * Describes the message agent.v1.GetTaskStatusRequest.
  * Use `create(GetTaskStatusRequestSchema)` to create a new message.
  */
-export const GetTaskStatusRequestSchema: GenMessage<GetTaskStatusRequest> /*@__PURE__*/ =
+export const GetTaskStatusRequestSchema: GenMessage<GetTaskStatusRequest> = /*@__PURE__*/
   messageDesc(file_agent_v1_core, 2);
 
 /**
@@ -117,7 +104,7 @@ export type GetTaskStatusResponse = Message<"agent.v1.GetTaskStatusResponse"> & 
  * Describes the message agent.v1.GetTaskStatusResponse.
  * Use `create(GetTaskStatusResponseSchema)` to create a new message.
  */
-export const GetTaskStatusResponseSchema: GenMessage<GetTaskStatusResponse> /*@__PURE__*/ =
+export const GetTaskStatusResponseSchema: GenMessage<GetTaskStatusResponse> = /*@__PURE__*/
   messageDesc(file_agent_v1_core, 3);
 
 /**
@@ -149,10 +136,8 @@ export type ListTasksRequest = Message<"agent.v1.ListTasksRequest"> & {
  * Describes the message agent.v1.ListTasksRequest.
  * Use `create(ListTasksRequestSchema)` to create a new message.
  */
-export const ListTasksRequestSchema: GenMessage<ListTasksRequest> /*@__PURE__*/ = messageDesc(
-  file_agent_v1_core,
-  4,
-);
+export const ListTasksRequestSchema: GenMessage<ListTasksRequest> = /*@__PURE__*/
+  messageDesc(file_agent_v1_core, 4);
 
 /**
  * @generated from message agent.v1.ListTasksResponse
@@ -173,10 +158,8 @@ export type ListTasksResponse = Message<"agent.v1.ListTasksResponse"> & {
  * Describes the message agent.v1.ListTasksResponse.
  * Use `create(ListTasksResponseSchema)` to create a new message.
  */
-export const ListTasksResponseSchema: GenMessage<ListTasksResponse> /*@__PURE__*/ = messageDesc(
-  file_agent_v1_core,
-  5,
-);
+export const ListTasksResponseSchema: GenMessage<ListTasksResponse> = /*@__PURE__*/
+  messageDesc(file_agent_v1_core, 5);
 
 /**
  * @generated from message agent.v1.CancelTaskRequest
@@ -192,10 +175,8 @@ export type CancelTaskRequest = Message<"agent.v1.CancelTaskRequest"> & {
  * Describes the message agent.v1.CancelTaskRequest.
  * Use `create(CancelTaskRequestSchema)` to create a new message.
  */
-export const CancelTaskRequestSchema: GenMessage<CancelTaskRequest> /*@__PURE__*/ = messageDesc(
-  file_agent_v1_core,
-  6,
-);
+export const CancelTaskRequestSchema: GenMessage<CancelTaskRequest> = /*@__PURE__*/
+  messageDesc(file_agent_v1_core, 6);
 
 /**
  * @generated from message agent.v1.CancelTaskResponse
@@ -211,10 +192,8 @@ export type CancelTaskResponse = Message<"agent.v1.CancelTaskResponse"> & {
  * Describes the message agent.v1.CancelTaskResponse.
  * Use `create(CancelTaskResponseSchema)` to create a new message.
  */
-export const CancelTaskResponseSchema: GenMessage<CancelTaskResponse> /*@__PURE__*/ = messageDesc(
-  file_agent_v1_core,
-  7,
-);
+export const CancelTaskResponseSchema: GenMessage<CancelTaskResponse> = /*@__PURE__*/
+  messageDesc(file_agent_v1_core, 7);
 
 /**
  * @generated from message agent.v1.StreamLogsRequest
@@ -235,10 +214,8 @@ export type StreamLogsRequest = Message<"agent.v1.StreamLogsRequest"> & {
  * Describes the message agent.v1.StreamLogsRequest.
  * Use `create(StreamLogsRequestSchema)` to create a new message.
  */
-export const StreamLogsRequestSchema: GenMessage<StreamLogsRequest> /*@__PURE__*/ = messageDesc(
-  file_agent_v1_core,
-  8,
-);
+export const StreamLogsRequestSchema: GenMessage<StreamLogsRequest> = /*@__PURE__*/
+  messageDesc(file_agent_v1_core, 8);
 
 /**
  * @generated from message agent.v1.StreamLogsResponse
@@ -254,10 +231,8 @@ export type StreamLogsResponse = Message<"agent.v1.StreamLogsResponse"> & {
  * Describes the message agent.v1.StreamLogsResponse.
  * Use `create(StreamLogsResponseSchema)` to create a new message.
  */
-export const StreamLogsResponseSchema: GenMessage<StreamLogsResponse> /*@__PURE__*/ = messageDesc(
-  file_agent_v1_core,
-  9,
-);
+export const StreamLogsResponseSchema: GenMessage<StreamLogsResponse> = /*@__PURE__*/
+  messageDesc(file_agent_v1_core, 9);
 
 /**
  * @generated from service agent.v1.CoreService
@@ -270,7 +245,7 @@ export const CoreService: GenService<{
     methodKind: "unary";
     input: typeof SubmitTaskRequestSchema;
     output: typeof SubmitTaskResponseSchema;
-  };
+  },
   /**
    * @generated from rpc agent.v1.CoreService.GetTaskStatus
    */
@@ -278,7 +253,7 @@ export const CoreService: GenService<{
     methodKind: "unary";
     input: typeof GetTaskStatusRequestSchema;
     output: typeof GetTaskStatusResponseSchema;
-  };
+  },
   /**
    * @generated from rpc agent.v1.CoreService.ListTasks
    */
@@ -286,7 +261,7 @@ export const CoreService: GenService<{
     methodKind: "unary";
     input: typeof ListTasksRequestSchema;
     output: typeof ListTasksResponseSchema;
-  };
+  },
   /**
    * @generated from rpc agent.v1.CoreService.CancelTask
    */
@@ -294,7 +269,7 @@ export const CoreService: GenService<{
     methodKind: "unary";
     input: typeof CancelTaskRequestSchema;
     output: typeof CancelTaskResponseSchema;
-  };
+  },
   /**
    * @generated from rpc agent.v1.CoreService.StreamLogs
    */
@@ -302,5 +277,7 @@ export const CoreService: GenService<{
     methodKind: "server_streaming";
     input: typeof StreamLogsRequestSchema;
     output: typeof StreamLogsResponseSchema;
-  };
-}> /*@__PURE__*/ = serviceDesc(file_agent_v1_core, 0);
+  },
+}> = /*@__PURE__*/
+  serviceDesc(file_agent_v1_core, 0);
+

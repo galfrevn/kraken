@@ -389,6 +389,7 @@ type CompleteRequest struct {
 	MaxTokens     *int32                 `protobuf:"varint,4,opt,name=max_tokens,json=maxTokens,proto3,oneof" json:"max_tokens,omitempty"`
 	SystemPrompt  *string                `protobuf:"bytes,5,opt,name=system_prompt,json=systemPrompt,proto3,oneof" json:"system_prompt,omitempty"`
 	Tools         []*Tool                `protobuf:"bytes,6,rep,name=tools,proto3" json:"tools,omitempty"`
+	Provider      *string                `protobuf:"bytes,7,opt,name=provider,proto3,oneof" json:"provider,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -463,6 +464,13 @@ func (x *CompleteRequest) GetTools() []*Tool {
 		return x.Tools
 	}
 	return nil
+}
+
+func (x *CompleteRequest) GetProvider() string {
+	if x != nil && x.Provider != nil {
+		return *x.Provider
+	}
+	return ""
 }
 
 type CompleteResponse struct {
@@ -565,6 +573,7 @@ type StreamCompleteRequest struct {
 	MaxTokens     *int32                 `protobuf:"varint,4,opt,name=max_tokens,json=maxTokens,proto3,oneof" json:"max_tokens,omitempty"`
 	SystemPrompt  *string                `protobuf:"bytes,5,opt,name=system_prompt,json=systemPrompt,proto3,oneof" json:"system_prompt,omitempty"`
 	Tools         []*Tool                `protobuf:"bytes,6,rep,name=tools,proto3" json:"tools,omitempty"`
+	Provider      *string                `protobuf:"bytes,7,opt,name=provider,proto3,oneof" json:"provider,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -639,6 +648,13 @@ func (x *StreamCompleteRequest) GetTools() []*Tool {
 		return x.Tools
 	}
 	return nil
+}
+
+func (x *StreamCompleteRequest) GetProvider() string {
+	if x != nil && x.Provider != nil {
+		return *x.Provider
+	}
+	return ""
 }
 
 type StreamCompleteResponse struct {
@@ -1382,7 +1398,7 @@ const file_agent_v1_gateway_proto_rawDesc = "" +
 	"\ftool_call_id\x18\x04 \x01(\tR\n" +
 	"toolCallId\x12\x17\n" +
 	"\x04name\x18\x05 \x01(\tH\x00R\x04name\x88\x01\x01B\a\n" +
-	"\x05_name\"\xa6\x02\n" +
+	"\x05_name\"\xd4\x02\n" +
 	"\x0fCompleteRequest\x12\x14\n" +
 	"\x05model\x18\x01 \x01(\tR\x05model\x121\n" +
 	"\bmessages\x18\x02 \x03(\v2\x15.agent.v1.ChatMessageR\bmessages\x12%\n" +
@@ -1390,10 +1406,12 @@ const file_agent_v1_gateway_proto_rawDesc = "" +
 	"\n" +
 	"max_tokens\x18\x04 \x01(\x05H\x01R\tmaxTokens\x88\x01\x01\x12(\n" +
 	"\rsystem_prompt\x18\x05 \x01(\tH\x02R\fsystemPrompt\x88\x01\x01\x12$\n" +
-	"\x05tools\x18\x06 \x03(\v2\x0e.agent.v1.ToolR\x05toolsB\x0e\n" +
+	"\x05tools\x18\x06 \x03(\v2\x0e.agent.v1.ToolR\x05tools\x12\x1f\n" +
+	"\bprovider\x18\a \x01(\tH\x03R\bprovider\x88\x01\x01B\x0e\n" +
 	"\f_temperatureB\r\n" +
 	"\v_max_tokensB\x10\n" +
-	"\x0e_system_prompt\"\x98\x02\n" +
+	"\x0e_system_promptB\v\n" +
+	"\t_provider\"\x98\x02\n" +
 	"\x10CompleteResponse\x12\x0e\n" +
 	"\x02id\x18\x01 \x01(\tR\x02id\x12\x14\n" +
 	"\x05model\x18\x02 \x01(\tR\x05model\x12/\n" +
@@ -1402,7 +1420,7 @@ const file_agent_v1_gateway_proto_rawDesc = "" +
 	"\x11completion_tokens\x18\x05 \x01(\x05R\x10completionTokens\x126\n" +
 	"\n" +
 	"tool_calls\x18\x06 \x03(\v2\x17.agent.v1.ToolCallEntryR\ttoolCalls\x12#\n" +
-	"\rfinish_reason\x18\a \x01(\tR\ffinishReason\"\xac\x02\n" +
+	"\rfinish_reason\x18\a \x01(\tR\ffinishReason\"\xda\x02\n" +
 	"\x15StreamCompleteRequest\x12\x14\n" +
 	"\x05model\x18\x01 \x01(\tR\x05model\x121\n" +
 	"\bmessages\x18\x02 \x03(\v2\x15.agent.v1.ChatMessageR\bmessages\x12%\n" +
@@ -1410,10 +1428,12 @@ const file_agent_v1_gateway_proto_rawDesc = "" +
 	"\n" +
 	"max_tokens\x18\x04 \x01(\x05H\x01R\tmaxTokens\x88\x01\x01\x12(\n" +
 	"\rsystem_prompt\x18\x05 \x01(\tH\x02R\fsystemPrompt\x88\x01\x01\x12$\n" +
-	"\x05tools\x18\x06 \x03(\v2\x0e.agent.v1.ToolR\x05toolsB\x0e\n" +
+	"\x05tools\x18\x06 \x03(\v2\x0e.agent.v1.ToolR\x05tools\x12\x1f\n" +
+	"\bprovider\x18\a \x01(\tH\x03R\bprovider\x88\x01\x01B\x0e\n" +
 	"\f_temperatureB\r\n" +
 	"\v_max_tokensB\x10\n" +
-	"\x0e_system_prompt\"\x9f\x02\n" +
+	"\x0e_system_promptB\v\n" +
+	"\t_provider\"\x9f\x02\n" +
 	"\x16StreamCompleteResponse\x12\x0e\n" +
 	"\x02id\x18\x01 \x01(\tR\x02id\x12\x14\n" +
 	"\x05delta\x18\x02 \x01(\tR\x05delta\x12\x12\n" +
