@@ -73,46 +73,76 @@ The **TUI** is written in TypeScript and contains the agent brain — the execut
 
 ---
 
-## Get started
+## Installation
 
-### Prerequisites
-
-Kraken requires a modern development environment with support for three language runtimes. The setup script automates most of the installation, but the following tools must be available on your system:
-
-- [Bun](https://bun.sh) 1.3.10+ (TypeScript runtime and package manager)
-- [Go](https://go.dev) 1.26+ (gateway compilation)
-- [Rust](https://rustup.rs) with the 2024 edition (scheduler compilation)
-- [Buf CLI](https://buf.build/docs/installation) (protobuf code generation)
-
-### Quick setup
+### Quick install (macOS / Linux)
 
 ```bash
-git clone https://github.com/valentin-galfre/kraken.git
+curl -fsSL https://raw.githubusercontent.com/galfrevn/kraken/main/scripts/install.sh | bash
+```
+
+This will detect your platform, download pre-built binaries (if a release exists), or clone and build from source. It also installs Bun if it's missing and adds `kraken` to your PATH.
+
+### Windows (PowerShell)
+
+Kraken doesn't have a one-liner installer for Windows yet. Install from source:
+
+```powershell
+git clone https://github.com/galfrevn/kraken.git
 cd kraken
-bash scripts/setup.sh
+powershell -ExecutionPolicy Bypass -File scripts/setup/powershell.ps1
 ```
 
-The setup script installs all workspace dependencies, generates TypeScript and Go code from the protobuf definitions, compiles the Rust scheduler and Go gateway, and links the CLI binary so that `kraken` is available globally.
+### From source (all platforms)
 
-### Manual setup
+If you prefer to build everything yourself:
 
-For more control over the build process, each step can be run individually:
+#### Prerequisites
+
+- [Bun](https://bun.sh) 1.3.10+
+- [Go](https://go.dev) 1.26+
+- [Rust](https://rustup.rs) (stable, edition 2024)
+- [Buf CLI](https://buf.build/docs/installation) for protobuf generation
+- [protoc](https://grpc.io/docs/protoc-installation/) for proto compilation
+
+#### macOS / Linux
 
 ```bash
-# Install dependencies
-bun install
-
-# Generate protobuf code
-bun run generate
-
-# Build all services
-bun run build
-
-# Start in dev mode
-bun run dev
+git clone https://github.com/galfrevn/kraken.git
+cd kraken
+bash scripts/setup/bash.sh
 ```
 
-### Configuration
+#### Windows
+
+```powershell
+git clone https://github.com/galfrevn/kraken.git
+cd kraken
+powershell -ExecutionPolicy Bypass -File scripts/setup/powershell.ps1
+```
+
+#### Manual setup
+
+For more control over the build process:
+
+```bash
+bun install             # Install dependencies
+bun run generate        # Generate protobuf code
+bun run build           # Build all services
+bun run dev             # Start in dev mode
+```
+
+### Verify installation
+
+```bash
+kraken version          # Print version
+kraken doctor           # Check system health
+kraken init             # Initialize in a project
+```
+
+---
+
+## Configuration
 
 Kraken uses a layered configuration system that merges values from multiple sources. Environment variables defined in `~/.kraken/.env` are loaded first, followed by the main configuration file at `~/.kraken/kraken.yml`, and finally any runtime environment variable overrides. This design allows sensitive values like API keys to be stored outside the repository while keeping project-specific settings in a version-controlled YAML file.
 
