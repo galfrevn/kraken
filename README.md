@@ -83,15 +83,13 @@ curl -fsSL https://raw.githubusercontent.com/galfrevn/kraken/main/scripts/instal
 
 This will detect your platform, download pre-built binaries (if a release exists), or clone and build from source. It also installs Bun if it's missing and adds `kraken` to your PATH.
 
-### Windows (PowerShell)
-
-Kraken doesn't have a one-liner installer for Windows yet. Install from source:
+### Quick install (Windows — PowerShell)
 
 ```powershell
-git clone https://github.com/galfrevn/kraken.git
-cd kraken
-powershell -ExecutionPolicy Bypass -File scripts/setup/powershell.ps1
+irm https://raw.githubusercontent.com/galfrevn/kraken/main/scripts/install.ps1 | iex
 ```
+
+Same behavior as the bash installer: downloads pre-built binaries if available, otherwise clones and builds from source. Installs Bun if missing and adds `kraken` to your PATH.
 
 ### From source (all platforms)
 
