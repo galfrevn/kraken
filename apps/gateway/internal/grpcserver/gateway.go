@@ -322,6 +322,17 @@ func (s *GatewayServer) RegisterWebhook(
 	}), nil
 }
 
+func (s *GatewayServer) UnregisterWebhook(
+	ctx context.Context,
+	req *connect.Request[agentv1.UnregisterWebhookRequest],
+) (*connect.Response[agentv1.UnregisterWebhookResponse], error) {
+	if s.webhookStore.Unregister(req.Msg.WebhookId) {
+		s.logger.Info("webhook unregistered", "webhook_id", req.Msg.WebhookId)
+		return connect.NewResponse(&agentv1.UnregisterWebhookResponse{}), nil
+	}
+	return nil, connect.NewError(connect.CodeNotFound, fmt.Errorf("webhook not found: %s", req.Msg.WebhookId))
+}
+
 func (s *GatewayServer) ListWebhooks(
 	ctx context.Context,
 	req *connect.Request[agentv1.ListWebhooksRequest],

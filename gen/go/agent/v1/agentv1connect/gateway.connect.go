@@ -41,6 +41,9 @@ const (
 	// GatewayServiceRegisterWebhookProcedure is the fully-qualified name of the GatewayService's
 	// RegisterWebhook RPC.
 	GatewayServiceRegisterWebhookProcedure = "/agent.v1.GatewayService/RegisterWebhook"
+	// GatewayServiceUnregisterWebhookProcedure is the fully-qualified name of the GatewayService's
+	// UnregisterWebhook RPC.
+	GatewayServiceUnregisterWebhookProcedure = "/agent.v1.GatewayService/UnregisterWebhook"
 	// GatewayServiceListWebhooksProcedure is the fully-qualified name of the GatewayService's
 	// ListWebhooks RPC.
 	GatewayServiceListWebhooksProcedure = "/agent.v1.GatewayService/ListWebhooks"
@@ -57,6 +60,7 @@ type GatewayServiceClient interface {
 	Complete(context.Context, *connect.Request[v1.CompleteRequest]) (*connect.Response[v1.CompleteResponse], error)
 	StreamComplete(context.Context, *connect.Request[v1.StreamCompleteRequest]) (*connect.ServerStreamForClient[v1.StreamCompleteResponse], error)
 	RegisterWebhook(context.Context, *connect.Request[v1.RegisterWebhookRequest]) (*connect.Response[v1.RegisterWebhookResponse], error)
+	UnregisterWebhook(context.Context, *connect.Request[v1.UnregisterWebhookRequest]) (*connect.Response[v1.UnregisterWebhookResponse], error)
 	ListWebhooks(context.Context, *connect.Request[v1.ListWebhooksRequest]) (*connect.Response[v1.ListWebhooksResponse], error)
 	StreamWebhookEvents(context.Context, *connect.Request[v1.StreamWebhookEventsRequest]) (*connect.ServerStreamForClient[v1.StreamWebhookEventsResponse], error)
 	HealthCheck(context.Context, *connect.Request[v1.HealthCheckRequest]) (*connect.Response[v1.HealthCheckResponse], error)
@@ -91,6 +95,12 @@ func NewGatewayServiceClient(httpClient connect.HTTPClient, baseURL string, opts
 			connect.WithSchema(gatewayServiceMethods.ByName("RegisterWebhook")),
 			connect.WithClientOptions(opts...),
 		),
+		unregisterWebhook: connect.NewClient[v1.UnregisterWebhookRequest, v1.UnregisterWebhookResponse](
+			httpClient,
+			baseURL+GatewayServiceUnregisterWebhookProcedure,
+			connect.WithSchema(gatewayServiceMethods.ByName("UnregisterWebhook")),
+			connect.WithClientOptions(opts...),
+		),
 		listWebhooks: connect.NewClient[v1.ListWebhooksRequest, v1.ListWebhooksResponse](
 			httpClient,
 			baseURL+GatewayServiceListWebhooksProcedure,
@@ -117,6 +127,7 @@ type gatewayServiceClient struct {
 	complete            *connect.Client[v1.CompleteRequest, v1.CompleteResponse]
 	streamComplete      *connect.Client[v1.StreamCompleteRequest, v1.StreamCompleteResponse]
 	registerWebhook     *connect.Client[v1.RegisterWebhookRequest, v1.RegisterWebhookResponse]
+	unregisterWebhook   *connect.Client[v1.UnregisterWebhookRequest, v1.UnregisterWebhookResponse]
 	listWebhooks        *connect.Client[v1.ListWebhooksRequest, v1.ListWebhooksResponse]
 	streamWebhookEvents *connect.Client[v1.StreamWebhookEventsRequest, v1.StreamWebhookEventsResponse]
 	healthCheck         *connect.Client[v1.HealthCheckRequest, v1.HealthCheckResponse]
@@ -135,6 +146,11 @@ func (c *gatewayServiceClient) StreamComplete(ctx context.Context, req *connect.
 // RegisterWebhook calls agent.v1.GatewayService.RegisterWebhook.
 func (c *gatewayServiceClient) RegisterWebhook(ctx context.Context, req *connect.Request[v1.RegisterWebhookRequest]) (*connect.Response[v1.RegisterWebhookResponse], error) {
 	return c.registerWebhook.CallUnary(ctx, req)
+}
+
+// UnregisterWebhook calls agent.v1.GatewayService.UnregisterWebhook.
+func (c *gatewayServiceClient) UnregisterWebhook(ctx context.Context, req *connect.Request[v1.UnregisterWebhookRequest]) (*connect.Response[v1.UnregisterWebhookResponse], error) {
+	return c.unregisterWebhook.CallUnary(ctx, req)
 }
 
 // ListWebhooks calls agent.v1.GatewayService.ListWebhooks.
@@ -157,6 +173,7 @@ type GatewayServiceHandler interface {
 	Complete(context.Context, *connect.Request[v1.CompleteRequest]) (*connect.Response[v1.CompleteResponse], error)
 	StreamComplete(context.Context, *connect.Request[v1.StreamCompleteRequest], *connect.ServerStream[v1.StreamCompleteResponse]) error
 	RegisterWebhook(context.Context, *connect.Request[v1.RegisterWebhookRequest]) (*connect.Response[v1.RegisterWebhookResponse], error)
+	UnregisterWebhook(context.Context, *connect.Request[v1.UnregisterWebhookRequest]) (*connect.Response[v1.UnregisterWebhookResponse], error)
 	ListWebhooks(context.Context, *connect.Request[v1.ListWebhooksRequest]) (*connect.Response[v1.ListWebhooksResponse], error)
 	StreamWebhookEvents(context.Context, *connect.Request[v1.StreamWebhookEventsRequest], *connect.ServerStream[v1.StreamWebhookEventsResponse]) error
 	HealthCheck(context.Context, *connect.Request[v1.HealthCheckRequest]) (*connect.Response[v1.HealthCheckResponse], error)
@@ -187,6 +204,12 @@ func NewGatewayServiceHandler(svc GatewayServiceHandler, opts ...connect.Handler
 		connect.WithSchema(gatewayServiceMethods.ByName("RegisterWebhook")),
 		connect.WithHandlerOptions(opts...),
 	)
+	gatewayServiceUnregisterWebhookHandler := connect.NewUnaryHandler(
+		GatewayServiceUnregisterWebhookProcedure,
+		svc.UnregisterWebhook,
+		connect.WithSchema(gatewayServiceMethods.ByName("UnregisterWebhook")),
+		connect.WithHandlerOptions(opts...),
+	)
 	gatewayServiceListWebhooksHandler := connect.NewUnaryHandler(
 		GatewayServiceListWebhooksProcedure,
 		svc.ListWebhooks,
@@ -213,6 +236,8 @@ func NewGatewayServiceHandler(svc GatewayServiceHandler, opts ...connect.Handler
 			gatewayServiceStreamCompleteHandler.ServeHTTP(w, r)
 		case GatewayServiceRegisterWebhookProcedure:
 			gatewayServiceRegisterWebhookHandler.ServeHTTP(w, r)
+		case GatewayServiceUnregisterWebhookProcedure:
+			gatewayServiceUnregisterWebhookHandler.ServeHTTP(w, r)
 		case GatewayServiceListWebhooksProcedure:
 			gatewayServiceListWebhooksHandler.ServeHTTP(w, r)
 		case GatewayServiceStreamWebhookEventsProcedure:
@@ -238,6 +263,10 @@ func (UnimplementedGatewayServiceHandler) StreamComplete(context.Context, *conne
 
 func (UnimplementedGatewayServiceHandler) RegisterWebhook(context.Context, *connect.Request[v1.RegisterWebhookRequest]) (*connect.Response[v1.RegisterWebhookResponse], error) {
 	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("agent.v1.GatewayService.RegisterWebhook is not implemented"))
+}
+
+func (UnimplementedGatewayServiceHandler) UnregisterWebhook(context.Context, *connect.Request[v1.UnregisterWebhookRequest]) (*connect.Response[v1.UnregisterWebhookResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("agent.v1.GatewayService.UnregisterWebhook is not implemented"))
 }
 
 func (UnimplementedGatewayServiceHandler) ListWebhooks(context.Context, *connect.Request[v1.ListWebhooksRequest]) (*connect.Response[v1.ListWebhooksResponse], error) {

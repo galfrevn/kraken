@@ -861,6 +861,86 @@ func (x *RegisterWebhookResponse) GetEndpointUrl() string {
 	return ""
 }
 
+type UnregisterWebhookRequest struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	WebhookId     string                 `protobuf:"bytes,1,opt,name=webhook_id,json=webhookId,proto3" json:"webhook_id,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *UnregisterWebhookRequest) Reset() {
+	*x = UnregisterWebhookRequest{}
+	mi := &file_agent_v1_gateway_proto_msgTypes[12]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *UnregisterWebhookRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*UnregisterWebhookRequest) ProtoMessage() {}
+
+func (x *UnregisterWebhookRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_agent_v1_gateway_proto_msgTypes[12]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use UnregisterWebhookRequest.ProtoReflect.Descriptor instead.
+func (*UnregisterWebhookRequest) Descriptor() ([]byte, []int) {
+	return file_agent_v1_gateway_proto_rawDescGZIP(), []int{12}
+}
+
+func (x *UnregisterWebhookRequest) GetWebhookId() string {
+	if x != nil {
+		return x.WebhookId
+	}
+	return ""
+}
+
+type UnregisterWebhookResponse struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *UnregisterWebhookResponse) Reset() {
+	*x = UnregisterWebhookResponse{}
+	mi := &file_agent_v1_gateway_proto_msgTypes[13]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *UnregisterWebhookResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*UnregisterWebhookResponse) ProtoMessage() {}
+
+func (x *UnregisterWebhookResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_agent_v1_gateway_proto_msgTypes[13]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use UnregisterWebhookResponse.ProtoReflect.Descriptor instead.
+func (*UnregisterWebhookResponse) Descriptor() ([]byte, []int) {
+	return file_agent_v1_gateway_proto_rawDescGZIP(), []int{13}
+}
+
 type ListWebhooksRequest struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	unknownFields protoimpl.UnknownFields
@@ -869,7 +949,7 @@ type ListWebhooksRequest struct {
 
 func (x *ListWebhooksRequest) Reset() {
 	*x = ListWebhooksRequest{}
-	mi := &file_agent_v1_gateway_proto_msgTypes[12]
+	mi := &file_agent_v1_gateway_proto_msgTypes[14]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -881,7 +961,7 @@ func (x *ListWebhooksRequest) String() string {
 func (*ListWebhooksRequest) ProtoMessage() {}
 
 func (x *ListWebhooksRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_agent_v1_gateway_proto_msgTypes[12]
+	mi := &file_agent_v1_gateway_proto_msgTypes[14]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -894,7 +974,7 @@ func (x *ListWebhooksRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ListWebhooksRequest.ProtoReflect.Descriptor instead.
 func (*ListWebhooksRequest) Descriptor() ([]byte, []int) {
-	return file_agent_v1_gateway_proto_rawDescGZIP(), []int{12}
+	return file_agent_v1_gateway_proto_rawDescGZIP(), []int{14}
 }
 
 type WebhookEntry struct {
@@ -910,7 +990,7 @@ type WebhookEntry struct {
 
 func (x *WebhookEntry) Reset() {
 	*x = WebhookEntry{}
-	mi := &file_agent_v1_gateway_proto_msgTypes[13]
+	mi := &file_agent_v1_gateway_proto_msgTypes[15]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -922,7 +1002,7 @@ func (x *WebhookEntry) String() string {
 func (*WebhookEntry) ProtoMessage() {}
 
 func (x *WebhookEntry) ProtoReflect() protoreflect.Message {
-	mi := &file_agent_v1_gateway_proto_msgTypes[13]
+	mi := &file_agent_v1_gateway_proto_msgTypes[15]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -935,7 +1015,7 @@ func (x *WebhookEntry) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use WebhookEntry.ProtoReflect.Descriptor instead.
 func (*WebhookEntry) Descriptor() ([]byte, []int) {
-	return file_agent_v1_gateway_proto_rawDescGZIP(), []int{13}
+	return file_agent_v1_gateway_proto_rawDescGZIP(), []int{15}
 }
 
 func (x *WebhookEntry) GetWebhookId() string {
@@ -982,7 +1062,7 @@ type ListWebhooksResponse struct {
 
 func (x *ListWebhooksResponse) Reset() {
 	*x = ListWebhooksResponse{}
-	mi := &file_agent_v1_gateway_proto_msgTypes[14]
+	mi := &file_agent_v1_gateway_proto_msgTypes[16]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -994,7 +1074,7 @@ func (x *ListWebhooksResponse) String() string {
 func (*ListWebhooksResponse) ProtoMessage() {}
 
 func (x *ListWebhooksResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_agent_v1_gateway_proto_msgTypes[14]
+	mi := &file_agent_v1_gateway_proto_msgTypes[16]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1007,7 +1087,7 @@ func (x *ListWebhooksResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ListWebhooksResponse.ProtoReflect.Descriptor instead.
 func (*ListWebhooksResponse) Descriptor() ([]byte, []int) {
-	return file_agent_v1_gateway_proto_rawDescGZIP(), []int{14}
+	return file_agent_v1_gateway_proto_rawDescGZIP(), []int{16}
 }
 
 func (x *ListWebhooksResponse) GetWebhooks() []*WebhookEntry {
@@ -1030,7 +1110,7 @@ type WebhookEvent struct {
 
 func (x *WebhookEvent) Reset() {
 	*x = WebhookEvent{}
-	mi := &file_agent_v1_gateway_proto_msgTypes[15]
+	mi := &file_agent_v1_gateway_proto_msgTypes[17]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1042,7 +1122,7 @@ func (x *WebhookEvent) String() string {
 func (*WebhookEvent) ProtoMessage() {}
 
 func (x *WebhookEvent) ProtoReflect() protoreflect.Message {
-	mi := &file_agent_v1_gateway_proto_msgTypes[15]
+	mi := &file_agent_v1_gateway_proto_msgTypes[17]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1055,7 +1135,7 @@ func (x *WebhookEvent) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use WebhookEvent.ProtoReflect.Descriptor instead.
 func (*WebhookEvent) Descriptor() ([]byte, []int) {
-	return file_agent_v1_gateway_proto_rawDescGZIP(), []int{15}
+	return file_agent_v1_gateway_proto_rawDescGZIP(), []int{17}
 }
 
 func (x *WebhookEvent) GetWebhookId() string {
@@ -1101,7 +1181,7 @@ type StreamWebhookEventsRequest struct {
 
 func (x *StreamWebhookEventsRequest) Reset() {
 	*x = StreamWebhookEventsRequest{}
-	mi := &file_agent_v1_gateway_proto_msgTypes[16]
+	mi := &file_agent_v1_gateway_proto_msgTypes[18]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1113,7 +1193,7 @@ func (x *StreamWebhookEventsRequest) String() string {
 func (*StreamWebhookEventsRequest) ProtoMessage() {}
 
 func (x *StreamWebhookEventsRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_agent_v1_gateway_proto_msgTypes[16]
+	mi := &file_agent_v1_gateway_proto_msgTypes[18]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1126,7 +1206,7 @@ func (x *StreamWebhookEventsRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use StreamWebhookEventsRequest.ProtoReflect.Descriptor instead.
 func (*StreamWebhookEventsRequest) Descriptor() ([]byte, []int) {
-	return file_agent_v1_gateway_proto_rawDescGZIP(), []int{16}
+	return file_agent_v1_gateway_proto_rawDescGZIP(), []int{18}
 }
 
 type StreamWebhookEventsResponse struct {
@@ -1138,7 +1218,7 @@ type StreamWebhookEventsResponse struct {
 
 func (x *StreamWebhookEventsResponse) Reset() {
 	*x = StreamWebhookEventsResponse{}
-	mi := &file_agent_v1_gateway_proto_msgTypes[17]
+	mi := &file_agent_v1_gateway_proto_msgTypes[19]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1150,7 +1230,7 @@ func (x *StreamWebhookEventsResponse) String() string {
 func (*StreamWebhookEventsResponse) ProtoMessage() {}
 
 func (x *StreamWebhookEventsResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_agent_v1_gateway_proto_msgTypes[17]
+	mi := &file_agent_v1_gateway_proto_msgTypes[19]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1163,7 +1243,7 @@ func (x *StreamWebhookEventsResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use StreamWebhookEventsResponse.ProtoReflect.Descriptor instead.
 func (*StreamWebhookEventsResponse) Descriptor() ([]byte, []int) {
-	return file_agent_v1_gateway_proto_rawDescGZIP(), []int{17}
+	return file_agent_v1_gateway_proto_rawDescGZIP(), []int{19}
 }
 
 func (x *StreamWebhookEventsResponse) GetEvent() *WebhookEvent {
@@ -1181,7 +1261,7 @@ type HealthCheckRequest struct {
 
 func (x *HealthCheckRequest) Reset() {
 	*x = HealthCheckRequest{}
-	mi := &file_agent_v1_gateway_proto_msgTypes[18]
+	mi := &file_agent_v1_gateway_proto_msgTypes[20]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1193,7 +1273,7 @@ func (x *HealthCheckRequest) String() string {
 func (*HealthCheckRequest) ProtoMessage() {}
 
 func (x *HealthCheckRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_agent_v1_gateway_proto_msgTypes[18]
+	mi := &file_agent_v1_gateway_proto_msgTypes[20]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1206,7 +1286,7 @@ func (x *HealthCheckRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use HealthCheckRequest.ProtoReflect.Descriptor instead.
 func (*HealthCheckRequest) Descriptor() ([]byte, []int) {
-	return file_agent_v1_gateway_proto_rawDescGZIP(), []int{18}
+	return file_agent_v1_gateway_proto_rawDescGZIP(), []int{20}
 }
 
 type HealthCheckResponse struct {
@@ -1220,7 +1300,7 @@ type HealthCheckResponse struct {
 
 func (x *HealthCheckResponse) Reset() {
 	*x = HealthCheckResponse{}
-	mi := &file_agent_v1_gateway_proto_msgTypes[19]
+	mi := &file_agent_v1_gateway_proto_msgTypes[21]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1232,7 +1312,7 @@ func (x *HealthCheckResponse) String() string {
 func (*HealthCheckResponse) ProtoMessage() {}
 
 func (x *HealthCheckResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_agent_v1_gateway_proto_msgTypes[19]
+	mi := &file_agent_v1_gateway_proto_msgTypes[21]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1245,7 +1325,7 @@ func (x *HealthCheckResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use HealthCheckResponse.ProtoReflect.Descriptor instead.
 func (*HealthCheckResponse) Descriptor() ([]byte, []int) {
-	return file_agent_v1_gateway_proto_rawDescGZIP(), []int{19}
+	return file_agent_v1_gateway_proto_rawDescGZIP(), []int{21}
 }
 
 func (x *HealthCheckResponse) GetHealthy() bool {
@@ -1352,7 +1432,11 @@ const file_agent_v1_gateway_proto_rawDesc = "" +
 	"\x17RegisterWebhookResponse\x12\x1d\n" +
 	"\n" +
 	"webhook_id\x18\x01 \x01(\tR\twebhookId\x12!\n" +
-	"\fendpoint_url\x18\x02 \x01(\tR\vendpointUrl\"\x15\n" +
+	"\fendpoint_url\x18\x02 \x01(\tR\vendpointUrl\"9\n" +
+	"\x18UnregisterWebhookRequest\x12\x1d\n" +
+	"\n" +
+	"webhook_id\x18\x01 \x01(\tR\twebhookId\"\x1b\n" +
+	"\x19UnregisterWebhookResponse\"\x15\n" +
 	"\x13ListWebhooksRequest\"\x98\x01\n" +
 	"\fWebhookEntry\x12\x1d\n" +
 	"\n" +
@@ -1384,11 +1468,12 @@ const file_agent_v1_gateway_proto_rawDesc = "" +
 	"\bservices\x18\x03 \x03(\v2+.agent.v1.HealthCheckResponse.ServicesEntryR\bservices\x1a;\n" +
 	"\rServicesEntry\x12\x10\n" +
 	"\x03key\x18\x01 \x01(\tR\x03key\x12\x14\n" +
-	"\x05value\x18\x02 \x01(\bR\x05value:\x028\x012\x83\x04\n" +
+	"\x05value\x18\x02 \x01(\bR\x05value:\x028\x012\xe1\x04\n" +
 	"\x0eGatewayService\x12A\n" +
 	"\bComplete\x12\x19.agent.v1.CompleteRequest\x1a\x1a.agent.v1.CompleteResponse\x12U\n" +
 	"\x0eStreamComplete\x12\x1f.agent.v1.StreamCompleteRequest\x1a .agent.v1.StreamCompleteResponse0\x01\x12V\n" +
-	"\x0fRegisterWebhook\x12 .agent.v1.RegisterWebhookRequest\x1a!.agent.v1.RegisterWebhookResponse\x12M\n" +
+	"\x0fRegisterWebhook\x12 .agent.v1.RegisterWebhookRequest\x1a!.agent.v1.RegisterWebhookResponse\x12\\\n" +
+	"\x11UnregisterWebhook\x12\".agent.v1.UnregisterWebhookRequest\x1a#.agent.v1.UnregisterWebhookResponse\x12M\n" +
 	"\fListWebhooks\x12\x1d.agent.v1.ListWebhooksRequest\x1a\x1e.agent.v1.ListWebhooksResponse\x12d\n" +
 	"\x13StreamWebhookEvents\x12$.agent.v1.StreamWebhookEventsRequest\x1a%.agent.v1.StreamWebhookEventsResponse0\x01\x12J\n" +
 	"\vHealthCheck\x12\x1c.agent.v1.HealthCheckRequest\x1a\x1d.agent.v1.HealthCheckResponseB}\n" +
@@ -1406,7 +1491,7 @@ func file_agent_v1_gateway_proto_rawDescGZIP() []byte {
 	return file_agent_v1_gateway_proto_rawDescData
 }
 
-var file_agent_v1_gateway_proto_msgTypes = make([]protoimpl.MessageInfo, 22)
+var file_agent_v1_gateway_proto_msgTypes = make([]protoimpl.MessageInfo, 24)
 var file_agent_v1_gateway_proto_goTypes = []any{
 	(*ToolParameter)(nil),               // 0: agent.v1.ToolParameter
 	(*ToolFunction)(nil),                // 1: agent.v1.ToolFunction
@@ -1420,16 +1505,18 @@ var file_agent_v1_gateway_proto_goTypes = []any{
 	(*StreamCompleteResponse)(nil),      // 9: agent.v1.StreamCompleteResponse
 	(*RegisterWebhookRequest)(nil),      // 10: agent.v1.RegisterWebhookRequest
 	(*RegisterWebhookResponse)(nil),     // 11: agent.v1.RegisterWebhookResponse
-	(*ListWebhooksRequest)(nil),         // 12: agent.v1.ListWebhooksRequest
-	(*WebhookEntry)(nil),                // 13: agent.v1.WebhookEntry
-	(*ListWebhooksResponse)(nil),        // 14: agent.v1.ListWebhooksResponse
-	(*WebhookEvent)(nil),                // 15: agent.v1.WebhookEvent
-	(*StreamWebhookEventsRequest)(nil),  // 16: agent.v1.StreamWebhookEventsRequest
-	(*StreamWebhookEventsResponse)(nil), // 17: agent.v1.StreamWebhookEventsResponse
-	(*HealthCheckRequest)(nil),          // 18: agent.v1.HealthCheckRequest
-	(*HealthCheckResponse)(nil),         // 19: agent.v1.HealthCheckResponse
-	nil,                                 // 20: agent.v1.WebhookEvent.HeadersEntry
-	nil,                                 // 21: agent.v1.HealthCheckResponse.ServicesEntry
+	(*UnregisterWebhookRequest)(nil),    // 12: agent.v1.UnregisterWebhookRequest
+	(*UnregisterWebhookResponse)(nil),   // 13: agent.v1.UnregisterWebhookResponse
+	(*ListWebhooksRequest)(nil),         // 14: agent.v1.ListWebhooksRequest
+	(*WebhookEntry)(nil),                // 15: agent.v1.WebhookEntry
+	(*ListWebhooksResponse)(nil),        // 16: agent.v1.ListWebhooksResponse
+	(*WebhookEvent)(nil),                // 17: agent.v1.WebhookEvent
+	(*StreamWebhookEventsRequest)(nil),  // 18: agent.v1.StreamWebhookEventsRequest
+	(*StreamWebhookEventsResponse)(nil), // 19: agent.v1.StreamWebhookEventsResponse
+	(*HealthCheckRequest)(nil),          // 20: agent.v1.HealthCheckRequest
+	(*HealthCheckResponse)(nil),         // 21: agent.v1.HealthCheckResponse
+	nil,                                 // 22: agent.v1.WebhookEvent.HeadersEntry
+	nil,                                 // 23: agent.v1.HealthCheckResponse.ServicesEntry
 }
 var file_agent_v1_gateway_proto_depIdxs = []int32{
 	0,  // 0: agent.v1.ToolFunction.parameters:type_name -> agent.v1.ToolParameter
@@ -1443,24 +1530,26 @@ var file_agent_v1_gateway_proto_depIdxs = []int32{
 	5,  // 8: agent.v1.StreamCompleteRequest.messages:type_name -> agent.v1.ChatMessage
 	2,  // 9: agent.v1.StreamCompleteRequest.tools:type_name -> agent.v1.Tool
 	4,  // 10: agent.v1.StreamCompleteResponse.tool_calls:type_name -> agent.v1.ToolCallEntry
-	13, // 11: agent.v1.ListWebhooksResponse.webhooks:type_name -> agent.v1.WebhookEntry
-	20, // 12: agent.v1.WebhookEvent.headers:type_name -> agent.v1.WebhookEvent.HeadersEntry
-	15, // 13: agent.v1.StreamWebhookEventsResponse.event:type_name -> agent.v1.WebhookEvent
-	21, // 14: agent.v1.HealthCheckResponse.services:type_name -> agent.v1.HealthCheckResponse.ServicesEntry
+	15, // 11: agent.v1.ListWebhooksResponse.webhooks:type_name -> agent.v1.WebhookEntry
+	22, // 12: agent.v1.WebhookEvent.headers:type_name -> agent.v1.WebhookEvent.HeadersEntry
+	17, // 13: agent.v1.StreamWebhookEventsResponse.event:type_name -> agent.v1.WebhookEvent
+	23, // 14: agent.v1.HealthCheckResponse.services:type_name -> agent.v1.HealthCheckResponse.ServicesEntry
 	6,  // 15: agent.v1.GatewayService.Complete:input_type -> agent.v1.CompleteRequest
 	8,  // 16: agent.v1.GatewayService.StreamComplete:input_type -> agent.v1.StreamCompleteRequest
 	10, // 17: agent.v1.GatewayService.RegisterWebhook:input_type -> agent.v1.RegisterWebhookRequest
-	12, // 18: agent.v1.GatewayService.ListWebhooks:input_type -> agent.v1.ListWebhooksRequest
-	16, // 19: agent.v1.GatewayService.StreamWebhookEvents:input_type -> agent.v1.StreamWebhookEventsRequest
-	18, // 20: agent.v1.GatewayService.HealthCheck:input_type -> agent.v1.HealthCheckRequest
-	7,  // 21: agent.v1.GatewayService.Complete:output_type -> agent.v1.CompleteResponse
-	9,  // 22: agent.v1.GatewayService.StreamComplete:output_type -> agent.v1.StreamCompleteResponse
-	11, // 23: agent.v1.GatewayService.RegisterWebhook:output_type -> agent.v1.RegisterWebhookResponse
-	14, // 24: agent.v1.GatewayService.ListWebhooks:output_type -> agent.v1.ListWebhooksResponse
-	17, // 25: agent.v1.GatewayService.StreamWebhookEvents:output_type -> agent.v1.StreamWebhookEventsResponse
-	19, // 26: agent.v1.GatewayService.HealthCheck:output_type -> agent.v1.HealthCheckResponse
-	21, // [21:27] is the sub-list for method output_type
-	15, // [15:21] is the sub-list for method input_type
+	12, // 18: agent.v1.GatewayService.UnregisterWebhook:input_type -> agent.v1.UnregisterWebhookRequest
+	14, // 19: agent.v1.GatewayService.ListWebhooks:input_type -> agent.v1.ListWebhooksRequest
+	18, // 20: agent.v1.GatewayService.StreamWebhookEvents:input_type -> agent.v1.StreamWebhookEventsRequest
+	20, // 21: agent.v1.GatewayService.HealthCheck:input_type -> agent.v1.HealthCheckRequest
+	7,  // 22: agent.v1.GatewayService.Complete:output_type -> agent.v1.CompleteResponse
+	9,  // 23: agent.v1.GatewayService.StreamComplete:output_type -> agent.v1.StreamCompleteResponse
+	11, // 24: agent.v1.GatewayService.RegisterWebhook:output_type -> agent.v1.RegisterWebhookResponse
+	13, // 25: agent.v1.GatewayService.UnregisterWebhook:output_type -> agent.v1.UnregisterWebhookResponse
+	16, // 26: agent.v1.GatewayService.ListWebhooks:output_type -> agent.v1.ListWebhooksResponse
+	19, // 27: agent.v1.GatewayService.StreamWebhookEvents:output_type -> agent.v1.StreamWebhookEventsResponse
+	21, // 28: agent.v1.GatewayService.HealthCheck:output_type -> agent.v1.HealthCheckResponse
+	22, // [22:29] is the sub-list for method output_type
+	15, // [15:22] is the sub-list for method input_type
 	15, // [15:15] is the sub-list for extension type_name
 	15, // [15:15] is the sub-list for extension extendee
 	0,  // [0:15] is the sub-list for field type_name
@@ -1480,7 +1569,7 @@ func file_agent_v1_gateway_proto_init() {
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_agent_v1_gateway_proto_rawDesc), len(file_agent_v1_gateway_proto_rawDesc)),
 			NumEnums:      0,
-			NumMessages:   22,
+			NumMessages:   24,
 			NumExtensions: 0,
 			NumServices:   1,
 		},

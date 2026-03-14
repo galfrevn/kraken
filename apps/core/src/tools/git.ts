@@ -4,6 +4,15 @@ import type { Tool, ToolResult, ToolExecutionContext } from "@/tools/schema.ts";
 const GIT_TIMEOUT_MILLISECONDS = 15_000;
 const IS_WINDOWS = process.platform === "win32";
 
+const SHELL_METACHARACTERS = /[;&|`$(){}><!\n\r]/;
+
+function sanitizeGitArg(value: string): string {
+  if (SHELL_METACHARACTERS.test(value)) {
+    throw new Error(`invalid characters in argument: ${value}`);
+  }
+  return value;
+}
+
 async function runGitCommand(
   args: string,
   workingDirectory: string,
@@ -85,7 +94,7 @@ export const gitDiffTool: Tool = {
 
     let command = "diff --stat --patch";
     if (staged) command += " --cached";
-    if (filePath) command += ` -- ${filePath}`;
+    if (filePath) command += ` -- ${sanitizeGitArg(filePath)}`;
 
     try {
       const result = await runGitCommand(command, context.workingDirectory);
@@ -140,14 +149,16 @@ export const gitCommitTool: Tool = {
     }
 
     try {
-      const addResult = await runGitCommand(`add ${files}`, context.workingDirectory);
+      const sanitizedFiles = files.split(/\s+/).map(sanitizeGitArg).join(" ");
+      const addResult = await runGitCommand(`add ${sanitizedFiles}`, context.workingDirectory);
       if (addResult.exitCode !== 0) {
         return { success: false, output: "", error: `git add failed: ${addResult.stderr}` };
       }
 
+      const sanitizedMessage = sanitizeGitArg(message);
       const escapedMessage = IS_WINDOWS
-        ? message.replace(/"/g, '\\"')
-        : message.replace(/'/g, "'\\''");
+        ? sanitizedMessage.replace(/"/g, '\\"')
+        : sanitizedMessage.replace(/'/g, "'\\''");
       const quotedMessage = IS_WINDOWS
         ? `commit -m "${escapedMessage}"`
         : `commit -m '${escapedMessage}'`;
@@ -193,7 +204,7 @@ export const gitLogTool: Tool = {
     const filePath = parameters["path"] as string | undefined;
 
     let command = `log --oneline --decorate -n ${count}`;
-    if (filePath) command += ` -- ${filePath}`;
+    if (filePath) command += ` -- ${sanitizeGitArg(filePath)}`;
 
     try {
       const result = await runGitCommand(command, context.workingDirectory);

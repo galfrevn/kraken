@@ -41,6 +41,16 @@ func (s *Store) Register(name, provider, secret string, events []string) *Regist
 	return reg
 }
 
+func (s *Store) Unregister(webhookID string) bool {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	_, exists := s.registrations[webhookID]
+	if exists {
+		delete(s.registrations, webhookID)
+	}
+	return exists
+}
+
 func (s *Store) Get(webhookID string) (*Registration, bool) {
 	s.mu.RLock()
 	defer s.mu.RUnlock()

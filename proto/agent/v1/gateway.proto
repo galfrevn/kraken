@@ -89,6 +89,12 @@ message RegisterWebhookResponse {
   string endpoint_url = 2;
 }
 
+message UnregisterWebhookRequest {
+  string webhook_id = 1;
+}
+
+message UnregisterWebhookResponse {}
+
 message ListWebhooksRequest {}
 
 message WebhookEntry {
@@ -129,6 +135,7 @@ service GatewayService {
   rpc Complete(CompleteRequest) returns (CompleteResponse);
   rpc StreamComplete(StreamCompleteRequest) returns (stream StreamCompleteResponse);
   rpc RegisterWebhook(RegisterWebhookRequest) returns (RegisterWebhookResponse);
+  rpc UnregisterWebhook(UnregisterWebhookRequest) returns (UnregisterWebhookResponse);
   rpc ListWebhooks(ListWebhooksRequest) returns (ListWebhooksResponse);
   rpc StreamWebhookEvents(StreamWebhookEventsRequest) returns (stream StreamWebhookEventsResponse);
   rpc HealthCheck(HealthCheckRequest) returns (HealthCheckResponse);

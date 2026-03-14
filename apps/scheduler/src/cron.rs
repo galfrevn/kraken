@@ -24,6 +24,7 @@ pub struct CronEngine {
     entries: Arc<DashMap<String, CronEntry>>,
     event_sender: broadcast::Sender<SchedulerEvent>,
     shutdown: tokio::sync::watch::Sender<bool>,
+    last_fired: Arc<DashMap<String, chrono::DateTime<Utc>>>,
 }
 
 impl CronEngine {
@@ -33,6 +34,7 @@ impl CronEngine {
             entries: Arc::new(DashMap::new()),
             event_sender,
             shutdown,
+            last_fired: Arc::new(DashMap::new()),
         }
     }
 
@@ -71,6 +73,7 @@ impl CronEngine {
     }
 
     pub fn unregister(&self, cron_id: &str) -> bool {
+        self.last_fired.remove(cron_id);
         self.entries.remove(cron_id).is_some()
     }
 
@@ -100,6 +103,7 @@ impl CronEngine {
     pub fn start(&self) {
         let entries = self.entries.clone();
         let sender = self.event_sender.clone();
+        let last_fired = self.last_fired.clone();
         let mut shutdown_rx = self.shutdown.subscribe();
 
         tokio::spawn(async move {
@@ -115,6 +119,14 @@ impl CronEngine {
                             if let Some(next) = entry.schedule.upcoming(Utc).next() {
                                 let diff = (next - now).num_seconds();
                                 if diff <= 0 {
+                                    let already_fired = last_fired
+                                        .get(&entry.id)
+                                        .is_some_and(|last| *last == next);
+                                    if already_fired {
+                                        continue;
+                                    }
+                                    last_fired.insert(entry.id.clone(), next);
+
                                     let payload = Struct {
                                         fields: entry.parameters.iter().map(|(k, v)| {
                                             (k.clone(), prost_types::Value {
