@@ -11,10 +11,8 @@ import type { Message } from "@bufbuild/protobuf";
 /**
  * Describes the file agent/v1/scheduler.proto.
  */
-export const file_agent_v1_scheduler: GenFile /*@__PURE__*/ = fileDesc(
-  "ChhhZ2VudC92MS9zY2hlZHVsZXIucHJvdG8SCGFnZW50LnYxIskBChNSZWdpc3RlckNyb25SZXF1ZXN0EgwKBG5hbWUYASABKAkSFwoPY3Jvbl9leHByZXNzaW9uGAIgASgJEhUKDXRhc2tfdGVtcGxhdGUYAyABKAkSQQoKcGFyYW1ldGVycxgEIAMoCzItLmFnZW50LnYxLlJlZ2lzdGVyQ3JvblJlcXVlc3QuUGFyYW1ldGVyc0VudHJ5GjEKD1BhcmFtZXRlcnNFbnRyeRILCgNrZXkYASABKAkSDQoFdmFsdWUYAiABKAk6AjgBIjkKFFJlZ2lzdGVyQ3JvblJlc3BvbnNlEg8KB2Nyb25faWQYASABKAkSEAoIbmV4dF9ydW4YAiABKAkiKAoVVW5yZWdpc3RlckNyb25SZXF1ZXN0Eg8KB2Nyb25faWQYASABKAkiGAoWVW5yZWdpc3RlckNyb25SZXNwb25zZSISChBMaXN0Q3JvbnNSZXF1ZXN0In0KCUNyb25FbnRyeRIPCgdjcm9uX2lkGAEgASgJEgwKBG5hbWUYAiABKAkSFwoPY3Jvbl9leHByZXNzaW9uGAMgASgJEhUKDXRhc2tfdGVtcGxhdGUYBCABKAkSEAoIbmV4dF9ydW4YBSABKAkSDwoHZW5hYmxlZBgGIAEoCCI3ChFMaXN0Q3JvbnNSZXNwb25zZRIiCgVjcm9ucxgBIAMoCzITLmFnZW50LnYxLkNyb25FbnRyeSJjChZSZWdpc3RlcldhdGNoZXJSZXF1ZXN0EgwKBG5hbWUYASABKAkSDQoFcGF0aHMYAiADKAkSFwoPaWdub3JlX3BhdHRlcm5zGAMgAygJEhMKC2RlYm91bmNlX21zGAQgASgNIi0KF1JlZ2lzdGVyV2F0Y2hlclJlc3BvbnNlEhIKCndhdGNoZXJfaWQYASABKAkiLgoYVW5yZWdpc3RlcldhdGNoZXJSZXF1ZXN0EhIKCndhdGNoZXJfaWQYASABKAkiGwoZVW5yZWdpc3RlcldhdGNoZXJSZXNwb25zZSIVChNMaXN0V2F0Y2hlcnNSZXF1ZXN0Im0KDFdhdGNoZXJFbnRyeRISCgp3YXRjaGVyX2lkGAEgASgJEgwKBG5hbWUYAiABKAkSDQoFcGF0aHMYAyADKAkSFwoPaWdub3JlX3BhdHRlcm5zGAQgAygJEhMKC2RlYm91bmNlX21zGAUgASgNIkAKFExpc3RXYXRjaGVyc1Jlc3BvbnNlEigKCHdhdGNoZXJzGAEgAygLMhYuYWdlbnQudjEuV2F0Y2hlckVudHJ5IhUKE1N0cmVhbUV2ZW50c1JlcXVlc3QiPwoUU3RyZWFtRXZlbnRzUmVzcG9uc2USJwoFZXZlbnQYASABKAsyGC5hZ2VudC52MS5TY2hlZHVsZXJFdmVudDLSBAoQU2NoZWR1bGVyU2VydmljZRJNCgxSZWdpc3RlckNyb24SHS5hZ2VudC52MS5SZWdpc3RlckNyb25SZXF1ZXN0Gh4uYWdlbnQudjEuUmVnaXN0ZXJDcm9uUmVzcG9uc2USUwoOVW5yZWdpc3RlckNyb24SHy5hZ2VudC52MS5VbnJlZ2lzdGVyQ3JvblJlcXVlc3QaIC5hZ2VudC52MS5VbnJlZ2lzdGVyQ3JvblJlc3BvbnNlEkQKCUxpc3RDcm9ucxIaLmFnZW50LnYxLkxpc3RDcm9uc1JlcXVlc3QaGy5hZ2VudC52MS5MaXN0Q3JvbnNSZXNwb25zZRJWCg9SZWdpc3RlcldhdGNoZXISIC5hZ2VudC52MS5SZWdpc3RlcldhdGNoZXJSZXF1ZXN0GiEuYWdlbnQudjEuUmVnaXN0ZXJXYXRjaGVyUmVzcG9uc2USXAoRVW5yZWdpc3RlcldhdGNoZXISIi5hZ2VudC52MS5VbnJlZ2lzdGVyV2F0Y2hlclJlcXVlc3QaIy5hZ2VudC52MS5VbnJlZ2lzdGVyV2F0Y2hlclJlc3BvbnNlEk0KDExpc3RXYXRjaGVycxIdLmFnZW50LnYxLkxpc3RXYXRjaGVyc1JlcXVlc3QaHi5hZ2VudC52MS5MaXN0V2F0Y2hlcnNSZXNwb25zZRJPCgxTdHJlYW1FdmVudHMSHS5hZ2VudC52MS5TdHJlYW1FdmVudHNSZXF1ZXN0Gh4uYWdlbnQudjEuU3RyZWFtRXZlbnRzUmVzcG9uc2UwAUJ/Cgxjb20uYWdlbnQudjFCDlNjaGVkdWxlclByb3RvUAFaHmtyYWtlbi9nZW4vZ28vYWdlbnQvdjE7YWdlbnR2MaICA0FYWKoCCEFnZW50LlYxygIIQWdlbnRcVjHiAhRBZ2VudFxWMVxHUEJNZXRhZGF0YeoCCUFnZW50OjpWMWIGcHJvdG8z",
-  [file_agent_v1_common],
-);
+export const file_agent_v1_scheduler: GenFile = /*@__PURE__*/
+  fileDesc("ChhhZ2VudC92MS9zY2hlZHVsZXIucHJvdG8SCGFnZW50LnYxIskBChNSZWdpc3RlckNyb25SZXF1ZXN0EgwKBG5hbWUYASABKAkSFwoPY3Jvbl9leHByZXNzaW9uGAIgASgJEhUKDXRhc2tfdGVtcGxhdGUYAyABKAkSQQoKcGFyYW1ldGVycxgEIAMoCzItLmFnZW50LnYxLlJlZ2lzdGVyQ3JvblJlcXVlc3QuUGFyYW1ldGVyc0VudHJ5GjEKD1BhcmFtZXRlcnNFbnRyeRILCgNrZXkYASABKAkSDQoFdmFsdWUYAiABKAk6AjgBIjkKFFJlZ2lzdGVyQ3JvblJlc3BvbnNlEg8KB2Nyb25faWQYASABKAkSEAoIbmV4dF9ydW4YAiABKAkiKAoVVW5yZWdpc3RlckNyb25SZXF1ZXN0Eg8KB2Nyb25faWQYASABKAkiGAoWVW5yZWdpc3RlckNyb25SZXNwb25zZSISChBMaXN0Q3JvbnNSZXF1ZXN0In0KCUNyb25FbnRyeRIPCgdjcm9uX2lkGAEgASgJEgwKBG5hbWUYAiABKAkSFwoPY3Jvbl9leHByZXNzaW9uGAMgASgJEhUKDXRhc2tfdGVtcGxhdGUYBCABKAkSEAoIbmV4dF9ydW4YBSABKAkSDwoHZW5hYmxlZBgGIAEoCCI3ChFMaXN0Q3JvbnNSZXNwb25zZRIiCgVjcm9ucxgBIAMoCzITLmFnZW50LnYxLkNyb25FbnRyeSJjChZSZWdpc3RlcldhdGNoZXJSZXF1ZXN0EgwKBG5hbWUYASABKAkSDQoFcGF0aHMYAiADKAkSFwoPaWdub3JlX3BhdHRlcm5zGAMgAygJEhMKC2RlYm91bmNlX21zGAQgASgNIi0KF1JlZ2lzdGVyV2F0Y2hlclJlc3BvbnNlEhIKCndhdGNoZXJfaWQYASABKAkiLgoYVW5yZWdpc3RlcldhdGNoZXJSZXF1ZXN0EhIKCndhdGNoZXJfaWQYASABKAkiGwoZVW5yZWdpc3RlcldhdGNoZXJSZXNwb25zZSIVChNMaXN0V2F0Y2hlcnNSZXF1ZXN0Im0KDFdhdGNoZXJFbnRyeRISCgp3YXRjaGVyX2lkGAEgASgJEgwKBG5hbWUYAiABKAkSDQoFcGF0aHMYAyADKAkSFwoPaWdub3JlX3BhdHRlcm5zGAQgAygJEhMKC2RlYm91bmNlX21zGAUgASgNIkAKFExpc3RXYXRjaGVyc1Jlc3BvbnNlEigKCHdhdGNoZXJzGAEgAygLMhYuYWdlbnQudjEuV2F0Y2hlckVudHJ5IhUKE1N0cmVhbUV2ZW50c1JlcXVlc3QiPwoUU3RyZWFtRXZlbnRzUmVzcG9uc2USJwoFZXZlbnQYASABKAsyGC5hZ2VudC52MS5TY2hlZHVsZXJFdmVudDLSBAoQU2NoZWR1bGVyU2VydmljZRJNCgxSZWdpc3RlckNyb24SHS5hZ2VudC52MS5SZWdpc3RlckNyb25SZXF1ZXN0Gh4uYWdlbnQudjEuUmVnaXN0ZXJDcm9uUmVzcG9uc2USUwoOVW5yZWdpc3RlckNyb24SHy5hZ2VudC52MS5VbnJlZ2lzdGVyQ3JvblJlcXVlc3QaIC5hZ2VudC52MS5VbnJlZ2lzdGVyQ3JvblJlc3BvbnNlEkQKCUxpc3RDcm9ucxIaLmFnZW50LnYxLkxpc3RDcm9uc1JlcXVlc3QaGy5hZ2VudC52MS5MaXN0Q3JvbnNSZXNwb25zZRJWCg9SZWdpc3RlcldhdGNoZXISIC5hZ2VudC52MS5SZWdpc3RlcldhdGNoZXJSZXF1ZXN0GiEuYWdlbnQudjEuUmVnaXN0ZXJXYXRjaGVyUmVzcG9uc2USXAoRVW5yZWdpc3RlcldhdGNoZXISIi5hZ2VudC52MS5VbnJlZ2lzdGVyV2F0Y2hlclJlcXVlc3QaIy5hZ2VudC52MS5VbnJlZ2lzdGVyV2F0Y2hlclJlc3BvbnNlEk0KDExpc3RXYXRjaGVycxIdLmFnZW50LnYxLkxpc3RXYXRjaGVyc1JlcXVlc3QaHi5hZ2VudC52MS5MaXN0V2F0Y2hlcnNSZXNwb25zZRJPCgxTdHJlYW1FdmVudHMSHS5hZ2VudC52MS5TdHJlYW1FdmVudHNSZXF1ZXN0Gh4uYWdlbnQudjEuU3RyZWFtRXZlbnRzUmVzcG9uc2UwAUJ/Cgxjb20uYWdlbnQudjFCDlNjaGVkdWxlclByb3RvUAFaHmtyYWtlbi9nZW4vZ28vYWdlbnQvdjE7YWdlbnR2MaICA0FYWKoCCEFnZW50LlYxygIIQWdlbnRcVjHiAhRBZ2VudFxWMVxHUEJNZXRhZGF0YeoCCUFnZW50OjpWMWIGcHJvdG8z", [file_agent_v1_common]);
 
 /**
  * @generated from message agent.v1.RegisterCronRequest
@@ -45,10 +43,8 @@ export type RegisterCronRequest = Message<"agent.v1.RegisterCronRequest"> & {
  * Describes the message agent.v1.RegisterCronRequest.
  * Use `create(RegisterCronRequestSchema)` to create a new message.
  */
-export const RegisterCronRequestSchema: GenMessage<RegisterCronRequest> /*@__PURE__*/ = messageDesc(
-  file_agent_v1_scheduler,
-  0,
-);
+export const RegisterCronRequestSchema: GenMessage<RegisterCronRequest> = /*@__PURE__*/
+  messageDesc(file_agent_v1_scheduler, 0);
 
 /**
  * @generated from message agent.v1.RegisterCronResponse
@@ -69,7 +65,7 @@ export type RegisterCronResponse = Message<"agent.v1.RegisterCronResponse"> & {
  * Describes the message agent.v1.RegisterCronResponse.
  * Use `create(RegisterCronResponseSchema)` to create a new message.
  */
-export const RegisterCronResponseSchema: GenMessage<RegisterCronResponse> /*@__PURE__*/ =
+export const RegisterCronResponseSchema: GenMessage<RegisterCronResponse> = /*@__PURE__*/
   messageDesc(file_agent_v1_scheduler, 1);
 
 /**
@@ -86,34 +82,34 @@ export type UnregisterCronRequest = Message<"agent.v1.UnregisterCronRequest"> & 
  * Describes the message agent.v1.UnregisterCronRequest.
  * Use `create(UnregisterCronRequestSchema)` to create a new message.
  */
-export const UnregisterCronRequestSchema: GenMessage<UnregisterCronRequest> /*@__PURE__*/ =
+export const UnregisterCronRequestSchema: GenMessage<UnregisterCronRequest> = /*@__PURE__*/
   messageDesc(file_agent_v1_scheduler, 2);
 
 /**
  * @generated from message agent.v1.UnregisterCronResponse
  */
-export type UnregisterCronResponse = Message<"agent.v1.UnregisterCronResponse"> & {};
+export type UnregisterCronResponse = Message<"agent.v1.UnregisterCronResponse"> & {
+};
 
 /**
  * Describes the message agent.v1.UnregisterCronResponse.
  * Use `create(UnregisterCronResponseSchema)` to create a new message.
  */
-export const UnregisterCronResponseSchema: GenMessage<UnregisterCronResponse> /*@__PURE__*/ =
+export const UnregisterCronResponseSchema: GenMessage<UnregisterCronResponse> = /*@__PURE__*/
   messageDesc(file_agent_v1_scheduler, 3);
 
 /**
  * @generated from message agent.v1.ListCronsRequest
  */
-export type ListCronsRequest = Message<"agent.v1.ListCronsRequest"> & {};
+export type ListCronsRequest = Message<"agent.v1.ListCronsRequest"> & {
+};
 
 /**
  * Describes the message agent.v1.ListCronsRequest.
  * Use `create(ListCronsRequestSchema)` to create a new message.
  */
-export const ListCronsRequestSchema: GenMessage<ListCronsRequest> /*@__PURE__*/ = messageDesc(
-  file_agent_v1_scheduler,
-  4,
-);
+export const ListCronsRequestSchema: GenMessage<ListCronsRequest> = /*@__PURE__*/
+  messageDesc(file_agent_v1_scheduler, 4);
 
 /**
  * @generated from message agent.v1.CronEntry
@@ -154,10 +150,8 @@ export type CronEntry = Message<"agent.v1.CronEntry"> & {
  * Describes the message agent.v1.CronEntry.
  * Use `create(CronEntrySchema)` to create a new message.
  */
-export const CronEntrySchema: GenMessage<CronEntry> /*@__PURE__*/ = messageDesc(
-  file_agent_v1_scheduler,
-  5,
-);
+export const CronEntrySchema: GenMessage<CronEntry> = /*@__PURE__*/
+  messageDesc(file_agent_v1_scheduler, 5);
 
 /**
  * @generated from message agent.v1.ListCronsResponse
@@ -173,10 +167,8 @@ export type ListCronsResponse = Message<"agent.v1.ListCronsResponse"> & {
  * Describes the message agent.v1.ListCronsResponse.
  * Use `create(ListCronsResponseSchema)` to create a new message.
  */
-export const ListCronsResponseSchema: GenMessage<ListCronsResponse> /*@__PURE__*/ = messageDesc(
-  file_agent_v1_scheduler,
-  6,
-);
+export const ListCronsResponseSchema: GenMessage<ListCronsResponse> = /*@__PURE__*/
+  messageDesc(file_agent_v1_scheduler, 6);
 
 /**
  * @generated from message agent.v1.RegisterWatcherRequest
@@ -207,7 +199,7 @@ export type RegisterWatcherRequest = Message<"agent.v1.RegisterWatcherRequest"> 
  * Describes the message agent.v1.RegisterWatcherRequest.
  * Use `create(RegisterWatcherRequestSchema)` to create a new message.
  */
-export const RegisterWatcherRequestSchema: GenMessage<RegisterWatcherRequest> /*@__PURE__*/ =
+export const RegisterWatcherRequestSchema: GenMessage<RegisterWatcherRequest> = /*@__PURE__*/
   messageDesc(file_agent_v1_scheduler, 7);
 
 /**
@@ -224,7 +216,7 @@ export type RegisterWatcherResponse = Message<"agent.v1.RegisterWatcherResponse"
  * Describes the message agent.v1.RegisterWatcherResponse.
  * Use `create(RegisterWatcherResponseSchema)` to create a new message.
  */
-export const RegisterWatcherResponseSchema: GenMessage<RegisterWatcherResponse> /*@__PURE__*/ =
+export const RegisterWatcherResponseSchema: GenMessage<RegisterWatcherResponse> = /*@__PURE__*/
   messageDesc(file_agent_v1_scheduler, 8);
 
 /**
@@ -241,34 +233,34 @@ export type UnregisterWatcherRequest = Message<"agent.v1.UnregisterWatcherReques
  * Describes the message agent.v1.UnregisterWatcherRequest.
  * Use `create(UnregisterWatcherRequestSchema)` to create a new message.
  */
-export const UnregisterWatcherRequestSchema: GenMessage<UnregisterWatcherRequest> /*@__PURE__*/ =
+export const UnregisterWatcherRequestSchema: GenMessage<UnregisterWatcherRequest> = /*@__PURE__*/
   messageDesc(file_agent_v1_scheduler, 9);
 
 /**
  * @generated from message agent.v1.UnregisterWatcherResponse
  */
-export type UnregisterWatcherResponse = Message<"agent.v1.UnregisterWatcherResponse"> & {};
+export type UnregisterWatcherResponse = Message<"agent.v1.UnregisterWatcherResponse"> & {
+};
 
 /**
  * Describes the message agent.v1.UnregisterWatcherResponse.
  * Use `create(UnregisterWatcherResponseSchema)` to create a new message.
  */
-export const UnregisterWatcherResponseSchema: GenMessage<UnregisterWatcherResponse> /*@__PURE__*/ =
+export const UnregisterWatcherResponseSchema: GenMessage<UnregisterWatcherResponse> = /*@__PURE__*/
   messageDesc(file_agent_v1_scheduler, 10);
 
 /**
  * @generated from message agent.v1.ListWatchersRequest
  */
-export type ListWatchersRequest = Message<"agent.v1.ListWatchersRequest"> & {};
+export type ListWatchersRequest = Message<"agent.v1.ListWatchersRequest"> & {
+};
 
 /**
  * Describes the message agent.v1.ListWatchersRequest.
  * Use `create(ListWatchersRequestSchema)` to create a new message.
  */
-export const ListWatchersRequestSchema: GenMessage<ListWatchersRequest> /*@__PURE__*/ = messageDesc(
-  file_agent_v1_scheduler,
-  11,
-);
+export const ListWatchersRequestSchema: GenMessage<ListWatchersRequest> = /*@__PURE__*/
+  messageDesc(file_agent_v1_scheduler, 11);
 
 /**
  * @generated from message agent.v1.WatcherEntry
@@ -304,10 +296,8 @@ export type WatcherEntry = Message<"agent.v1.WatcherEntry"> & {
  * Describes the message agent.v1.WatcherEntry.
  * Use `create(WatcherEntrySchema)` to create a new message.
  */
-export const WatcherEntrySchema: GenMessage<WatcherEntry> /*@__PURE__*/ = messageDesc(
-  file_agent_v1_scheduler,
-  12,
-);
+export const WatcherEntrySchema: GenMessage<WatcherEntry> = /*@__PURE__*/
+  messageDesc(file_agent_v1_scheduler, 12);
 
 /**
  * @generated from message agent.v1.ListWatchersResponse
@@ -323,22 +313,21 @@ export type ListWatchersResponse = Message<"agent.v1.ListWatchersResponse"> & {
  * Describes the message agent.v1.ListWatchersResponse.
  * Use `create(ListWatchersResponseSchema)` to create a new message.
  */
-export const ListWatchersResponseSchema: GenMessage<ListWatchersResponse> /*@__PURE__*/ =
+export const ListWatchersResponseSchema: GenMessage<ListWatchersResponse> = /*@__PURE__*/
   messageDesc(file_agent_v1_scheduler, 13);
 
 /**
  * @generated from message agent.v1.StreamEventsRequest
  */
-export type StreamEventsRequest = Message<"agent.v1.StreamEventsRequest"> & {};
+export type StreamEventsRequest = Message<"agent.v1.StreamEventsRequest"> & {
+};
 
 /**
  * Describes the message agent.v1.StreamEventsRequest.
  * Use `create(StreamEventsRequestSchema)` to create a new message.
  */
-export const StreamEventsRequestSchema: GenMessage<StreamEventsRequest> /*@__PURE__*/ = messageDesc(
-  file_agent_v1_scheduler,
-  14,
-);
+export const StreamEventsRequestSchema: GenMessage<StreamEventsRequest> = /*@__PURE__*/
+  messageDesc(file_agent_v1_scheduler, 14);
 
 /**
  * @generated from message agent.v1.StreamEventsResponse
@@ -354,7 +343,7 @@ export type StreamEventsResponse = Message<"agent.v1.StreamEventsResponse"> & {
  * Describes the message agent.v1.StreamEventsResponse.
  * Use `create(StreamEventsResponseSchema)` to create a new message.
  */
-export const StreamEventsResponseSchema: GenMessage<StreamEventsResponse> /*@__PURE__*/ =
+export const StreamEventsResponseSchema: GenMessage<StreamEventsResponse> = /*@__PURE__*/
   messageDesc(file_agent_v1_scheduler, 15);
 
 /**
@@ -368,7 +357,7 @@ export const SchedulerService: GenService<{
     methodKind: "unary";
     input: typeof RegisterCronRequestSchema;
     output: typeof RegisterCronResponseSchema;
-  };
+  },
   /**
    * @generated from rpc agent.v1.SchedulerService.UnregisterCron
    */
@@ -376,7 +365,7 @@ export const SchedulerService: GenService<{
     methodKind: "unary";
     input: typeof UnregisterCronRequestSchema;
     output: typeof UnregisterCronResponseSchema;
-  };
+  },
   /**
    * @generated from rpc agent.v1.SchedulerService.ListCrons
    */
@@ -384,7 +373,7 @@ export const SchedulerService: GenService<{
     methodKind: "unary";
     input: typeof ListCronsRequestSchema;
     output: typeof ListCronsResponseSchema;
-  };
+  },
   /**
    * @generated from rpc agent.v1.SchedulerService.RegisterWatcher
    */
@@ -392,7 +381,7 @@ export const SchedulerService: GenService<{
     methodKind: "unary";
     input: typeof RegisterWatcherRequestSchema;
     output: typeof RegisterWatcherResponseSchema;
-  };
+  },
   /**
    * @generated from rpc agent.v1.SchedulerService.UnregisterWatcher
    */
@@ -400,7 +389,7 @@ export const SchedulerService: GenService<{
     methodKind: "unary";
     input: typeof UnregisterWatcherRequestSchema;
     output: typeof UnregisterWatcherResponseSchema;
-  };
+  },
   /**
    * @generated from rpc agent.v1.SchedulerService.ListWatchers
    */
@@ -408,7 +397,7 @@ export const SchedulerService: GenService<{
     methodKind: "unary";
     input: typeof ListWatchersRequestSchema;
     output: typeof ListWatchersResponseSchema;
-  };
+  },
   /**
    * @generated from rpc agent.v1.SchedulerService.StreamEvents
    */
@@ -416,5 +405,7 @@ export const SchedulerService: GenService<{
     methodKind: "server_streaming";
     input: typeof StreamEventsRequestSchema;
     output: typeof StreamEventsResponseSchema;
-  };
-}> /*@__PURE__*/ = serviceDesc(file_agent_v1_scheduler, 0);
+  },
+}> = /*@__PURE__*/
+  serviceDesc(file_agent_v1_scheduler, 0);
+

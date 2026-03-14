@@ -5,19 +5,14 @@
 import type { GenEnum, GenFile, GenMessage } from "@bufbuild/protobuf/codegenv2";
 import { enumDesc, fileDesc, messageDesc } from "@bufbuild/protobuf/codegenv2";
 import type { Timestamp } from "@bufbuild/protobuf/wkt";
-import {
-  file_google_protobuf_struct,
-  file_google_protobuf_timestamp,
-} from "@bufbuild/protobuf/wkt";
+import { file_google_protobuf_struct, file_google_protobuf_timestamp } from "@bufbuild/protobuf/wkt";
 import type { JsonObject, Message } from "@bufbuild/protobuf";
 
 /**
  * Describes the file agent/v1/common.proto.
  */
-export const file_agent_v1_common: GenFile /*@__PURE__*/ = fileDesc(
-  "ChVhZ2VudC92MS9jb21tb24ucHJvdG8SCGFnZW50LnYxIssDCgRUYXNrEgoKAmlkGAEgASgJEgwKBG5hbWUYAiABKAkSEwoLZGVzY3JpcHRpb24YAyABKAkSJAoGc3RhdHVzGAQgASgOMhQuYWdlbnQudjEuVGFza1N0YXR1cxIoCghwcmlvcml0eRgFIAEoDjIWLmFnZW50LnYxLlRhc2tQcmlvcml0eRIrCgx0cmlnZ2VyX3R5cGUYBiABKA4yFS5hZ2VudC52MS5UcmlnZ2VyVHlwZRIxCg9hcHByb3ZhbF9wb2xpY3kYByABKA4yGC5hZ2VudC52MS5BcHByb3ZhbFBvbGljeRIrCgpwYXJhbWV0ZXJzGAggASgLMhcuZ29vZ2xlLnByb3RvYnVmLlN0cnVjdBIOCgZvdXRwdXQYCSABKAkSFQoNZXJyb3JfbWVzc2FnZRgKIAEoCRIuCgpjcmVhdGVkX2F0GAsgASgLMhouZ29vZ2xlLnByb3RvYnVmLlRpbWVzdGFtcBIuCgpzdGFydGVkX2F0GAwgASgLMhouZ29vZ2xlLnByb3RvYnVmLlRpbWVzdGFtcBIwCgxjb21wbGV0ZWRfYXQYDSABKAsyGi5nb29nbGUucHJvdG9idWYuVGltZXN0YW1wIrIBCg5TY2hlZHVsZXJFdmVudBIKCgJpZBgBIAEoCRIrCgx0cmlnZ2VyX3R5cGUYAiABKA4yFS5hZ2VudC52MS5UcmlnZ2VyVHlwZRIOCgZzb3VyY2UYAyABKAkSKAoHcGF5bG9hZBgEIAEoCzIXLmdvb2dsZS5wcm90b2J1Zi5TdHJ1Y3QSLQoJdGltZXN0YW1wGAUgASgLMhouZ29vZ2xlLnByb3RvYnVmLlRpbWVzdGFtcCLPAQoITG9nRW50cnkSDwoHdGFza19pZBgBIAEoCRINCgVsZXZlbBgCIAEoCRIPCgdtZXNzYWdlGAMgASgJEi0KCXRpbWVzdGFtcBgEIAEoCzIaLmdvb2dsZS5wcm90b2J1Zi5UaW1lc3RhbXASMgoIbWV0YWRhdGEYBSADKAsyIC5hZ2VudC52MS5Mb2dFbnRyeS5NZXRhZGF0YUVudHJ5Gi8KDU1ldGFkYXRhRW50cnkSCwoDa2V5GAEgASgJEg0KBXZhbHVlGAIgASgJOgI4ASqpAQoKVGFza1N0YXR1cxIbChdUQVNLX1NUQVRVU19VTlNQRUNJRklFRBAAEhcKE1RBU0tfU1RBVFVTX1BFTkRJTkcQARIXChNUQVNLX1NUQVRVU19SVU5OSU5HEAISGQoVVEFTS19TVEFUVVNfQ09NUExFVEVEEAMSFgoSVEFTS19TVEFUVVNfRkFJTEVEEAQSGQoVVEFTS19TVEFUVVNfQ0FOQ0VMTEVEEAUqrwEKC1RyaWdnZXJUeXBlEhwKGFRSSUdHRVJfVFlQRV9VTlNQRUNJRklFRBAAEhcKE1RSSUdHRVJfVFlQRV9NQU5VQUwQARIVChFUUklHR0VSX1RZUEVfQ1JPThACEhgKFFRSSUdHRVJfVFlQRV9XRUJIT09LEAMSHAoYVFJJR0dFUl9UWVBFX0ZJTEVfQ0hBTkdFEAQSGgoWVFJJR0dFUl9UWVBFX0NPTVBBTklPThAFKpIBCgxUYXNrUHJpb3JpdHkSHQoZVEFTS19QUklPUklUWV9VTlNQRUNJRklFRBAAEhUKEVRBU0tfUFJJT1JJVFlfTE9XEAESGAoUVEFTS19QUklPUklUWV9NRURJVU0QAhIWChJUQVNLX1BSSU9SSVRZX0hJR0gQAxIaChZUQVNLX1BSSU9SSVRZX0NSSVRJQ0FMEAQqcAoOQXBwcm92YWxQb2xpY3kSHwobQVBQUk9WQUxfUE9MSUNZX1VOU1BFQ0lGSUVEEAASGAoUQVBQUk9WQUxfUE9MSUNZX0FVVE8QARIjCh9BUFBST1ZBTF9QT0xJQ1lfUkVWSUVXX1JFUVVJUkVEEAJCfAoMY29tLmFnZW50LnYxQgtDb21tb25Qcm90b1ABWh5rcmFrZW4vZ2VuL2dvL2FnZW50L3YxO2FnZW50djGiAgNBWFiqAghBZ2VudC5WMcoCCEFnZW50XFYx4gIUQWdlbnRcVjFcR1BCTWV0YWRhdGHqAglBZ2VudDo6VjFiBnByb3RvMw",
-  [file_google_protobuf_timestamp, file_google_protobuf_struct],
-);
+export const file_agent_v1_common: GenFile = /*@__PURE__*/
+  fileDesc("ChVhZ2VudC92MS9jb21tb24ucHJvdG8SCGFnZW50LnYxIssDCgRUYXNrEgoKAmlkGAEgASgJEgwKBG5hbWUYAiABKAkSEwoLZGVzY3JpcHRpb24YAyABKAkSJAoGc3RhdHVzGAQgASgOMhQuYWdlbnQudjEuVGFza1N0YXR1cxIoCghwcmlvcml0eRgFIAEoDjIWLmFnZW50LnYxLlRhc2tQcmlvcml0eRIrCgx0cmlnZ2VyX3R5cGUYBiABKA4yFS5hZ2VudC52MS5UcmlnZ2VyVHlwZRIxCg9hcHByb3ZhbF9wb2xpY3kYByABKA4yGC5hZ2VudC52MS5BcHByb3ZhbFBvbGljeRIrCgpwYXJhbWV0ZXJzGAggASgLMhcuZ29vZ2xlLnByb3RvYnVmLlN0cnVjdBIOCgZvdXRwdXQYCSABKAkSFQoNZXJyb3JfbWVzc2FnZRgKIAEoCRIuCgpjcmVhdGVkX2F0GAsgASgLMhouZ29vZ2xlLnByb3RvYnVmLlRpbWVzdGFtcBIuCgpzdGFydGVkX2F0GAwgASgLMhouZ29vZ2xlLnByb3RvYnVmLlRpbWVzdGFtcBIwCgxjb21wbGV0ZWRfYXQYDSABKAsyGi5nb29nbGUucHJvdG9idWYuVGltZXN0YW1wIrIBCg5TY2hlZHVsZXJFdmVudBIKCgJpZBgBIAEoCRIrCgx0cmlnZ2VyX3R5cGUYAiABKA4yFS5hZ2VudC52MS5UcmlnZ2VyVHlwZRIOCgZzb3VyY2UYAyABKAkSKAoHcGF5bG9hZBgEIAEoCzIXLmdvb2dsZS5wcm90b2J1Zi5TdHJ1Y3QSLQoJdGltZXN0YW1wGAUgASgLMhouZ29vZ2xlLnByb3RvYnVmLlRpbWVzdGFtcCLPAQoITG9nRW50cnkSDwoHdGFza19pZBgBIAEoCRINCgVsZXZlbBgCIAEoCRIPCgdtZXNzYWdlGAMgASgJEi0KCXRpbWVzdGFtcBgEIAEoCzIaLmdvb2dsZS5wcm90b2J1Zi5UaW1lc3RhbXASMgoIbWV0YWRhdGEYBSADKAsyIC5hZ2VudC52MS5Mb2dFbnRyeS5NZXRhZGF0YUVudHJ5Gi8KDU1ldGFkYXRhRW50cnkSCwoDa2V5GAEgASgJEg0KBXZhbHVlGAIgASgJOgI4ASqpAQoKVGFza1N0YXR1cxIbChdUQVNLX1NUQVRVU19VTlNQRUNJRklFRBAAEhcKE1RBU0tfU1RBVFVTX1BFTkRJTkcQARIXChNUQVNLX1NUQVRVU19SVU5OSU5HEAISGQoVVEFTS19TVEFUVVNfQ09NUExFVEVEEAMSFgoSVEFTS19TVEFUVVNfRkFJTEVEEAQSGQoVVEFTS19TVEFUVVNfQ0FOQ0VMTEVEEAUqrwEKC1RyaWdnZXJUeXBlEhwKGFRSSUdHRVJfVFlQRV9VTlNQRUNJRklFRBAAEhcKE1RSSUdHRVJfVFlQRV9NQU5VQUwQARIVChFUUklHR0VSX1RZUEVfQ1JPThACEhgKFFRSSUdHRVJfVFlQRV9XRUJIT09LEAMSHAoYVFJJR0dFUl9UWVBFX0ZJTEVfQ0hBTkdFEAQSGgoWVFJJR0dFUl9UWVBFX0NPTVBBTklPThAFKpIBCgxUYXNrUHJpb3JpdHkSHQoZVEFTS19QUklPUklUWV9VTlNQRUNJRklFRBAAEhUKEVRBU0tfUFJJT1JJVFlfTE9XEAESGAoUVEFTS19QUklPUklUWV9NRURJVU0QAhIWChJUQVNLX1BSSU9SSVRZX0hJR0gQAxIaChZUQVNLX1BSSU9SSVRZX0NSSVRJQ0FMEAQqcAoOQXBwcm92YWxQb2xpY3kSHwobQVBQUk9WQUxfUE9MSUNZX1VOU1BFQ0lGSUVEEAASGAoUQVBQUk9WQUxfUE9MSUNZX0FVVE8QARIjCh9BUFBST1ZBTF9QT0xJQ1lfUkVWSUVXX1JFUVVJUkVEEAJCfAoMY29tLmFnZW50LnYxQgtDb21tb25Qcm90b1ABWh5rcmFrZW4vZ2VuL2dvL2FnZW50L3YxO2FnZW50djGiAgNBWFiqAghBZ2VudC5WMcoCCEFnZW50XFYx4gIUQWdlbnRcVjFcR1BCTWV0YWRhdGHqAglBZ2VudDo6VjFiBnByb3RvMw", [file_google_protobuf_timestamp, file_google_protobuf_struct]);
 
 /**
  * @generated from message agent.v1.Task
@@ -93,7 +88,8 @@ export type Task = Message<"agent.v1.Task"> & {
  * Describes the message agent.v1.Task.
  * Use `create(TaskSchema)` to create a new message.
  */
-export const TaskSchema: GenMessage<Task> /*@__PURE__*/ = messageDesc(file_agent_v1_common, 0);
+export const TaskSchema: GenMessage<Task> = /*@__PURE__*/
+  messageDesc(file_agent_v1_common, 0);
 
 /**
  * @generated from message agent.v1.SchedulerEvent
@@ -129,10 +125,8 @@ export type SchedulerEvent = Message<"agent.v1.SchedulerEvent"> & {
  * Describes the message agent.v1.SchedulerEvent.
  * Use `create(SchedulerEventSchema)` to create a new message.
  */
-export const SchedulerEventSchema: GenMessage<SchedulerEvent> /*@__PURE__*/ = messageDesc(
-  file_agent_v1_common,
-  1,
-);
+export const SchedulerEventSchema: GenMessage<SchedulerEvent> = /*@__PURE__*/
+  messageDesc(file_agent_v1_common, 1);
 
 /**
  * @generated from message agent.v1.LogEntry
@@ -168,10 +162,8 @@ export type LogEntry = Message<"agent.v1.LogEntry"> & {
  * Describes the message agent.v1.LogEntry.
  * Use `create(LogEntrySchema)` to create a new message.
  */
-export const LogEntrySchema: GenMessage<LogEntry> /*@__PURE__*/ = messageDesc(
-  file_agent_v1_common,
-  2,
-);
+export const LogEntrySchema: GenMessage<LogEntry> = /*@__PURE__*/
+  messageDesc(file_agent_v1_common, 2);
 
 /**
  * @generated from enum agent.v1.TaskStatus
@@ -211,10 +203,8 @@ export enum TaskStatus {
 /**
  * Describes the enum agent.v1.TaskStatus.
  */
-export const TaskStatusSchema: GenEnum<TaskStatus> /*@__PURE__*/ = enumDesc(
-  file_agent_v1_common,
-  0,
-);
+export const TaskStatusSchema: GenEnum<TaskStatus> = /*@__PURE__*/
+  enumDesc(file_agent_v1_common, 0);
 
 /**
  * @generated from enum agent.v1.TriggerType
@@ -254,10 +244,8 @@ export enum TriggerType {
 /**
  * Describes the enum agent.v1.TriggerType.
  */
-export const TriggerTypeSchema: GenEnum<TriggerType> /*@__PURE__*/ = enumDesc(
-  file_agent_v1_common,
-  1,
-);
+export const TriggerTypeSchema: GenEnum<TriggerType> = /*@__PURE__*/
+  enumDesc(file_agent_v1_common, 1);
 
 /**
  * @generated from enum agent.v1.TaskPriority
@@ -292,10 +280,8 @@ export enum TaskPriority {
 /**
  * Describes the enum agent.v1.TaskPriority.
  */
-export const TaskPrioritySchema: GenEnum<TaskPriority> /*@__PURE__*/ = enumDesc(
-  file_agent_v1_common,
-  2,
-);
+export const TaskPrioritySchema: GenEnum<TaskPriority> = /*@__PURE__*/
+  enumDesc(file_agent_v1_common, 2);
 
 /**
  * @generated from enum agent.v1.ApprovalPolicy
@@ -320,7 +306,6 @@ export enum ApprovalPolicy {
 /**
  * Describes the enum agent.v1.ApprovalPolicy.
  */
-export const ApprovalPolicySchema: GenEnum<ApprovalPolicy> /*@__PURE__*/ = enumDesc(
-  file_agent_v1_common,
-  3,
-);
+export const ApprovalPolicySchema: GenEnum<ApprovalPolicy> = /*@__PURE__*/
+  enumDesc(file_agent_v1_common, 3);
+

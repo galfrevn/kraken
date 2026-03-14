@@ -1,0 +1,104 @@
+syntax = "proto3";
+
+package agent.v1;
+
+import "agent/v1/worker.proto";
+import "google/protobuf/timestamp.proto";
+
+message GetStatusRequest {}
+
+message GetStatusResponse {
+  bool healthy = 1;
+  int64 uptime_seconds = 2;
+  int32 active_workers = 3;
+  int32 max_workers = 4;
+  int32 pending_tasks = 5;
+  int32 completed_tasks_today = 6;
+  bool gateway_connected = 7;
+}
+
+message DaemonServiceSubmitTaskRequest {
+  string name = 1;
+  string description = 2;
+  int32 priority = 3;
+}
+
+message DaemonServiceSubmitTaskResponse {
+  string task_id = 1;
+}
+
+message DaemonServiceListTasksRequest {
+  string status_filter = 1;
+  int32 limit = 2;
+}
+
+message DaemonServiceListTasksResponse {
+  repeated DaemonTask tasks = 1;
+}
+
+message DaemonTask {
+  string id = 1;
+  string name = 2;
+  string status = 3;
+  int32 priority = 4;
+  string trigger_type = 5;
+  int32 worker_pid = 6;
+  string output = 7;
+  string error_message = 8;
+  int64 prompt_tokens = 9;
+  int64 completion_tokens = 10;
+  double estimated_cost_usd = 11;
+  google.protobuf.Timestamp created_at = 12;
+  google.protobuf.Timestamp started_at = 13;
+  google.protobuf.Timestamp completed_at = 14;
+}
+
+message GetTaskDetailRequest {
+  string task_id = 1;
+}
+
+message GetTaskDetailResponse {
+  DaemonTask task = 1;
+  repeated TaskLogEntry logs = 2;
+  repeated Artifact artifacts = 3;
+}
+
+message DaemonServiceCancelTaskRequest {
+  string task_id = 1;
+}
+
+message DaemonServiceCancelTaskResponse {
+  bool success = 1;
+}
+
+message WatchTasksRequest {}
+
+message WatchTasksResponse {
+  string event_type = 1;
+  DaemonTask task = 2;
+  string activity = 3;
+}
+
+message StreamTaskLogsRequest {
+  string task_id = 1;
+}
+
+message StreamTaskLogsResponse {
+  TaskLogEntry log = 1;
+}
+
+message TaskLogEntry {
+  string level = 1;
+  string message = 2;
+  google.protobuf.Timestamp timestamp = 3;
+}
+
+service DaemonService {
+  rpc GetStatus(GetStatusRequest) returns (GetStatusResponse);
+  rpc SubmitTask(DaemonServiceSubmitTaskRequest) returns (DaemonServiceSubmitTaskResponse);
+  rpc ListTasks(DaemonServiceListTasksRequest) returns (DaemonServiceListTasksResponse);
+  rpc GetTaskDetail(GetTaskDetailRequest) returns (GetTaskDetailResponse);
+  rpc CancelTask(DaemonServiceCancelTaskRequest) returns (DaemonServiceCancelTaskResponse);
+  rpc WatchTasks(WatchTasksRequest) returns (stream WatchTasksResponse);
+  rpc StreamTaskLogs(StreamTaskLogsRequest) returns (stream StreamTaskLogsResponse);
+}
