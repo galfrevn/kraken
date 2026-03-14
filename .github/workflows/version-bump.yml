@@ -1,10 +1,10 @@
-name: Version Bump
+name: 🔖 Version Bump
 
 on:
   workflow_dispatch:
     inputs:
       bump:
-        description: Version bump type
+        description: Version bump type (patch, minor, or major)
         required: true
         type: choice
         options:
@@ -17,13 +17,15 @@ permissions:
 
 jobs:
   bump:
+    name: 🔖 Bump Version
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - name: 📥 Checkout repository
+        uses: actions/checkout@v4
         with:
           fetch-depth: 0
 
-      - name: Bump version
+      - name: 🔢 Calculate next version
         id: bump
         run: |
           CURRENT=$(jq -r .version version.json)
@@ -39,7 +41,7 @@ jobs:
           echo "{\"version\":\"${NEXT}\"}" | jq . > version.json
           echo "version=$NEXT" >> "$GITHUB_OUTPUT"
 
-      - name: Commit and tag
+      - name: 🏷️ Commit and tag release
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"

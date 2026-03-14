@@ -1,4 +1,4 @@
-name: Release
+name: 🚀 Release
 
 on:
   push:
@@ -10,6 +10,7 @@ permissions:
 
 jobs:
   build:
+    name: 📦 Build — ${{ matrix.platform }}
     strategy:
       matrix:
         include:
@@ -37,24 +38,25 @@ jobs:
     runs-on: ${{ matrix.os }}
 
     steps:
-      - uses: actions/checkout@v4
+      - name: 📥 Checkout repository
+        uses: actions/checkout@v4
 
-      - name: Install Rust
+      - name: 🦀 Install Rust
         uses: dtolnay/rust-toolchain@stable
         with:
           targets: ${{ matrix.rust_target }}
 
-      - name: Setup Go
+      - name: 🐹 Setup Go
         uses: actions/setup-go@v5
         with:
           go-version-file: apps/gateway/go.mod
 
-      - name: Setup protoc
+      - name: 📦 Setup protoc
         uses: arduino/setup-protoc@v3
         with:
           repo-token: ${{ github.token }}
 
-      - name: Cache Rust
+      - name: 💾 Cache Rust dependencies
         uses: actions/cache@v4
         with:
           path: |
@@ -64,11 +66,11 @@ jobs:
           key: rust-${{ runner.os }}-${{ matrix.rust_target }}-${{ hashFiles('apps/scheduler/Cargo.lock') }}
           restore-keys: rust-${{ runner.os }}-${{ matrix.rust_target }}-
 
-      - name: Build scheduler
+      - name: 🦀 Build scheduler
         working-directory: apps/scheduler
         run: cargo build --release --target ${{ matrix.rust_target }}
 
-      - name: Build gateway
+      - name: 🐹 Build gateway
         working-directory: apps/gateway
         env:
           GOOS: ${{ matrix.go_os }}
@@ -76,36 +78,38 @@ jobs:
           CGO_ENABLED: "0"
         run: go build -o gateway ./cmd/gateway
 
-      - name: Package release
+      - name: 📦 Package release artifacts
         run: |
           mkdir -p release
           cp apps/scheduler/target/${{ matrix.rust_target }}/release/scheduler release/
           cp apps/gateway/gateway release/
           tar -czf kraken-${{ matrix.platform }}.tar.gz -C release .
 
-      - name: Upload artifact
+      - name: ☁️ Upload artifact
         uses: actions/upload-artifact@v4
         with:
           name: kraken-${{ matrix.platform }}
           path: kraken-${{ matrix.platform }}.tar.gz
 
   publish:
+    name: 🚀 Publish GitHub Release
     needs: build
     runs-on: ubuntu-latest
 
     steps:
-      - uses: actions/checkout@v4
+      - name: 📥 Checkout repository
+        uses: actions/checkout@v4
 
-      - name: Extract version
+      - name: 🏷️ Extract version tag
         id: version
         run: echo "tag=${GITHUB_REF#refs/tags/}" >> "$GITHUB_OUTPUT"
 
-      - name: Download all artifacts
+      - name: 📥 Download all artifacts
         uses: actions/download-artifact@v4
         with:
           path: artifacts
 
-      - name: Create GitHub Release
+      - name: 🚀 Create GitHub Release
         uses: softprops/action-gh-release@v2
         with:
           name: Kraken ${{ steps.version.outputs.tag }}
