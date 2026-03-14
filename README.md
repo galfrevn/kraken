@@ -1,5 +1,5 @@
 <p align="center">
-  <img src="docs/assets/kraken-logo.png" alt="Kraken" width="120" />
+  <img src="docs/assets/front.png" alt="Kraken" width="700" />
 </p>
 
 <h1 align="center">Kraken</h1>
@@ -10,10 +10,6 @@
 
 <p align="center">
   Kraken understands your codebase, runs tasks on a schedule, watches your files for changes, receives webhooks — and acts on all of it autonomously. Think of it as a developer that never sleeps.
-</p>
-
-<p align="center">
-  <img src="docs/assets/demo.gif" alt="Kraken demo" width="800" />
 </p>
 
 ---
@@ -37,7 +33,7 @@ At its core, Kraken treats the development environment as an event-driven system
 The terminal interface is built with OpenTUI, a React-based framework for terminal applications. This provides a rich, interactive experience — syntax-highlighted diffs, real-time streaming of LLM responses, and a conversational interface — while keeping everything inside the terminal where developers already work.
 
 <p align="center">
-  <img src="docs/assets/architecture.png" alt="Architecture overview" width="700" />
+  <img src="docs/assets/back.png" alt="Kraken architecture" width="700" />
 </p>
 
 ---
