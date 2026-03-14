@@ -1,4 +1,4 @@
-name: 🚀 Release
+name: Release
 
 on:
   push:
@@ -16,7 +16,7 @@ permissions:
 
 jobs:
   build:
-    name: 📦 Build — ${{ matrix.platform }}
+    name: Build — ${{ matrix.platform }}
     strategy:
       matrix:
         include:
@@ -54,27 +54,27 @@ jobs:
     runs-on: ${{ matrix.os }}
 
     steps:
-      - name: 📥 Checkout repository
+      - name: Checkout repository
         uses: actions/checkout@v4
         with:
           ref: ${{ inputs.tag || github.ref }}
 
-      - name: 🦀 Install Rust
+      - name: Install Rust
         uses: dtolnay/rust-toolchain@stable
         with:
           targets: ${{ matrix.rust_target }}
 
-      - name: 🐹 Setup Go
+      - name: Setup Go
         uses: actions/setup-go@v5
         with:
           go-version-file: apps/gateway/go.mod
 
-      - name: 📦 Setup protoc
+      - name: Setup protoc
         uses: arduino/setup-protoc@v3
         with:
           repo-token: ${{ github.token }}
 
-      - name: 💾 Cache Rust dependencies
+      - name: Cache Rust dependencies
         uses: actions/cache@v4
         with:
           path: |
@@ -84,11 +84,11 @@ jobs:
           key: rust-${{ runner.os }}-${{ matrix.rust_target }}-${{ hashFiles('apps/scheduler/Cargo.lock') }}
           restore-keys: rust-${{ runner.os }}-${{ matrix.rust_target }}-
 
-      - name: 🦀 Build scheduler
+      - name: Build scheduler
         working-directory: apps/scheduler
         run: cargo build --release --target ${{ matrix.rust_target }}
 
-      - name: 🐹 Build gateway
+      - name: Build gateway
         working-directory: apps/gateway
         env:
           GOOS: ${{ matrix.go_os }}
@@ -96,7 +96,7 @@ jobs:
           CGO_ENABLED: "0"
         run: go build -o gateway${{ matrix.ext }} ./cmd/gateway
 
-      - name: 📦 Package release artifacts (Unix)
+      - name: Package release artifacts (Unix)
         if: runner.os != 'Windows'
         run: |
           mkdir -p release
@@ -104,7 +104,7 @@ jobs:
           cp apps/gateway/gateway release/
           tar -czf kraken-${{ matrix.platform }}.tar.gz -C release .
 
-      - name: 📦 Package release artifacts (Windows)
+      - name: Package release artifacts (Windows)
         if: runner.os == 'Windows'
         shell: pwsh
         run: |
@@ -113,24 +113,24 @@ jobs:
           Copy-Item "apps/gateway/gateway.exe" "release/"
           tar -czf "kraken-${{ matrix.platform }}.tar.gz" -C release .
 
-      - name: ☁️ Upload artifact
+      - name: Upload artifact
         uses: actions/upload-artifact@v4
         with:
           name: kraken-${{ matrix.platform }}
           path: kraken-${{ matrix.platform }}.tar.gz
 
   publish:
-    name: 🚀 Publish GitHub Release
+    name: Publish GitHub Release
     needs: build
     runs-on: ubuntu-latest
 
     steps:
-      - name: 📥 Checkout repository
+      - name: Checkout repository
         uses: actions/checkout@v4
         with:
           ref: ${{ inputs.tag || github.ref }}
 
-      - name: 🏷️ Extract version tag
+      - name: Extract version tag
         id: version
         run: |
           if [ -n "${{ inputs.tag }}" ]; then
@@ -139,12 +139,12 @@ jobs:
             echo "tag=${GITHUB_REF#refs/tags/}" >> "$GITHUB_OUTPUT"
           fi
 
-      - name: 📥 Download all artifacts
+      - name: Download all artifacts
         uses: actions/download-artifact@v4
         with:
           path: artifacts
 
-      - name: 🚀 Create GitHub Release
+      - name: Create GitHub Release
         uses: softprops/action-gh-release@v2
         with:
           tag_name: ${{ steps.version.outputs.tag }}
