@@ -24,6 +24,7 @@ import { fetchAllAvailableModels, type ProviderModel } from "@core/tools/model.t
 import { Avatar, type AvatarState } from "@/avatar.tsx";
 import { loadImagePreview, generatePreviewRows } from "@/images.ts";
 import { SetupPanel } from "@/views/setup.tsx";
+import { ProviderSetupPanel, type ProviderOption } from "@/views/provider-setup.tsx";
 import { existsSync } from "node:fs";
 import { basename, isAbsolute } from "node:path";
 
@@ -327,6 +328,7 @@ export function ChatView({ threadManager, focused, onRequestFocus, onRequestBlur
   const [pendingQuestions, setPendingQuestions] = useState<PendingQuestions | null>(null);
   const [pendingConfirmation, setPendingConfirmation] = useState<PendingConfirmation | null>(null);
   const [pendingSetup, setPendingSetup] = useState<PendingSetup | null>(null);
+  const [providerSetupData, setProviderSetupData] = useState<ProviderOption[] | null>(null);
 
   useEffect(() => {
     onQuestionStateChange?.(pendingQuestions !== null || pendingConfirmation !== null || pendingSetup !== null);
@@ -408,6 +410,8 @@ export function ChatView({ threadManager, focused, onRequestFocus, onRequestBlur
         content: () => <PluginStoreContent registry={registry} pluginRegistry={pluginRegistry} />,
         size: "large",
       });
+    } else if (result.displayMode === "provider-setup") {
+      setProviderSetupData(result.data as ProviderOption[]);
     } else if (result.displayMode === "dialog") {
       dialog.show({
         content: () => (
@@ -952,6 +956,7 @@ export function ChatView({ threadManager, focused, onRequestFocus, onRequestBlur
                   key={`${model.provider}:${model.modelId}`}
                   width="100%"
                   height={1}
+                  flexDirection="row"
                   backgroundColor={isSelected ? COLORS.cyan : undefined}
                   onMouseUp={() => acceptModel(model)}
                 >
@@ -978,7 +983,17 @@ export function ChatView({ threadManager, focused, onRequestFocus, onRequestBlur
             ))}
           </box>
         ) : null}
-        {pendingSetup ? (
+        {providerSetupData ? (
+          <ProviderSetupPanel
+            providers={providerSetupData}
+            onComplete={(configured) => {
+              setProviderSetupData(null);
+              if (configured) {
+                toast.success(`${configured.label} configured — models now available via /model`);
+              }
+            }}
+          />
+        ) : pendingSetup ? (
           <SetupPanel
             fields={pendingSetup.fields}
             onComplete={() => {

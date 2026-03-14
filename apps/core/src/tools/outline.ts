@@ -60,7 +60,7 @@ export const codeOutlineTool: Tool = {
     }
 
     const content = await file.text();
-    const lines = content.split("\n");
+    const lines = content.split(/\r?\n/);
     const symbols = extractor(lines);
 
     if (symbols.length === 0) {

@@ -48,7 +48,7 @@ export const readFileTool: Tool = {
 
     // Apply line offset/limit if specified
     if (offset > 1 || limit !== undefined) {
-      const lines = content.split("\n");
+      const lines = content.split(/\r?\n/);
       const startLine = Math.max(0, offset - 1);
       const endLine = limit !== undefined ? startLine + limit : lines.length;
       content = lines.slice(startLine, endLine).join("\n");

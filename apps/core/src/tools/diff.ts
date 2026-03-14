@@ -57,8 +57,8 @@ export const diffFilesTool: Tool = {
       return { success: true, output: `${fileA} and ${fileB} are identical` };
     }
 
-    const linesA = contentA.split("\n");
-    const linesB = contentB.split("\n");
+    const linesA = contentA.split(/\r?\n/);
+    const linesB = contentB.split(/\r?\n/);
 
     const diffOutput = computeUnifiedDiff(linesA, linesB, fileA, fileB, contextLines);
 

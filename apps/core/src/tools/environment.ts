@@ -47,7 +47,7 @@ export const environmentTool: Tool = {
     for (const check of runtimeChecks) {
       const version = await safeCommand(check.command);
       if (version) {
-        sections.push(`  ${check.name}: ${version.split("\n")[0]}`);
+        sections.push(`  ${check.name}: ${version.split(/\r?\n/)[0]}`);
       }
     }
 

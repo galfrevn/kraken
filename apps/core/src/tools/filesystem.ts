@@ -1,4 +1,4 @@
-import { join, resolve, dirname, basename } from "node:path";
+import { join, resolve, relative, dirname, basename } from "node:path";
 import { mkdirSync, rmSync, renameSync, statSync } from "node:fs";
 import type { Tool, ToolResult, ToolExecutionContext } from "@/tools/schema.ts";
 
@@ -32,7 +32,7 @@ export const deleteFileTool: Tool = {
     const normalizedWorkDir = resolve(context.workingDirectory);
     const absolutePath = resolve(context.workingDirectory, filePath);
 
-    if (!absolutePath.startsWith(normalizedWorkDir)) {
+    if (relative(normalizedWorkDir, absolutePath).startsWith("..")) {
       return { success: false, output: "", error: "cannot delete outside working directory" };
     }
 
@@ -92,10 +92,10 @@ export const moveFileTool: Tool = {
     const absoluteSource = resolve(context.workingDirectory, source);
     const absoluteDestination = resolve(context.workingDirectory, destination);
 
-    if (!absoluteSource.startsWith(normalizedWorkDir)) {
+    if (relative(normalizedWorkDir, absoluteSource).startsWith("..")) {
       return { success: false, output: "", error: "source path is outside working directory" };
     }
-    if (!absoluteDestination.startsWith(normalizedWorkDir)) {
+    if (relative(normalizedWorkDir, absoluteDestination).startsWith("..")) {
       return { success: false, output: "", error: "destination path is outside working directory" };
     }
 
@@ -150,7 +150,7 @@ export const readLinesTool: Tool = {
     }
 
     const content = await file.text();
-    const allLines = content.split("\n");
+    const allLines = content.split(/\r?\n/);
     const totalLines = allLines.length;
 
     const start = Math.max(1, Number(parameters["start"]) || 1);

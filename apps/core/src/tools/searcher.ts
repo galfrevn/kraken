@@ -63,7 +63,7 @@ export const searchFilesTool: Tool = {
         return { success: false, output: "", error: `search failed: ${stderr}` };
       }
 
-      const lines = output.split("\n");
+      const lines = output.split(/\r?\n/);
       const truncatedOutput =
         lines.length > MAX_RESULT_LINES
           ? lines.slice(0, MAX_RESULT_LINES).join("\n") +

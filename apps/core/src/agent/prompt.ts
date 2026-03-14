@@ -40,14 +40,39 @@ Always reply in the same language the user writes in.
 Not every message requires a tool call — you can have normal conversations.`;
 }
 
+function describePlatform(platform: string): string {
+  switch (platform) {
+    case "win32":
+      return "Windows";
+    case "darwin":
+      return "macOS";
+    case "linux":
+      return "Linux";
+    default:
+      return platform;
+  }
+}
+
 function buildEnvironmentSection(env: EnvironmentContext): string {
+  const osName = describePlatform(env.platform);
+  const isWindows = env.platform === "win32";
+
+  let shellGuidance = "";
+  if (isWindows) {
+    shellGuidance = `\n\nThis is a Windows system. When using run_command:
+- Use Windows-compatible commands (dir instead of ls, type instead of cat, del instead of rm)
+- Use backslashes in paths or quote forward-slash paths
+- Use 'cmd /c' syntax; Unix commands like grep, sed, awk are not available unless installed separately
+- PowerShell cmdlets (Get-ChildItem, Select-String) are also available`;
+  }
+
   return `## Environment
 
 - Working directory: ${env.workingDirectory}
-- Platform: ${env.platform}
+- OS: ${osName} (${env.platform})
 - Shell: ${env.shell}
 - Date: ${env.date}
-- Model: ${env.modelName}`;
+- Model: ${env.modelName}${shellGuidance}`;
 }
 
 function buildToolGuidanceSection(): string {

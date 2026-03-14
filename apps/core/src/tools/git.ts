@@ -6,9 +6,12 @@ const IS_WINDOWS = process.platform === "win32";
 
 const SHELL_METACHARACTERS = /[;&|`$(){}><!\n\r]/;
 
-function sanitizeGitArg(value: string): string {
+function sanitizeGitPath(value: string): string {
   if (SHELL_METACHARACTERS.test(value)) {
-    throw new Error(`invalid characters in argument: ${value}`);
+    throw new Error(`invalid characters in path: ${value}`);
+  }
+  if (value !== "." && (value.startsWith("/") || value.startsWith("\\\\") || /^[A-Za-z]:/.test(value))) {
+    throw new Error(`absolute paths are not allowed: ${value}`);
   }
   return value;
 }
@@ -94,7 +97,7 @@ export const gitDiffTool: Tool = {
 
     let command = "diff --stat --patch";
     if (staged) command += " --cached";
-    if (filePath) command += ` -- ${sanitizeGitArg(filePath)}`;
+    if (filePath) command += ` -- ${sanitizeGitPath(filePath)}`;
 
     try {
       const result = await runGitCommand(command, context.workingDirectory);
@@ -104,7 +107,7 @@ export const gitDiffTool: Tool = {
       }
 
       const output = result.stdout || "(no changes)";
-      const lines = output.split("\n");
+      const lines = output.split(/\r?\n/);
 
       if (lines.length > 300) {
         return {
@@ -149,16 +152,15 @@ export const gitCommitTool: Tool = {
     }
 
     try {
-      const sanitizedFiles = files.split(/\s+/).map(sanitizeGitArg).join(" ");
+      const sanitizedFiles = files.split(/\s+/).map(sanitizeGitPath).join(" ");
       const addResult = await runGitCommand(`add ${sanitizedFiles}`, context.workingDirectory);
       if (addResult.exitCode !== 0) {
         return { success: false, output: "", error: `git add failed: ${addResult.stderr}` };
       }
 
-      const sanitizedMessage = sanitizeGitArg(message);
       const escapedMessage = IS_WINDOWS
-        ? sanitizedMessage.replace(/"/g, '\\"')
-        : sanitizedMessage.replace(/'/g, "'\\''");
+        ? message.replace(/"/g, '\\"')
+        : message.replace(/'/g, "'\\''");
       const quotedMessage = IS_WINDOWS
         ? `commit -m "${escapedMessage}"`
         : `commit -m '${escapedMessage}'`;
@@ -204,7 +206,7 @@ export const gitLogTool: Tool = {
     const filePath = parameters["path"] as string | undefined;
 
     let command = `log --oneline --decorate -n ${count}`;
-    if (filePath) command += ` -- ${sanitizeGitArg(filePath)}`;
+    if (filePath) command += ` -- ${sanitizeGitPath(filePath)}`;
 
     try {
       const result = await runGitCommand(command, context.workingDirectory);

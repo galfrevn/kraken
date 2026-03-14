@@ -12,7 +12,7 @@ export function setPendingProviderSwitch(provider: string | null): void {
 export interface CommandResult {
   output: string;
   switchedThread?: boolean;
-  displayMode?: "toast" | "dialog" | "plugin-browser" | "plugin-store";
+  displayMode?: "toast" | "dialog" | "plugin-browser" | "plugin-store" | "provider-setup";
   data?: unknown;
 }
 
@@ -232,40 +232,21 @@ const KNOWN_PROVIDERS: { name: string; envVar: string; label: string }[] = [
 ];
 
 const setupCommand: SlashCommand = {
-  name: "setup",
-  aliases: [],
+  name: "setup-provider",
+  aliases: ["setup"],
   description: "Configure LLM providers and API keys",
-  usage: "/setup provider",
-  execute(args, threadManager) {
-    const subcommand = args.trim().toLowerCase();
-
-    if (subcommand !== "provider" && subcommand !== "p" && subcommand !== "") {
-      return { output: "usage: /setup provider" };
-    }
-
-    const unconfigured = KNOWN_PROVIDERS.filter((p) => !process.env[p.envVar]);
-
-    if (unconfigured.length === 0) {
-      return { output: "all providers configured", displayMode: "toast" };
-    }
-
-    const engine = threadManager.getActiveEngine();
-    engine.handleSetupRequired({
-      id: `setup-provider-${Date.now()}`,
-      fields: unconfigured.map((p) => ({
-        pluginName: "Provider Setup",
-        fieldName: p.name,
-        field: {
-          type: "string" as const,
-          description: `${p.label} API key`,
-          envVar: p.envVar,
-          required: true,
-        },
+  usage: "/setup-provider",
+  execute() {
+    return {
+      output: "",
+      displayMode: "provider-setup",
+      data: KNOWN_PROVIDERS.map((p) => ({
+        name: p.name,
+        label: p.label,
+        description: process.env[p.envVar] ? `${p.label} (configured)` : `Configure ${p.label} API key`,
+        envVar: p.envVar,
       })),
-      resolve: () => {},
-    });
-
-    return { output: "" };
+    };
   },
 };
 

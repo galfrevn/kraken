@@ -29,7 +29,7 @@ export const countTokensTool: Tool = {
 
     const characters = text.length;
     const words = text.split(/\s+/).filter(Boolean).length;
-    const lines = text.split("\n").length;
+    const lines = text.split(/\r?\n/).length;
     const estimatedTokens = Math.ceil(characters / AVERAGE_CHARACTERS_PER_TOKEN);
 
     const breakdown = [

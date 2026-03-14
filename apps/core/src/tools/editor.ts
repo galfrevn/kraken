@@ -64,8 +64,8 @@ export const editFileTool: Tool = {
     const updatedContent = content.replace(oldString, newString);
     await Bun.write(absolutePath, updatedContent);
 
-    const removedLines = oldString.split("\n").length;
-    const addedLines = newString.split("\n").length;
+    const removedLines = oldString.split(/\r?\n/).length;
+    const addedLines = newString.split(/\r?\n/).length;
 
     return {
       success: true,
