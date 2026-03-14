@@ -50,7 +50,14 @@ interface ApplicationProps {
   onSetupComplete?: () => void;
 }
 
-export function Application({ store, threadManager, pluginRegistry, pluginFailures, pendingSetup, onSetupComplete }: ApplicationProps) {
+export function Application({
+  store,
+  threadManager,
+  pluginRegistry,
+  pluginFailures,
+  pendingSetup,
+  onSetupComplete,
+}: ApplicationProps) {
   const [activeView, setActiveView] = useState<ViewName>("chat");
   const [chatInputFocused, setChatInputFocused] = useState(true);
   const [hasQuestions, setHasQuestions] = useState(false);
@@ -106,9 +113,10 @@ export function Application({ store, threadManager, pluginRegistry, pluginFailur
 
     if (key.name === "left" || key.name === "right") {
       const currentIndex = VIEWS.indexOf(activeView);
-      const nextIndex = key.name === "right"
-        ? (currentIndex + 1) % VIEWS.length
-        : (currentIndex - 1 + VIEWS.length) % VIEWS.length;
+      const nextIndex =
+        key.name === "right"
+          ? (currentIndex + 1) % VIEWS.length
+          : (currentIndex - 1 + VIEWS.length) % VIEWS.length;
       navigateToView(VIEWS[nextIndex]!);
       return;
     }
@@ -168,12 +176,7 @@ export function Application({ store, threadManager, pluginRegistry, pluginFailur
         }}
       />
 
-      <box
-        flexDirection="column"
-        width={width}
-        height={height}
-        backgroundColor={COLORS.background}
-      >
+      <box flexDirection="column" width={width} height={height} backgroundColor={COLORS.background}>
         {!setupDone && pendingSetup && pendingSetup.length > 0 ? (
           <SetupPanel
             fields={pendingSetup}
@@ -183,49 +186,57 @@ export function Application({ store, threadManager, pluginRegistry, pluginFailur
             }}
           />
         ) : (
-        <>
-        <Header activeView={activeView} chatInputFocused={chatInputFocused} />
+          <>
+            <Header activeView={activeView} chatInputFocused={chatInputFocused} />
 
-        <box flexGrow={1} padding={1} gap={1} flexDirection="row">
-          {activeView === "chat" && width >= SIDEBAR_MIN_TERMINAL_WIDTH && (
-            <ThreadSidebar
-              threadManager={threadManager}
-              width={SIDEBAR_WIDTH}
-              onSelectThread={(identifier) => threadManager.switchThread(identifier)}
-            />
-          )}
-          <box flexGrow={1} flexDirection="column">
-            {activeView === "chat" && (
-              <ChatView
-                threadManager={threadManager}
-                focused={chatInputFocused}
-                onRequestFocus={requestChatFocus}
-                onRequestBlur={requestChatBlur}
-                onQuestionStateChange={setHasQuestions}
-              />
-            )}
-            {activeView === "dashboard" && <DashboardView store={store} pluginRegistry={pluginRegistry} />}
-            {activeView === "tasks" && (
-              <TasksView store={store} focused={activeView === "tasks"} />
-            )}
-            {activeView === "reviews" && (
-              <ReviewsView store={store} focused={activeView === "reviews"} />
-            )}
-            {activeView === "logs" && (
-              <LogsView store={store} focused={activeView === "logs"} />
-            )}
-          </box>
-        </box>
+            <box flexGrow={1} padding={1} gap={1} flexDirection="row">
+              {activeView === "chat" && width >= SIDEBAR_MIN_TERMINAL_WIDTH && (
+                <ThreadSidebar
+                  threadManager={threadManager}
+                  width={SIDEBAR_WIDTH}
+                  onSelectThread={(identifier) => threadManager.switchThread(identifier)}
+                />
+              )}
+              <box flexGrow={1} flexDirection="column">
+                {activeView === "chat" && (
+                  <ChatView
+                    threadManager={threadManager}
+                    focused={chatInputFocused}
+                    onRequestFocus={requestChatFocus}
+                    onRequestBlur={requestChatBlur}
+                    onQuestionStateChange={setHasQuestions}
+                  />
+                )}
+                {activeView === "dashboard" && (
+                  <DashboardView store={store} pluginRegistry={pluginRegistry} />
+                )}
+                {activeView === "tasks" && (
+                  <TasksView store={store} focused={activeView === "tasks"} />
+                )}
+                {activeView === "reviews" && (
+                  <ReviewsView store={store} focused={activeView === "reviews"} />
+                )}
+                {activeView === "logs" && (
+                  <LogsView store={store} focused={activeView === "logs"} />
+                )}
+              </box>
+            </box>
 
-        <Footer activeView={activeView} chatInputFocused={chatInputFocused} />
-        </>
+            <Footer activeView={activeView} chatInputFocused={chatInputFocused} />
+          </>
         )}
       </box>
     </DialogProvider>
   );
 }
 
-function Header({ activeView, chatInputFocused }: { activeView: ViewName; chatInputFocused: boolean }) {
+function Header({
+  activeView,
+  chatInputFocused,
+}: {
+  activeView: ViewName;
+  chatInputFocused: boolean;
+}) {
   const modeIndicator = activeView === "chat" && chatInputFocused ? "input" : "nav";
 
   return (
@@ -244,9 +255,7 @@ function Header({ activeView, chatInputFocused }: { activeView: ViewName; chatIn
         const label = TAB_LABELS[view];
         return (
           <box flexDirection="row" paddingRight={1}>
-            <text fg={isActive ? COLORS.text : COLORS.textMuted}>
-              {" " + label + " "}
-            </text>
+            <text fg={isActive ? COLORS.text : COLORS.textMuted}>{" " + label + " "}</text>
           </box>
         );
       })}
@@ -256,7 +265,13 @@ function Header({ activeView, chatInputFocused }: { activeView: ViewName; chatIn
   );
 }
 
-function Footer({ activeView, chatInputFocused }: { activeView: ViewName; chatInputFocused: boolean }) {
+function Footer({
+  activeView,
+  chatInputFocused,
+}: {
+  activeView: ViewName;
+  chatInputFocused: boolean;
+}) {
   let hint: string;
 
   if (activeView === "chat" && chatInputFocused) {

@@ -67,8 +67,7 @@ export function TasksView({ store, focused }: TasksViewProps) {
           const icon = STATUS_ICONS[task.status] ?? "?";
           const statusColor = STATUS_COLORS[task.status] ?? COLORS.textMuted;
           const reviewTag =
-            task.approval_policy === "review_required" &&
-            task.status === "pending"
+            task.approval_policy === "review_required" && task.status === "pending"
               ? " [review]"
               : "";
 
@@ -183,7 +182,13 @@ function TaskDetail({ store, task: initialTask }: TaskDetailProps) {
           </box>
 
           {descriptionPreview ? (
-            <box backgroundColor={COLORS.card} flexDirection="column" padding={1} width="100%" marginTop={1}>
+            <box
+              backgroundColor={COLORS.card}
+              flexDirection="column"
+              padding={1}
+              width="100%"
+              marginTop={1}
+            >
               <box width="100%">
                 <text fg={COLORS.textMuted}>{"description"}</text>
               </box>
@@ -194,7 +199,13 @@ function TaskDetail({ store, task: initialTask }: TaskDetailProps) {
           ) : null}
 
           {promptPreview ? (
-            <box backgroundColor={COLORS.card} flexDirection="column" padding={1} width="100%" marginTop={1}>
+            <box
+              backgroundColor={COLORS.card}
+              flexDirection="column"
+              padding={1}
+              width="100%"
+              marginTop={1}
+            >
               <box width="100%">
                 <text fg={COLORS.textMuted}>{"prompt"}</text>
               </box>
@@ -205,7 +216,13 @@ function TaskDetail({ store, task: initialTask }: TaskDetailProps) {
           ) : null}
 
           {task.output ? (
-            <box backgroundColor={COLORS.card} flexDirection="column" padding={1} width="100%" marginTop={1}>
+            <box
+              backgroundColor={COLORS.card}
+              flexDirection="column"
+              padding={1}
+              width="100%"
+              marginTop={1}
+            >
               <box width="100%">
                 <text fg={COLORS.textMuted}>{"output"}</text>
               </box>
@@ -216,7 +233,13 @@ function TaskDetail({ store, task: initialTask }: TaskDetailProps) {
           ) : null}
 
           {task.error_message ? (
-            <box backgroundColor={COLORS.card} flexDirection="column" padding={1} width="100%" marginTop={1}>
+            <box
+              backgroundColor={COLORS.card}
+              flexDirection="column"
+              padding={1}
+              width="100%"
+              marginTop={1}
+            >
               <box width="100%">
                 <text fg={COLORS.red}>{"error"}</text>
               </box>
@@ -227,7 +250,13 @@ function TaskDetail({ store, task: initialTask }: TaskDetailProps) {
           ) : null}
 
           {logs.length > 0 ? (
-            <box backgroundColor={COLORS.card} flexDirection="column" padding={1} width="100%" marginTop={1}>
+            <box
+              backgroundColor={COLORS.card}
+              flexDirection="column"
+              padding={1}
+              width="100%"
+              marginTop={1}
+            >
               <box width="100%">
                 <text fg={COLORS.textMuted}>{"logs (" + logs.length + ")"}</text>
               </box>

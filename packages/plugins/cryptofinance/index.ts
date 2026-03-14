@@ -48,7 +48,8 @@ async function getCoinList(): Promise<CachedCoin[]> {
 // Formatting helpers
 // ---------------------------------------------------------------------------
 function fmtPrice(n: number): string {
-  if (n >= 1) return `$${n.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+  if (n >= 1)
+    return `$${n.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
   if (n >= 0.01) return `$${n.toFixed(4)}`;
   return `$${n.toPrecision(4)}`;
 }
@@ -87,12 +88,13 @@ const cryptoListTool: Tool = {
 
     try {
       const coins = await getCoinList();
-      const lines = coins.slice(0, limit).map(
-        (c) => `#${c.rank} ${c.symbol} — ${c.name}`,
-      );
+      const lines = coins.slice(0, limit).map((c) => `#${c.rank} ${c.symbol} — ${c.name}`);
       return { success: true, output: lines.join("\n") };
     } catch (error) {
-      return { success: false, output: `Failed to fetch coin list: ${error instanceof Error ? error.message : error}` };
+      return {
+        success: false,
+        output: `Failed to fetch coin list: ${error instanceof Error ? error.message : error}`,
+      };
     }
   },
 };
@@ -100,7 +102,8 @@ const cryptoListTool: Tool = {
 const cryptoPriceTool: Tool = {
   definition: {
     name: "crypto_price",
-    description: "Get the current price and market data of a cryptocurrency in USD. Supports BTC, ETH, SOL, and 1000+ coins.",
+    description:
+      "Get the current price and market data of a cryptocurrency in USD. Supports BTC, ETH, SOL, and 1000+ coins.",
     parameters: [
       {
         name: "symbol",
@@ -118,7 +121,10 @@ const cryptoPriceTool: Tool = {
       const coins = await getCoinList();
       const coin = coins.find((c) => c.symbol === symbol);
       if (!coin) {
-        return { success: false, output: `'${symbol}' not found. Use crypto_list to see available coins.` };
+        return {
+          success: false,
+          output: `'${symbol}' not found. Use crypto_list to see available coins.`,
+        };
       }
 
       const response = await fetch(`${COINPAPRIKA_API}/tickers/${coin.id}`);
@@ -157,7 +163,10 @@ const cryptoPriceTool: Tool = {
 
       return { success: true, output };
     } catch (error) {
-      return { success: false, output: `Failed to fetch price: ${error instanceof Error ? error.message : error}` };
+      return {
+        success: false,
+        output: `Failed to fetch price: ${error instanceof Error ? error.message : error}`,
+      };
     }
   },
 };
@@ -165,7 +174,8 @@ const cryptoPriceTool: Tool = {
 const exchangeRateTool: Tool = {
   definition: {
     name: "exchange_rate",
-    description: "Get exchange rates for a base currency. Optionally filter to specific target currencies instead of returning all 170+.",
+    description:
+      "Get exchange rates for a base currency. Optionally filter to specific target currencies instead of returning all 170+.",
     parameters: [
       {
         name: "base",
@@ -176,7 +186,8 @@ const exchangeRateTool: Tool = {
       {
         name: "targets",
         type: "string",
-        description: "Comma-separated target currencies to filter (e.g., 'EUR,GBP,ARS'). If omitted, returns top 20 by common usage.",
+        description:
+          "Comma-separated target currencies to filter (e.g., 'EUR,GBP,ARS'). If omitted, returns top 20 by common usage.",
         required: false,
       },
     ],
@@ -188,7 +199,11 @@ const exchangeRateTool: Tool = {
     try {
       const response = await fetch(`${EXCHANGE_RATE_API}/latest/${base}`);
       if (!response.ok) {
-        if (response.status === 404) return { success: false, output: `Currency '${base}' not found. Use 3-letter ISO 4217 codes.` };
+        if (response.status === 404)
+          return {
+            success: false,
+            output: `Currency '${base}' not found. Use 3-letter ISO 4217 codes.`,
+          };
         return { success: false, output: `ExchangeRate-API error: ${response.status}` };
       }
 
@@ -199,9 +214,31 @@ const exchangeRateTool: Tool = {
         time_last_update_utc: string;
       };
 
-      if (data.result !== "success") return { success: false, output: "Failed to fetch exchange rates" };
+      if (data.result !== "success")
+        return { success: false, output: "Failed to fetch exchange rates" };
 
-      const DEFAULT_TARGETS = ["USD", "EUR", "GBP", "JPY", "CAD", "AUD", "CHF", "CNY", "MXN", "ARS", "BRL", "CLP", "COP", "INR", "KRW", "SGD", "HKD", "NZD", "SEK", "NOK"];
+      const DEFAULT_TARGETS = [
+        "USD",
+        "EUR",
+        "GBP",
+        "JPY",
+        "CAD",
+        "AUD",
+        "CHF",
+        "CNY",
+        "MXN",
+        "ARS",
+        "BRL",
+        "CLP",
+        "COP",
+        "INR",
+        "KRW",
+        "SGD",
+        "HKD",
+        "NZD",
+        "SEK",
+        "NOK",
+      ];
 
       let targets: string[];
       if (targetsRaw) {
@@ -221,7 +258,10 @@ const exchangeRateTool: Tool = {
 
       return { success: true, output: lines.join("\n") };
     } catch (error) {
-      return { success: false, output: `Failed to fetch rates: ${error instanceof Error ? error.message : error}` };
+      return {
+        success: false,
+        output: `Failed to fetch rates: ${error instanceof Error ? error.message : error}`,
+      };
     }
   },
 };
@@ -256,34 +296,45 @@ const exchangeConvertTool: Tool = {
     const from = (parameters["from"] as string)?.toUpperCase();
     const to = (parameters["to"] as string)?.toUpperCase();
 
-    if (amount === undefined || amount === null || isNaN(amount)) return { success: false, output: "amount is required and must be a number" };
+    if (amount === undefined || amount === null || isNaN(amount))
+      return { success: false, output: "amount is required and must be a number" };
     if (!from) return { success: false, output: "from is required" };
     if (!to) return { success: false, output: "to is required" };
 
     try {
       const response = await fetch(`${EXCHANGE_RATE_API}/latest/${from}`);
       if (!response.ok) {
-        if (response.status === 404) return { success: false, output: `Currency '${from}' not found.` };
+        if (response.status === 404)
+          return { success: false, output: `Currency '${from}' not found.` };
         return { success: false, output: `ExchangeRate-API error: ${response.status}` };
       }
 
       const data = (await response.json()) as { result: string; rates: Record<string, number> };
-      if (data.result !== "success") return { success: false, output: "Failed to fetch exchange rates" };
+      if (data.result !== "success")
+        return { success: false, output: "Failed to fetch exchange rates" };
 
       const rate = data.rates[to];
-      if (rate === undefined) return { success: false, output: `Target currency '${to}' not found.` };
+      if (rate === undefined)
+        return { success: false, output: `Target currency '${to}' not found.` };
 
       const converted = amount * rate;
-      const fmtConverted = converted >= 1
-        ? converted.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })
-        : converted.toPrecision(4);
+      const fmtConverted =
+        converted >= 1
+          ? converted.toLocaleString("en-US", {
+              minimumFractionDigits: 2,
+              maximumFractionDigits: 2,
+            })
+          : converted.toPrecision(4);
 
       return {
         success: true,
         output: `${amount.toLocaleString("en-US")} ${from} = ${fmtConverted} ${to} (rate: ${rate.toPrecision(6)})`,
       };
     } catch (error) {
-      return { success: false, output: `Failed to convert: ${error instanceof Error ? error.message : error}` };
+      return {
+        success: false,
+        output: `Failed to convert: ${error instanceof Error ? error.message : error}`,
+      };
     }
   },
 };
@@ -348,7 +399,12 @@ function sampleUniform(data: CandleData[], maxCandles: number): CandleData[] {
   return result;
 }
 
-function renderCandlestickChart(data: CandleData[], symbol: string, period: string, interval: string): string {
+function renderCandlestickChart(
+  data: CandleData[],
+  symbol: string,
+  period: string,
+  interval: string,
+): string {
   const CHART_HEIGHT = 18;
   const MAX_CANDLES = 60;
 
@@ -400,9 +456,10 @@ function renderCandlestickChart(data: CandleData[], symbol: string, period: stri
 
   for (let row = CHART_HEIGHT - 1; row >= 0; row--) {
     const tickIdx = tickRows.indexOf(row);
-    const label = tickIdx !== -1
-      ? fmtPrice(tickPrices[tickIdx]!).padStart(maxLabelLen)
-      : " ".repeat(maxLabelLen);
+    const label =
+      tickIdx !== -1
+        ? fmtPrice(tickPrices[tickIdx]!).padStart(maxLabelLen)
+        : " ".repeat(maxLabelLen);
     lines.push(`${label} \u2502${grid[row]!.join("")}`);
   }
 
@@ -411,16 +468,26 @@ function renderCandlestickChart(data: CandleData[], symbol: string, period: stri
   // Date footer
   const firstCandle = candles[0]!;
   const lastCandle = candles[candles.length - 1]!;
-  const firstDate = new Date(firstCandle.time_open).toLocaleDateString("en-US", { month: "short", day: "numeric" });
-  const lastDate = new Date(lastCandle.time_open).toLocaleDateString("en-US", { month: "short", day: "numeric" });
+  const firstDate = new Date(firstCandle.time_open).toLocaleDateString("en-US", {
+    month: "short",
+    day: "numeric",
+  });
+  const lastDate = new Date(lastCandle.time_open).toLocaleDateString("en-US", {
+    month: "short",
+    day: "numeric",
+  });
   const dateLinePad = " ".repeat(maxLabelLen + 2);
-  lines.push(`${dateLinePad}${firstDate}${" ".repeat(Math.max(1, candles.length - firstDate.length - lastDate.length))}${lastDate}`);
+  lines.push(
+    `${dateLinePad}${firstDate}${" ".repeat(Math.max(1, candles.length - firstDate.length - lastDate.length))}${lastDate}`,
+  );
 
   // Summary
   const changePct = ((lastCandle.close - firstCandle.open) / firstCandle.open) * 100;
 
   lines.push("");
-  lines.push(` Open: ${fmtPrice(firstCandle.open)}  Close: ${fmtPrice(lastCandle.close)}  High: ${fmtPrice(globalHigh)}  Low: ${fmtPrice(globalLow)}`);
+  lines.push(
+    ` Open: ${fmtPrice(firstCandle.open)}  Close: ${fmtPrice(lastCandle.close)}  High: ${fmtPrice(globalHigh)}  Low: ${fmtPrice(globalLow)}`,
+  );
   lines.push(` Change: ${fmtPct(changePct)}`);
 
   return lines.join("\n");
@@ -429,7 +496,8 @@ function renderCandlestickChart(data: CandleData[], symbol: string, period: stri
 const cryptoChartTool: Tool = {
   definition: {
     name: "crypto_chart",
-    description: "Display an ASCII candlestick chart for a cryptocurrency's historical price. Shows OHLCV data as a visual chart in the terminal.",
+    description:
+      "Display an ASCII candlestick chart for a cryptocurrency's historical price. Shows OHLCV data as a visual chart in the terminal.",
     parameters: [
       {
         name: "symbol",
@@ -457,7 +525,8 @@ const cryptoChartTool: Tool = {
 
     const period = (parameters["period"] as string) || "30d";
     const config = PERIOD_CONFIG[period];
-    if (!config) return { success: false, output: `Invalid period '${period}'. Use: 7d, 30d, 90d, 1y.` };
+    if (!config)
+      return { success: false, output: `Invalid period '${period}'. Use: 7d, 30d, 90d, 1y.` };
 
     const interval = (parameters["interval"] as string) || config.defaultInterval;
 
@@ -465,7 +534,10 @@ const cryptoChartTool: Tool = {
       const coins = await getCoinList();
       const coin = coins.find((c) => c.symbol === symbol);
       if (!coin) {
-        return { success: false, output: `'${symbol}' not found. Use crypto_list to see available coins.` };
+        return {
+          success: false,
+          output: `'${symbol}' not found. Use crypto_list to see available coins.`,
+        };
       }
 
       const start = new Date();
@@ -473,7 +545,8 @@ const cryptoChartTool: Tool = {
 
       const url = `${COINPAPRIKA_API}/tickers/${coin.id}/historical?start=${start.toISOString()}&interval=1d`;
       const response = await fetch(url);
-      if (!response.ok) return { success: false, output: `Failed to fetch historical data: ${response.status}` };
+      if (!response.ok)
+        return { success: false, output: `Failed to fetch historical data: ${response.status}` };
 
       const points = (await response.json()) as TickerHistoryPoint[];
       if (!Array.isArray(points) || points.length === 0) {
@@ -485,7 +558,10 @@ const cryptoChartTool: Tool = {
 
       return { success: true, output: chart };
     } catch (error) {
-      return { success: false, output: `Failed to generate chart: ${error instanceof Error ? error.message : error}` };
+      return {
+        success: false,
+        output: `Failed to generate chart: ${error instanceof Error ? error.message : error}`,
+      };
     }
   },
 };
@@ -497,7 +573,8 @@ const cryptoChartTool: Tool = {
 export default definePlugin({
   name: "cryptofinance",
   version: "0.3.0",
-  description: "Cryptocurrency prices and exchange rates using free public APIs. No API keys needed.",
+  description:
+    "Cryptocurrency prices and exchange rates using free public APIs. No API keys needed.",
   author: "kraken",
 
   toolDisplayNames: {

@@ -5,15 +5,18 @@ import { VERSION } from "@/constants.ts";
 type CommandModule = { execute: (args: string[]) => Promise<void> };
 
 const COMMANDS: Record<string, { description: string; module: string }> = {
-  start:     { description: "Start the TUI with scheduler and gateway", module: "@/commands/start.ts" },
-  init:      { description: "Initialize kraken in the current project",  module: "@/commands/init.ts" },
-  config:    { description: "View or edit project configuration",        module: "@/commands/config.ts" },
-  doctor:    { description: "Check system health and dependencies",      module: "@/commands/doctor.ts" },
-  plugins:   { description: "Manage plugins",                            module: "@/commands/plugins.ts" },
-  update:    { description: "Update kraken to the latest version",       module: "@/commands/update.ts" },
-  uninstall: { description: "Uninstall kraken from your system",         module: "@/commands/uninstall.ts" },
-  version:   { description: "Print version",                             module: "@/commands/version.ts" },
-  help:      { description: "Show this help message",                    module: "@/commands/help.ts" },
+  start: { description: "Start the TUI with scheduler and gateway", module: "@/commands/start.ts" },
+  init: { description: "Initialize kraken in the current project", module: "@/commands/init.ts" },
+  config: { description: "View or edit project configuration", module: "@/commands/config.ts" },
+  doctor: { description: "Check system health and dependencies", module: "@/commands/doctor.ts" },
+  plugins: { description: "Manage plugins", module: "@/commands/plugins.ts" },
+  update: { description: "Update kraken to the latest version", module: "@/commands/update.ts" },
+  uninstall: {
+    description: "Uninstall kraken from your system",
+    module: "@/commands/uninstall.ts",
+  },
+  version: { description: "Print version", module: "@/commands/version.ts" },
+  help: { description: "Show this help message", module: "@/commands/help.ts" },
 };
 
 function resolveCommand(argv: string[]): { command: string; commandArgs: string[] } {
@@ -48,7 +51,7 @@ async function main(): Promise<void> {
     process.exit(1);
   }
 
-  const mod = await import(entry.module) as CommandModule;
+  const mod = (await import(entry.module)) as CommandModule;
   await mod.execute(commandArgs);
 }
 

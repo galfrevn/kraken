@@ -89,7 +89,9 @@ export class ThreadManager {
     try {
       const engine = this.getActiveEngine();
       engine.updatePluginPromptExtensions(extensions);
-    } catch { /* no active thread yet */ }
+    } catch {
+      /* no active thread yet */
+    }
   }
 
   setPluginHooks(dispatcher: HookDispatcher, context: PluginContext): void {
@@ -147,9 +149,7 @@ export class ThreadManager {
     const extensions = this.promptExtensionsGetter?.();
     return {
       memoryContext: this.loadMemoryContext(),
-      pluginPromptExtensions: extensions && extensions.length > 0
-        ? extensions
-        : undefined,
+      pluginPromptExtensions: extensions && extensions.length > 0 ? extensions : undefined,
       environmentContext: this.buildEnvironmentContext(),
     };
   }
@@ -262,16 +262,20 @@ export class ThreadManager {
 
     // Wait until the agent has responded at least once
     const userMessages = messages.filter((message) => message.role === "user");
-    const hasAssistantResponse = messages.some((message) => message.role === "assistant" && message.content.trim().length > 0);
+    const hasAssistantResponse = messages.some(
+      (message) => message.role === "assistant" && message.content.trim().length > 0,
+    );
     if (userMessages.length === 0 || !hasAssistantResponse) return;
 
     // Pick the first substantive user message (skip short greetings like "hola", "hi", "hey")
-    const substantiveMessage = userMessages.find((m) => m.content.trim().length > 10) ?? userMessages[0]!;
+    const substantiveMessage =
+      userMessages.find((m) => m.content.trim().length > 10) ?? userMessages[0]!;
     const titleInput = substantiveMessage.content.slice(0, 300);
 
-    const truncatedFallback = substantiveMessage.content.length > 40
-      ? substantiveMessage.content.slice(0, 40) + "..."
-      : substantiveMessage.content;
+    const truncatedFallback =
+      substantiveMessage.content.length > 40
+        ? substantiveMessage.content.slice(0, 40) + "..."
+        : substantiveMessage.content;
 
     try {
       const generatedTitle = await this.languageModelClient.singlePrompt(
@@ -327,53 +331,39 @@ export class ThreadManager {
         },
       );
 
-      const cleanedSummary = generatedSummary
-        .replace(/^["']|["']$/g, "")
-        .trim();
+      const cleanedSummary = generatedSummary.replace(/^["']|["']$/g, "").trim();
 
       if (cleanedSummary.length < 20) return;
 
-      const title = metadata.title !== UNTITLED_THREAD_PREFIX
-        ? metadata.title
-        : "untitled session";
+      const title = metadata.title !== UNTITLED_THREAD_PREFIX ? metadata.title : "untitled session";
 
       const tags = [identifier, "session"];
 
-      const toolNames = [...new Set(
-        messages
-          .filter((m) => m.role === "tool_call" && m.toolName)
-          .map((m) => m.toolName!),
-      )];
+      const toolNames = [
+        ...new Set(
+          messages.filter((m) => m.role === "tool_call" && m.toolName).map((m) => m.toolName!),
+        ),
+      ];
       if (toolNames.length > 0) {
         tags.push(...toolNames.slice(0, 5));
       }
 
-      this.database.insertFact(
-        "context",
-        `Session "${title}": ${cleanedSummary}`,
-        "summary",
-        tags,
-      );
+      this.database.insertFact("context", `Session "${title}": ${cleanedSummary}`, "summary", tags);
     } catch {
       // non-critical, continue silently
     }
   }
 
-  private buildCondensedTranscript(
-    messages: Array<{ role: string; content: string }>,
-  ): string {
-    const relevantMessages = messages.filter(
-      (m) => m.role === "user" || m.role === "assistant",
-    );
+  private buildCondensedTranscript(messages: Array<{ role: string; content: string }>): string {
+    const relevantMessages = messages.filter((m) => m.role === "user" || m.role === "assistant");
 
     const lines: string[] = [];
     let totalLength = 0;
 
     for (const message of relevantMessages) {
       const role = message.role === "user" ? "User" : "Agent";
-      const content = message.content.length > 400
-        ? message.content.slice(0, 400) + "..."
-        : message.content;
+      const content =
+        message.content.length > 400 ? message.content.slice(0, 400) + "..." : message.content;
 
       const line = `${role}: ${content}`;
 
@@ -523,7 +513,9 @@ export class ThreadManager {
         const messageRows: ThreadMessageRow[] = state.messages.map((message) => ({
           role: message.role,
           content: message.content,
-          raw_content: message.rawContent ?? (message.attachments ? JSON.stringify(message.attachments) : null),
+          raw_content:
+            message.rawContent ??
+            (message.attachments ? JSON.stringify(message.attachments) : null),
           tool_name: message.toolName ?? null,
           tool_success: message.toolSuccess !== undefined ? (message.toolSuccess ? 1 : 0) : null,
           created_at: message.timestamp,
@@ -616,7 +608,9 @@ export class ThreadManager {
                   attachments = parsed;
                   rawContent = undefined;
                 }
-              } catch { /* not JSON, keep as rawContent */ }
+              } catch {
+                /* not JSON, keep as rawContent */
+              }
             }
             return {
               role: messageRow.role as any,
@@ -624,7 +618,8 @@ export class ThreadManager {
               rawContent,
               timestamp: messageRow.created_at,
               toolName: messageRow.tool_name ?? undefined,
-              toolSuccess: messageRow.tool_success !== null ? messageRow.tool_success === 1 : undefined,
+              toolSuccess:
+                messageRow.tool_success !== null ? messageRow.tool_success === 1 : undefined,
               attachments,
             };
           }),
@@ -637,7 +632,11 @@ export class ThreadManager {
           pendingQuestions: (() => {
             const pqRow = conversationRows.find((r) => r.role === "__pending_questions__");
             if (!pqRow) return undefined;
-            try { return JSON.parse(pqRow.content); } catch { return undefined; }
+            try {
+              return JSON.parse(pqRow.content);
+            } catch {
+              return undefined;
+            }
           })(),
           ...(() => {
             const planRow = conversationRows.find((r) => r.role === "__plan__");
@@ -646,7 +645,9 @@ export class ThreadManager {
               const parsed = JSON.parse(planRow.content);
               const { planMode: pm, ...plan } = parsed;
               return { plan, planMode: pm ?? undefined };
-            } catch { return {}; }
+            } catch {
+              return {};
+            }
           })(),
         };
 

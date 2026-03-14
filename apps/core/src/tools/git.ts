@@ -9,7 +9,10 @@ function sanitizeGitPath(value: string): string {
   if (SHELL_METACHARACTERS.test(value)) {
     throw new Error(`invalid characters in path: ${value}`);
   }
-  if (value !== "." && (value.startsWith("/") || value.startsWith("\\\\") || /^[A-Za-z]:/.test(value))) {
+  if (
+    value !== "." &&
+    (value.startsWith("/") || value.startsWith("\\\\") || /^[A-Za-z]:/.test(value))
+  ) {
     throw new Error(`absolute paths are not allowed: ${value}`);
   }
   return value;
@@ -40,7 +43,10 @@ export const gitStatusTool: Tool = {
     context: ToolExecutionContext,
   ): Promise<ToolResult> {
     try {
-      const branchResult = await runGitCommand(["branch", "--show-current"], context.workingDirectory);
+      const branchResult = await runGitCommand(
+        ["branch", "--show-current"],
+        context.workingDirectory,
+      );
       const statusResult = await runGitCommand(["status", "--short"], context.workingDirectory);
 
       if (statusResult.exitCode !== 0) {

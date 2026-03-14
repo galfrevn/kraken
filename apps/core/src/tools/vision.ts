@@ -2,15 +2,7 @@ import { existsSync } from "node:fs";
 import { join, isAbsolute, extname } from "node:path";
 import type { Tool, ToolResult, ToolExecutionContext } from "@/tools/schema.ts";
 
-const SUPPORTED_FORMATS = new Set([
-  ".png",
-  ".jpg",
-  ".jpeg",
-  ".gif",
-  ".bmp",
-  ".webp",
-  ".svg",
-]);
+const SUPPORTED_FORMATS = new Set([".png", ".jpg", ".jpeg", ".gif", ".bmp", ".webp", ".svg"]);
 
 export const viewImageTool: Tool = {
   definition: {
@@ -36,9 +28,7 @@ export const viewImageTool: Tool = {
       return { success: false, output: "", error: "path parameter is required" };
     }
 
-    const filePath = isAbsolute(rawPath)
-      ? rawPath
-      : join(context.workingDirectory, rawPath);
+    const filePath = isAbsolute(rawPath) ? rawPath : join(context.workingDirectory, rawPath);
 
     if (!existsSync(filePath)) {
       return { success: false, output: "", error: `file not found: ${rawPath}` };

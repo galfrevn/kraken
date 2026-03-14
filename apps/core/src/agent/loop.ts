@@ -86,7 +86,10 @@ export class AgentExecutionLoop {
       while (iterations < this.maxIterations) {
         iterations += 1;
 
-        if (completionResult.finishReason !== "tool_calls" || completionResult.toolCalls.length === 0) {
+        if (
+          completionResult.finishReason !== "tool_calls" ||
+          completionResult.toolCalls.length === 0
+        ) {
           const output = completionResult.content;
           this.taskQueueManager.completeTask(task.id, output);
           return {
@@ -112,7 +115,10 @@ export class AgentExecutionLoop {
         completionResult = await this.languageModelClient.complete(messages);
 
         if (completionResult.toolCalls.length > 0) {
-          conversation.addAssistantToolCallMessage(completionResult.content, completionResult.toolCalls);
+          conversation.addAssistantToolCallMessage(
+            completionResult.content,
+            completionResult.toolCalls,
+          );
         } else {
           conversation.addAssistantMessage(completionResult.content);
         }
@@ -163,17 +169,28 @@ export class AgentExecutionLoop {
       }
 
       if (this.hookDispatcher) {
-        parameters = await this.hookDispatcher.dispatchBeforeToolCall(toolCall.function.name, parameters);
+        parameters = await this.hookDispatcher.dispatchBeforeToolCall(
+          toolCall.function.name,
+          parameters,
+        );
       }
 
       this.database.addTaskLog(task.id, "info", `calling tool: ${toolCall.function.name}`, {
         parameters: JSON.stringify(parameters),
       });
 
-      const toolResult = await this.toolRegistry.executeTool(toolCall.function.name, parameters, context);
+      const toolResult = await this.toolRegistry.executeTool(
+        toolCall.function.name,
+        parameters,
+        context,
+      );
 
       if (this.hookDispatcher) {
-        await this.hookDispatcher.dispatchAfterToolCall(toolCall.function.name, parameters, toolResult);
+        await this.hookDispatcher.dispatchAfterToolCall(
+          toolCall.function.name,
+          parameters,
+          toolResult,
+        );
       }
 
       this.database.addTaskLog(

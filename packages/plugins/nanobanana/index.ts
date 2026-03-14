@@ -41,7 +41,10 @@ function extractBase64FromDataUrl(dataUrl: string): string {
   return dataUrl.replace(/^data:image\/\w+;base64,/, "");
 }
 
-function saveImageToDisk(base64Data: string, outputDirectory: string): { path: string; sizeBytes: number } {
+function saveImageToDisk(
+  base64Data: string,
+  outputDirectory: string,
+): { path: string; sizeBytes: number } {
   mkdirSync(outputDirectory, { recursive: true });
   const filename = `image-${Date.now()}.png`;
   const filepath = join(outputDirectory, filename);
@@ -52,9 +55,7 @@ function saveImageToDisk(base64Data: string, outputDirectory: string): { path: s
 
 function findImageInResponse(response: OpenRouterResponse): OpenRouterImageItem | undefined {
   const images = response.choices?.[0]?.message?.images ?? [];
-  return images.find(
-    (item) => item.type === "image_url" && item.image_url?.url,
-  );
+  return images.find((item) => item.type === "image_url" && item.image_url?.url);
 }
 
 const generateImageTool: Tool = {
@@ -86,7 +87,8 @@ const generateImageTool: Tool = {
     if (!apiKey) {
       return {
         success: false,
-        output: "OpenRouter API key not configured. Set apiKey in plugin config or OPENROUTER_API_KEY env variable.",
+        output:
+          "OpenRouter API key not configured. Set apiKey in plugin config or OPENROUTER_API_KEY env variable.",
       };
     }
 
@@ -108,17 +110,21 @@ const generateImageTool: Tool = {
 
       if (!response.ok) {
         const errorBody = await response.text();
-        return { success: false, output: `OpenRouter API error (${response.status}): ${errorBody}` };
+        return {
+          success: false,
+          output: `OpenRouter API error (${response.status}): ${errorBody}`,
+        };
       }
 
-      const data = await response.json() as OpenRouterResponse;
+      const data = (await response.json()) as OpenRouterResponse;
       const textContent = data.choices?.[0]?.message?.content;
       const imageItem = findImageInResponse(data);
 
       if (!imageItem?.image_url?.url) {
-        const fallback = typeof textContent === "string" && textContent.trim()
-          ? textContent.trim()
-          : "Image generation completed but no image data was returned.";
+        const fallback =
+          typeof textContent === "string" && textContent.trim()
+            ? textContent.trim()
+            : "Image generation completed but no image data was returned.";
         return { success: true, output: fallback };
       }
 
@@ -126,9 +132,8 @@ const generateImageTool: Tool = {
       const outputDirectory = join(KRAKEN_HOME, "images");
       const { path, sizeBytes } = saveImageToDisk(base64Data, outputDirectory);
 
-      const description = typeof textContent === "string" && textContent.trim()
-        ? textContent.trim()
-        : undefined;
+      const description =
+        typeof textContent === "string" && textContent.trim() ? textContent.trim() : undefined;
 
       return {
         success: true,

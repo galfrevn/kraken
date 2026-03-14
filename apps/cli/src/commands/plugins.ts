@@ -1,6 +1,15 @@
 import { existsSync, readdirSync, readFileSync, mkdirSync, writeFileSync } from "node:fs";
 import { join, resolve } from "node:path";
-import { bold, colorize, fail, success, warn, step, KRAKEN_HOME, GITHUB_REPO } from "@/constants.ts";
+import {
+  bold,
+  colorize,
+  fail,
+  success,
+  warn,
+  step,
+  KRAKEN_HOME,
+  GITHUB_REPO,
+} from "@/constants.ts";
 
 const GITHUB_BRANCH = "main";
 
@@ -105,9 +114,13 @@ function printPluginList(plugins: PluginInfo[]): void {
   console.log();
   for (const plugin of plugins) {
     const authorTag = plugin.author ? ` ${colorize(`by ${plugin.author}`, "dim")}` : "";
-    console.log(`  ${colorize(plugin.name, "cyan")} ${colorize(`v${plugin.version}`, "dim")}${authorTag}`);
+    console.log(
+      `  ${colorize(plugin.name, "cyan")} ${colorize(`v${plugin.version}`, "dim")}${authorTag}`,
+    );
     console.log(`    ${plugin.description}`);
-    console.log(`    ${colorize(`${plugin.toolCount} tools`, "dim")} | ${colorize(plugin.path, "dim")}`);
+    console.log(
+      `    ${colorize(`${plugin.toolCount} tools`, "dim")} | ${colorize(plugin.path, "dim")}`,
+    );
     console.log();
   }
 }
@@ -201,7 +214,9 @@ export default plugin;
 
     writeFileSync(join(pluginPath, "index.ts"), template);
     success(`created plugin '${pluginName}' at ${pluginPath}`);
-    console.log(`\n  Edit ${colorize(`${pluginPath}/index.ts`, "cyan")} to customize your plugin.\n`);
+    console.log(
+      `\n  Edit ${colorize(`${pluginPath}/index.ts`, "cyan")} to customize your plugin.\n`,
+    );
     return;
   }
 
@@ -215,7 +230,9 @@ export default plugin;
 
       if (!entry) {
         fail(`plugin "${pluginName}" not found in registry`);
-        console.log(`\n  Available plugins: ${registry.plugins.map((p) => colorize(p.name, "cyan")).join(", ")}\n`);
+        console.log(
+          `\n  Available plugins: ${registry.plugins.map((p) => colorize(p.name, "cyan")).join(", ")}\n`,
+        );
         process.exit(1);
       }
 
@@ -241,7 +258,9 @@ export default plugin;
 
       for (const requirement of entry.requires) {
         if (!checkCommandAvailable(requirement)) {
-          warn(`required CLI tool "${requirement}" is not installed. Install it with: npm install -g ${requirement}`);
+          warn(
+            `required CLI tool "${requirement}" is not installed. Install it with: npm install -g ${requirement}`,
+          );
         }
       }
 
@@ -267,9 +286,13 @@ export default plugin;
         const isInstalled = installedNames.has(entry.name);
         const statusIcon = isInstalled ? colorize("✓", "green") : colorize("○", "dim");
         const statusLabel = isInstalled ? colorize(" installed", "green") : "";
-        console.log(`  ${statusIcon} ${colorize(entry.name, "cyan")} ${colorize(`v${entry.version}`, "dim")}${statusLabel}`);
+        console.log(
+          `  ${statusIcon} ${colorize(entry.name, "cyan")} ${colorize(`v${entry.version}`, "dim")}${statusLabel}`,
+        );
         console.log(`    ${entry.description}`);
-        console.log(`    ${colorize(`${entry.tools.length} tools`, "dim")}${entry.requires.length > 0 ? colorize(` | requires: ${entry.requires.join(", ")}`, "dim") : ""}`);
+        console.log(
+          `    ${colorize(`${entry.tools.length} tools`, "dim")}${entry.requires.length > 0 ? colorize(` | requires: ${entry.requires.join(", ")}`, "dim") : ""}`,
+        );
         console.log();
       }
     } catch (error) {
@@ -282,8 +305,12 @@ export default plugin;
 
   console.log(`\n  ${bold("Usage:")}`);
   console.log(`    ${colorize("kraken plugins", "cyan")}                 list installed plugins`);
-  console.log(`    ${colorize("kraken plugins search", "cyan")}           browse available plugins`);
-  console.log(`    ${colorize("kraken plugins install", "cyan")} <name>   install a plugin from the registry`);
+  console.log(
+    `    ${colorize("kraken plugins search", "cyan")}           browse available plugins`,
+  );
+  console.log(
+    `    ${colorize("kraken plugins install", "cyan")} <name>   install a plugin from the registry`,
+  );
   console.log(`    ${colorize("kraken plugins inspect", "cyan")} <name>   show plugin details`);
   console.log(`    ${colorize("kraken plugins create", "cyan")} <name>    scaffold a new plugin\n`);
 }

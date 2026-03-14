@@ -18,9 +18,9 @@ export interface ImagePreviewData {
 function rgbaAt(data: Uint8Array | Uint16Array, index: number, channels: number): PixelColor {
   const base = index * channels;
   return {
-    r: data[base]! & 0xFF,
-    g: data[base + 1]! & 0xFF,
-    b: data[base + 2]! & 0xFF,
+    r: data[base]! & 0xff,
+    g: data[base + 1]! & 0xff,
+    b: data[base + 2]! & 0xff,
   };
 }
 
@@ -50,13 +50,16 @@ function nearestNeighborResize(
   return pixels;
 }
 
-export function loadImagePreview(filePath: string, maxColumns: number = 60): ImagePreviewData | null {
+export function loadImagePreview(
+  filePath: string,
+  maxColumns: number = 60,
+): ImagePreviewData | null {
   if (!existsSync(filePath)) return null;
 
   try {
     const fileBuffer = readFileSync(filePath);
     const decoded = decode(fileBuffer);
-    const channels = decoded.channels ?? (decoded.data.length / (decoded.width * decoded.height));
+    const channels = decoded.channels ?? decoded.data.length / (decoded.width * decoded.height);
 
     const aspectRatio = decoded.width / decoded.height;
     let previewWidth = Math.min(maxColumns, decoded.width);
@@ -115,9 +118,8 @@ export function generatePreviewRows(preview: ImagePreviewData): ColorSegment[][]
 
     for (let x = 0; x < preview.width; x++) {
       const topPixel = preview.pixels[y]![x]!;
-      const bottomPixel = y + 1 < preview.height
-        ? preview.pixels[y + 1]![x]!
-        : { r: 0, g: 0, b: 0 };
+      const bottomPixel =
+        y + 1 < preview.height ? preview.pixels[y + 1]![x]! : { r: 0, g: 0, b: 0 };
 
       const fg = pixelToHex(topPixel);
       const bg = pixelToHex(bottomPixel);

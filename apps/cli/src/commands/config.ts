@@ -199,9 +199,19 @@ export async function execute(args: string[]): Promise<void> {
   }
 
   console.log(`\n  ${bold("Usage:")}`);
-  console.log(`    ${colorize("kraken config", "cyan")}                    show full configuration`);
-  console.log(`    ${colorize("kraken config get", "cyan")} <key>          get a specific value (dot notation)`);
-  console.log(`    ${colorize("kraken config set", "cyan")} <k> <v>        set a specific value in kraken.yml`);
-  console.log(`    ${colorize("kraken config set-key", "cyan")} <key>      set the API key in ~/.kraken/.env`);
-  console.log(`    ${colorize("kraken config path", "cyan")}               show config file path\n`);
+  console.log(
+    `    ${colorize("kraken config", "cyan")}                    show full configuration`,
+  );
+  console.log(
+    `    ${colorize("kraken config get", "cyan")} <key>          get a specific value (dot notation)`,
+  );
+  console.log(
+    `    ${colorize("kraken config set", "cyan")} <k> <v>        set a specific value in kraken.yml`,
+  );
+  console.log(
+    `    ${colorize("kraken config set-key", "cyan")} <key>      set the API key in ~/.kraken/.env`,
+  );
+  console.log(
+    `    ${colorize("kraken config path", "cyan")}               show config file path\n`,
+  );
 }

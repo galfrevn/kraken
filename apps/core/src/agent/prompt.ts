@@ -24,7 +24,9 @@ export interface PromptOptions {
 // --- Section builders ---
 
 function buildIdentitySection(env?: EnvironmentContext): string {
-  const name = env?.projectName ? `You are Kraken, an autonomous developer agent working on **${env.projectName}**.` : "You are Kraken, an autonomous developer agent.";
+  const name = env?.projectName
+    ? `You are Kraken, an autonomous developer agent working on **${env.projectName}**.`
+    : "You are Kraken, an autonomous developer agent.";
 
   return `${name}
 

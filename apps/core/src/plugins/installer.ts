@@ -30,7 +30,9 @@ export async function fetchRegistry(): Promise<PluginRegistryManifest> {
 
   const response = await fetch(registryUrl, { signal: AbortSignal.timeout(10_000) });
   if (!response.ok) {
-    throw new Error(`Failed to fetch plugin registry (${response.status}): ${await response.text()}`);
+    throw new Error(
+      `Failed to fetch plugin registry (${response.status}): ${await response.text()}`,
+    );
   }
 
   return (await response.json()) as PluginRegistryManifest;
@@ -59,9 +61,7 @@ export function isPluginInstalled(pluginName: string): boolean {
 
 function checkCommandAvailable(command: string): boolean {
   try {
-    const cmd = process.platform === "win32"
-      ? ["cmd", "/c", "where", command]
-      : ["which", command];
+    const cmd = process.platform === "win32" ? ["cmd", "/c", "where", command] : ["which", command];
     const result = Bun.spawnSync({ cmd, stdout: "pipe", stderr: "pipe" });
     return result.exitCode === 0;
   } catch {
@@ -185,7 +185,9 @@ export async function installPluginFromRegistry(pluginName: string): Promise<Ins
   const warnings: string[] = [];
   for (const requirement of entry.requires) {
     if (!checkCommandAvailable(requirement)) {
-      warnings.push(`Required CLI tool "${requirement}" is not installed. Install it with: npm install -g ${requirement}`);
+      warnings.push(
+        `Required CLI tool "${requirement}" is not installed. Install it with: npm install -g ${requirement}`,
+      );
     }
   }
 

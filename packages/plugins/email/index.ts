@@ -17,8 +17,7 @@ let defaultFrom: string | undefined;
 const emailSendTool: Tool = {
   definition: {
     name: "email_send",
-    description:
-      "Send an email via Resend. The user will be prompted to confirm before sending.",
+    description: "Send an email via Resend. The user will be prompted to confirm before sending.",
     requiresConfirmation: true,
     parameters: [
       {
@@ -219,10 +218,8 @@ export default definePlugin({
     "Optionally also configure from_address for the default sender.",
 
   activate: async (context: PluginContext) => {
-    apiKey =
-      (context.config.api_key as string) || Bun.env.RESEND_API_KEY;
-    defaultFrom =
-      (context.config.from_address as string) || Bun.env.RESEND_FROM_ADDRESS;
+    apiKey = (context.config.api_key as string) || Bun.env.RESEND_API_KEY;
+    defaultFrom = (context.config.from_address as string) || Bun.env.RESEND_FROM_ADDRESS;
     console.log("[email] activated");
   },
 

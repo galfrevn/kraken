@@ -1,6 +1,16 @@
 import { existsSync } from "node:fs";
 import { join } from "node:path";
-import { KRAKEN_ROOT, GITHUB_REPO, VERSION, step, success, warn, fail, bold, colorize } from "@/constants.ts";
+import {
+  KRAKEN_ROOT,
+  GITHUB_REPO,
+  VERSION,
+  step,
+  success,
+  warn,
+  fail,
+  bold,
+  colorize,
+} from "@/constants.ts";
 
 interface GitHubRelease {
   tag_name: string;
@@ -10,12 +20,12 @@ interface GitHubRelease {
 async function fetchLatestRelease(): Promise<GitHubRelease | null> {
   try {
     const response = await fetch(`https://api.github.com/repos/${GITHUB_REPO}/releases/latest`, {
-      headers: { "Accept": "application/vnd.github.v3+json" },
+      headers: { Accept: "application/vnd.github.v3+json" },
       signal: AbortSignal.timeout(10000),
     });
 
     if (!response.ok) return null;
-    return await response.json() as GitHubRelease;
+    return (await response.json()) as GitHubRelease;
   } catch {
     return null;
   }
@@ -61,7 +71,12 @@ async function updateFromSource(): Promise<boolean> {
   success("source code updated");
 
   step("installing dependencies");
-  const bunInstall = Bun.spawnSync({ cmd: ["bun", "install"], cwd: KRAKEN_ROOT, stdout: "pipe", stderr: "pipe" });
+  const bunInstall = Bun.spawnSync({
+    cmd: ["bun", "install"],
+    cwd: KRAKEN_ROOT,
+    stdout: "pipe",
+    stderr: "pipe",
+  });
   if (bunInstall.exitCode !== 0) {
     warn("bun install had issues, but continuing...");
   }
@@ -126,7 +141,9 @@ export async function execute(_args: string[]): Promise<void> {
     return;
   }
 
-  console.log(`\n  ${colorize("New version available!", "green")} ${colorize(`v${VERSION}`, "dim")} → ${colorize(remoteVersion, "cyan")}`);
+  console.log(
+    `\n  ${colorize("New version available!", "green")} ${colorize(`v${VERSION}`, "dim")} → ${colorize(remoteVersion, "cyan")}`,
+  );
 
   const updated = await updateFromSource();
   if (updated) {

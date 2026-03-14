@@ -68,16 +68,26 @@ export function SetupPanel({ fields, onComplete }: SetupPanelProps) {
   }
 
   return (
-    <box flexDirection="column" width="100%" height="100%" backgroundColor={COLORS.background} padding={2}>
+    <box
+      flexDirection="column"
+      width="100%"
+      height="100%"
+      backgroundColor={COLORS.background}
+      padding={2}
+    >
       <box flexDirection="row" width="100%" paddingBottom={1}>
-        <text fg={COLORS.blue}><b>{"Plugin Setup"}</b></text>
+        <text fg={COLORS.blue}>
+          <b>{"Plugin Setup"}</b>
+        </text>
         <text fg={COLORS.textMuted}>{`  (${currentIndex + 1}/${fields.length})`}</text>
       </box>
 
       <box flexDirection="column" width="100%" paddingBottom={1}>
         <box flexDirection="row" width="100%">
           <text fg={COLORS.textMuted}>{"plugin: "}</text>
-          <text fg={COLORS.purple}><b>{currentField.pluginName}</b></text>
+          <text fg={COLORS.purple}>
+            <b>{currentField.pluginName}</b>
+          </text>
         </box>
         <box flexDirection="row" width="100%">
           <text fg={COLORS.textMuted}>{"field: "}</text>
@@ -102,9 +112,18 @@ export function SetupPanel({ fields, onComplete }: SetupPanelProps) {
       </box>
 
       <box flexDirection="row" width="100%" paddingTop={1} gap={2}>
-        <text fg={COLORS.green}><b>{"enter"}</b>{" save"}</text>
-        <text fg={COLORS.textMuted}><b>{"tab"}</b>{" skip"}</text>
-        <text fg={COLORS.textMuted}><b>{"esc"}</b>{" skip all"}</text>
+        <text fg={COLORS.green}>
+          <b>{"enter"}</b>
+          {" save"}
+        </text>
+        <text fg={COLORS.textMuted}>
+          <b>{"tab"}</b>
+          {" skip"}
+        </text>
+        <text fg={COLORS.textMuted}>
+          <b>{"esc"}</b>
+          {" skip all"}
+        </text>
       </box>
     </box>
   );

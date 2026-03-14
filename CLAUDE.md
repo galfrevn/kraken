@@ -87,18 +87,18 @@ gen/
 ### Service Ports
 
 | Service   | Default Port | Env Variable     |
-|-----------|-------------|------------------|
-| Scheduler | 50051       | `SCHEDULER_PORT` |
-| Gateway   | 50052       | `GATEWAY_PORT`   |
+| --------- | ------------ | ---------------- |
+| Scheduler | 50051        | `SCHEDULER_PORT` |
+| Gateway   | 50052        | `GATEWAY_PORT`   |
 
 ### Key Environment Variables
 
-| Variable | Purpose |
-|---|---|
-| `KRAKEN_OPENROUTER_API_KEY` / `OPENROUTER_API_KEY` / `ANTHROPIC_API_KEY` / `OPENAI_API_KEY` | LLM provider API key |
-| `BRAVE_SEARCH_API_KEY` | Web search tool |
-| `KRAKEN_CONFIGURATION_FILE` | Override config file path (default: `~/.kraken/kraken.yml`) |
-| `KRAKEN_SCHEDULER_URL` / `KRAKEN_GATEWAY_URL` | Override service URLs |
+| Variable                                                                                    | Purpose                                                     |
+| ------------------------------------------------------------------------------------------- | ----------------------------------------------------------- |
+| `KRAKEN_OPENROUTER_API_KEY` / `OPENROUTER_API_KEY` / `ANTHROPIC_API_KEY` / `OPENAI_API_KEY` | LLM provider API key                                        |
+| `BRAVE_SEARCH_API_KEY`                                                                      | Web search tool                                             |
+| `KRAKEN_CONFIGURATION_FILE`                                                                 | Override config file path (default: `~/.kraken/kraken.yml`) |
+| `KRAKEN_SCHEDULER_URL` / `KRAKEN_GATEWAY_URL`                                               | Override service URLs                                       |
 
 ## Tech Stack
 

@@ -30,9 +30,7 @@ export function ReviewsView({ store, focused }: ReviewsViewProps) {
     if (!focused) return;
 
     if (key.name === "j" || key.name === "down") {
-      setSelectedIndex((previous) =>
-        Math.min(previous + 1, pendingReviews.length - 1),
-      );
+      setSelectedIndex((previous) => Math.min(previous + 1, pendingReviews.length - 1));
     }
     if (key.name === "k" || key.name === "up") {
       setSelectedIndex((previous) => Math.max(previous - 1, 0));
@@ -70,8 +68,7 @@ export function ReviewsView({ store, focused }: ReviewsViewProps) {
     <box flexDirection="column" flexGrow={1} width="100%">
       <box flexDirection="row" paddingBottom={1}>
         <text fg={COLORS.textSecondary}>
-          {pendingReviews.length +
-            " pending  ·  j/k navigate  ·  a approve  ·  x reject"}
+          {pendingReviews.length + " pending  ·  j/k navigate  ·  a approve  ·  x reject"}
         </text>
       </box>
 
@@ -101,21 +98,14 @@ export function ReviewsView({ store, focused }: ReviewsViewProps) {
               >
                 <box flexDirection="row">
                   <text fg={COLORS.yellow}>{"◉ "}</text>
-                  <text fg={isSelected ? COLORS.text : COLORS.textSecondary}>
-                    {task.name}
-                  </text>
+                  <text fg={isSelected ? COLORS.text : COLORS.textSecondary}>{task.name}</text>
                   <box flexGrow={1} />
                   <text fg={COLORS.textMuted}>{task.id.slice(0, 8)}</text>
                 </box>
                 <text fg={COLORS.textMuted}>
-                  {"  trigger: " +
-                    task.triggerType +
-                    "  ·  priority: " +
-                    task.priority}
+                  {"  trigger: " + task.triggerType + "  ·  priority: " + task.priority}
                 </text>
-                {task.description && (
-                  <text fg={COLORS.textMuted}>{"  " + task.description}</text>
-                )}
+                {task.description && <text fg={COLORS.textMuted}>{"  " + task.description}</text>}
               </box>
             );
           })}

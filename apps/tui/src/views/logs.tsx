@@ -53,7 +53,9 @@ export function LogsView({ store, focused }: LogsViewProps) {
       message: log.message,
     }));
 
-    const merged = [...taskLogs, ...engineLogs].sort((a, b) => a.timestamp.localeCompare(b.timestamp));
+    const merged = [...taskLogs, ...engineLogs].sort((a, b) =>
+      a.timestamp.localeCompare(b.timestamp),
+    );
     setLogs(merged);
   }, [store]);
 
@@ -101,12 +103,7 @@ export function LogsView({ store, focused }: LogsViewProps) {
         </text>
       </box>
 
-      <scrollbox
-        flexGrow={1}
-        width="100%"
-        stickyScroll={true}
-        stickyStart="bottom"
-      >
+      <scrollbox flexGrow={1} width="100%" stickyScroll={true} stickyStart="bottom">
         {filteredLogs.length === 0 ? (
           <text fg={COLORS.textMuted}>{"  no logs"}</text>
         ) : (

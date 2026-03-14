@@ -3,9 +3,7 @@ import type { Tool, ToolResult } from "@kraken/sdk";
 
 const IS_WINDOWS = process.platform === "win32";
 
-async function run(
-  args: string[],
-): Promise<{ stdout: string; stderr: string; exitCode: number }> {
+async function run(args: string[]): Promise<{ stdout: string; stderr: string; exitCode: number }> {
   const cmd = IS_WINDOWS ? ["cmd", "/c", ...args] : args;
   const proc = Bun.spawn(cmd, { stdout: "pipe", stderr: "pipe" });
   const exitCode = await proc.exited;
@@ -30,8 +28,7 @@ const monitorProcessTool: Tool = {
       {
         name: "timeout",
         type: "number",
-        description:
-          "Maximum time in seconds to wait before killing the process. Default: 10.",
+        description: "Maximum time in seconds to wait before killing the process. Default: 10.",
         required: false,
       },
     ],
@@ -44,9 +41,7 @@ const monitorProcessTool: Tool = {
     const timeoutMs = timeoutSeconds * 1000;
 
     try {
-      const cmd = IS_WINDOWS
-        ? ["cmd", "/c", command]
-        : ["sh", "-c", command];
+      const cmd = IS_WINDOWS ? ["cmd", "/c", command] : ["sh", "-c", command];
       const proc = Bun.spawn(cmd, { stdout: "pipe", stderr: "pipe" });
 
       const timer = setTimeout(() => {
@@ -208,9 +203,7 @@ const monitorWatchTool: Tool = {
     const durationMs = duration * 1000;
 
     try {
-      const cmd = IS_WINDOWS
-        ? ["cmd", "/c", command]
-        : ["sh", "-c", command];
+      const cmd = IS_WINDOWS ? ["cmd", "/c", command] : ["sh", "-c", command];
       const proc = Bun.spawn(cmd, { stdout: "pipe", stderr: "pipe" });
 
       await new Promise((resolve) => setTimeout(resolve, durationMs));
@@ -282,13 +275,12 @@ const monitorProcessesTool: Tool = {
         const lines = output.split("\n");
         const header = lines[0] ?? "";
         const filterLower = filter.toLowerCase();
-        const matched = lines
-          .slice(1)
-          .filter((line) => line.toLowerCase().includes(filterLower));
+        const matched = lines.slice(1).filter((line) => line.toLowerCase().includes(filterLower));
 
-        output = matched.length > 0
-          ? `${header}\n${matched.join("\n")}`
-          : `No processes matching "${filter}" found.`;
+        output =
+          matched.length > 0
+            ? `${header}\n${matched.join("\n")}`
+            : `No processes matching "${filter}" found.`;
       }
 
       return { success: true, output };

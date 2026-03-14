@@ -78,7 +78,15 @@ export function ProviderSetupPanel({ providers, onComplete }: ProviderSetupPanel
   const currentStepIndex = STEPS.findIndex((s) => s.id === step);
 
   return (
-    <box flexDirection="column" width="100%" paddingLeft={2} paddingRight={2} paddingTop={1} paddingBottom={1} backgroundColor={COLORS.inputBackground}>
+    <box
+      flexDirection="column"
+      width="100%"
+      paddingLeft={2}
+      paddingRight={2}
+      paddingTop={1}
+      paddingBottom={1}
+      backgroundColor={COLORS.inputBackground}
+    >
       {/* Step bar */}
       <box flexDirection="row" width="100%" paddingBottom={1}>
         {STEPS.map((s, idx) => {
@@ -86,15 +94,15 @@ export function ProviderSetupPanel({ providers, onComplete }: ProviderSetupPanel
           const isPast = idx < currentStepIndex;
           return (
             <box key={s.id} flexDirection="row">
-              {idx > 0 ? (
-                <text fg={COLORS.textMuted}>{"  ▸  "}</text>
-              ) : null}
+              {idx > 0 ? <text fg={COLORS.textMuted}>{"  ▸  "}</text> : null}
               <box
                 backgroundColor={isCurrent ? COLORS.purple : undefined}
                 paddingLeft={1}
                 paddingRight={1}
               >
-                <text fg={isCurrent ? COLORS.background : isPast ? COLORS.textMuted : COLORS.textMuted}>
+                <text
+                  fg={isCurrent ? COLORS.background : isPast ? COLORS.textMuted : COLORS.textMuted}
+                >
                   <b>{s.label}</b>
                 </text>
               </box>
@@ -106,7 +114,9 @@ export function ProviderSetupPanel({ providers, onComplete }: ProviderSetupPanel
       {step === "provider" ? (
         <box flexDirection="column" width="100%">
           <box width="100%" paddingBottom={1}>
-            <text fg={COLORS.text}><b>{"Select a provider to configure"}</b></text>
+            <text fg={COLORS.text}>
+              <b>{"Select a provider to configure"}</b>
+            </text>
           </box>
 
           {providers.map((provider, idx) => {
@@ -114,7 +124,15 @@ export function ProviderSetupPanel({ providers, onComplete }: ProviderSetupPanel
             const arrow = isSelected ? "→" : " ";
             const bullet = isSelected ? "●" : "○";
             return (
-              <box key={provider.name} flexDirection="column" width="100%" onMouseUp={() => { setSelectedIndex(idx); selectProvider(); }}>
+              <box
+                key={provider.name}
+                flexDirection="column"
+                width="100%"
+                onMouseUp={() => {
+                  setSelectedIndex(idx);
+                  selectProvider();
+                }}
+              >
                 <box flexDirection="row" width="100%">
                   <text fg={isSelected ? COLORS.purple : COLORS.textMuted}>
                     {`${arrow} ${bullet} `}
@@ -160,8 +178,14 @@ export function ProviderSetupPanel({ providers, onComplete }: ProviderSetupPanel
           </box>
 
           <box flexDirection="row" width="100%" paddingTop={1} gap={2}>
-            <text fg={COLORS.textMuted}><b>{"enter"}</b>{" save"}</text>
-            <text fg={COLORS.textMuted}><b>{"esc"}</b>{" cancel"}</text>
+            <text fg={COLORS.textMuted}>
+              <b>{"enter"}</b>
+              {" save"}
+            </text>
+            <text fg={COLORS.textMuted}>
+              <b>{"esc"}</b>
+              {" cancel"}
+            </text>
           </box>
         </box>
       ) : null}

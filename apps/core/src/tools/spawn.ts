@@ -47,10 +47,7 @@ export async function spawnCommand(
  * Run an arbitrary command string through the platform shell.
  * Used for user-provided commands where pipes/redirects must be interpreted.
  */
-export async function spawnShellCommand(
-  command: string,
-  cwd: string,
-): Promise<SpawnResult> {
+export async function spawnShellCommand(command: string, cwd: string): Promise<SpawnResult> {
   const shellArgs = IS_WINDOWS ? ["cmd", "/c", command] : ["sh", "-c", command];
 
   const proc = Bun.spawn(shellArgs, {

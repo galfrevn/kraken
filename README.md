@@ -48,11 +48,11 @@ The **Gateway** is written in Go and serves as the LLM proxy and webhook ingesti
 
 The **TUI** is written in TypeScript and contains the agent brain — the execution loop, tool registry, conversation history, persistent memory, plugin system, and SQLite storage layer. It renders a terminal interface using OpenTUI and orchestrates all interactions between the user, the LLM, and the supporting services.
 
-| Service | Language | Port | Role |
-|---------|----------|------|------|
-| **Scheduler** | Rust | 50051 | Cron engine + file watchers, streams events via gRPC |
-| **Gateway** | Go | 50052 | LLM proxy (multi-provider) + webhook receiver |
-| **TUI** | TypeScript | — | Terminal UI, agent brain, tools, storage |
+| Service       | Language   | Port  | Role                                                 |
+| ------------- | ---------- | ----- | ---------------------------------------------------- |
+| **Scheduler** | Rust       | 50051 | Cron engine + file watchers, streams events via gRPC |
+| **Gateway**   | Go         | 50052 | LLM proxy (multi-provider) + webhook receiver        |
+| **TUI**       | TypeScript | —     | Terminal UI, agent brain, tools, storage             |
 
 ```
 ┌─────────────────────────────────────────────────┐
@@ -201,9 +201,15 @@ export default definePlugin({
   ],
 
   hooks: {
-    beforeToolCall(toolName, params) { /* ... */ },
-    afterToolCall(toolName, result) { /* ... */ },
-    onConversationStart(context) { /* ... */ },
+    beforeToolCall(toolName, params) {
+      /* ... */
+    },
+    afterToolCall(toolName, result) {
+      /* ... */
+    },
+    onConversationStart(context) {
+      /* ... */
+    },
   },
 });
 ```
@@ -214,17 +220,17 @@ export default definePlugin({
 
 Kraken ships with over 30 built-in tools that the agent can invoke autonomously during task execution. These tools cover the most common operations a developer performs: reading and writing files, navigating codebases, running shell commands, interacting with git, searching the web, and managing scheduled work. Each tool includes input validation, cross-platform support (Windows, macOS, and Linux), and security checks where appropriate.
 
-| Category | Tools |
-|----------|-------|
-| **Files** | `read_file`, `write_file`, `edit_file`, `delete_file`, `move_file`, `list_directory`, `glob_files`, `search_files` |
-| **Git** | `git_status`, `git_diff`, `git_commit`, `git_log` |
-| **Code** | `code_outline`, `diff_files`, `replace_in_files`, `read_lines` |
-| **Web** | `web_search`, `fetch_url`, `http_request` |
-| **Scheduling** | `schedule_cron`, `list_schedules`, `delete_schedule`, `schedule_watcher`, `list_watchers`, `delete_watcher` |
-| **Memory** | `remember`, `recall`, `index_project` |
-| **Tasks** | `task_list`, `task_submit`, `schedule_once`, `list_timers`, `cancel_timer` |
-| **System** | `run_command`, `environment`, `view_image`, `count_tokens` |
-| **Model** | `model_list`, `model_switch`, `current_model`, `delegate` |
+| Category       | Tools                                                                                                              |
+| -------------- | ------------------------------------------------------------------------------------------------------------------ |
+| **Files**      | `read_file`, `write_file`, `edit_file`, `delete_file`, `move_file`, `list_directory`, `glob_files`, `search_files` |
+| **Git**        | `git_status`, `git_diff`, `git_commit`, `git_log`                                                                  |
+| **Code**       | `code_outline`, `diff_files`, `replace_in_files`, `read_lines`                                                     |
+| **Web**        | `web_search`, `fetch_url`, `http_request`                                                                          |
+| **Scheduling** | `schedule_cron`, `list_schedules`, `delete_schedule`, `schedule_watcher`, `list_watchers`, `delete_watcher`        |
+| **Memory**     | `remember`, `recall`, `index_project`                                                                              |
+| **Tasks**      | `task_list`, `task_submit`, `schedule_once`, `list_timers`, `cancel_timer`                                         |
+| **System**     | `run_command`, `environment`, `view_image`, `count_tokens`                                                         |
+| **Model**      | `model_list`, `model_switch`, `current_model`, `delegate`                                                          |
 
 ---
 
@@ -284,17 +290,17 @@ gen/
 
 Kraken deliberately combines multiple language ecosystems, selecting each for the specific strengths it brings to the system. TypeScript provides the flexibility and ecosystem needed for the agent brain, plugin system, and terminal UI. Go offers the concurrency model and HTTP primitives required for a high-throughput LLM proxy. Rust delivers the performance guarantees necessary for real-time scheduling and file system monitoring. Protobuf and ConnectRPC bind them together with type-safe, language-agnostic contracts.
 
-| Layer | Technology |
-|-------|-----------|
-| Monorepo | Turborepo + Bun |
-| TypeScript | ESNext, strict mode, `verbatimModuleSyntax` |
-| TUI framework | OpenTUI (`@opentui/react`) |
-| Gateway | Go 1.26 |
-| Scheduler | Rust (edition 2024), tokio async |
-| RPC | ConnectRPC, protobuf |
-| Database | SQLite via `bun:sqlite` (WAL mode) |
-| Linting | oxlint |
-| Formatting | oxfmt |
+| Layer         | Technology                                  |
+| ------------- | ------------------------------------------- |
+| Monorepo      | Turborepo + Bun                             |
+| TypeScript    | ESNext, strict mode, `verbatimModuleSyntax` |
+| TUI framework | OpenTUI (`@opentui/react`)                  |
+| Gateway       | Go 1.26                                     |
+| Scheduler     | Rust (edition 2024), tokio async            |
+| RPC           | ConnectRPC, protobuf                        |
+| Database      | SQLite via `bun:sqlite` (WAL mode)          |
+| Linting       | oxlint                                      |
+| Formatting    | oxfmt                                       |
 
 ---
 

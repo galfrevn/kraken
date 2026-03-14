@@ -1,14 +1,14 @@
 {
   "name": "kraken",
   "private": true,
+  "bin": {
+    "kraken": "./apps/cli/src/index.ts"
+  },
   "workspaces": [
     "apps/*",
     "packages/*"
   ],
   "type": "module",
-  "bin": {
-    "kraken": "./apps/cli/src/index.ts"
-  },
   "scripts": {
     "dev": "turbo dev",
     "build": "turbo build",

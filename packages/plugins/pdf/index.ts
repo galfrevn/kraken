@@ -294,7 +294,10 @@ const pdfInfoTool: Tool = {
       const meta = extractMetadataFallback(buffer);
       const lines = Object.entries(meta).map(([k, v]) => `  ${k}: ${v}`);
       const header = "[Fallback extraction — run pdf_setup for richer metadata]";
-      return { success: true, output: `PDF Metadata (${filePath}):\n${header}\n${lines.join("\n")}` };
+      return {
+        success: true,
+        output: `PDF Metadata (${filePath}):\n${header}\n${lines.join("\n")}`,
+      };
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);
       return { success: false, output: `Failed to read PDF info: ${message}` };
@@ -325,7 +328,8 @@ const pdfSetupTool: Tool = {
       if (loaded) {
         return {
           success: true,
-          output: "pdf-parse installed and loaded successfully. PDF extraction quality will now be improved.",
+          output:
+            "pdf-parse installed and loaded successfully. PDF extraction quality will now be improved.",
         };
       }
 
@@ -370,9 +374,7 @@ export default definePlugin({
     if (pdfParseAvailable) {
       console.log("[pdf] activated (pdf-parse available)");
     } else {
-      console.log(
-        "[pdf] activated (fallback mode — run pdf_setup for better extraction)",
-      );
+      console.log("[pdf] activated (fallback mode — run pdf_setup for better extraction)");
     }
   },
 

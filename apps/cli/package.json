@@ -7,12 +7,12 @@
     "dev": "bun run src/index.ts",
     "typecheck": "tsc --noEmit"
   },
+  "dependencies": {
+    "@clack/prompts": "^1.1.0"
+  },
   "devDependencies": {
     "@kraken/configuration": "workspace:*",
     "@types/bun": "latest",
     "typescript": "^5"
-  },
-  "dependencies": {
-    "@clack/prompts": "^1.1.0"
   }
 }

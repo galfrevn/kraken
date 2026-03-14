@@ -12,7 +12,10 @@ function checkCommand(command: string, args: string[]): { available: boolean; ve
   try {
     const result = Bun.spawnSync({ cmd: [command, ...args], stdout: "pipe", stderr: "pipe" });
     if (result.exitCode === 0) {
-      return { available: true, version: result.stdout.toString().trim().split("\n")[0] || "unknown" };
+      return {
+        available: true,
+        version: result.stdout.toString().trim().split("\n")[0] || "unknown",
+      };
     }
     return { available: false, version: "" };
   } catch {
@@ -30,9 +33,12 @@ async function checkServiceHealth(url: string, timeoutMs: number = 2000): Promis
 }
 
 function renderResult(result: CheckResult): void {
-  const icon = result.status === "ok" ? colorize("✓", "green")
-    : result.status === "warn" ? colorize("!", "yellow")
-    : colorize("✗", "red");
+  const icon =
+    result.status === "ok"
+      ? colorize("✓", "green")
+      : result.status === "warn"
+        ? colorize("!", "yellow")
+        : colorize("✗", "red");
   console.log(`  ${icon} ${bold(result.name)}: ${result.message}`);
 }
 
@@ -54,14 +60,18 @@ export async function execute(_args: string[]): Promise<void> {
   results.push({
     name: "Rust/Cargo",
     status: cargo.available ? "ok" : "warn",
-    message: cargo.available ? cargo.version : "not installed -- scheduler will use fallback (https://rustup.rs)",
+    message: cargo.available
+      ? cargo.version
+      : "not installed -- scheduler will use fallback (https://rustup.rs)",
   });
 
   const golang = checkCommand("go", ["version"]);
   results.push({
     name: "Go",
     status: golang.available ? "ok" : "warn",
-    message: golang.available ? golang.version : "not installed -- gateway will use fallback (https://go.dev/dl)",
+    message: golang.available
+      ? golang.version
+      : "not installed -- gateway will use fallback (https://go.dev/dl)",
   });
 
   step("checking binaries");
@@ -73,7 +83,9 @@ export async function execute(_args: string[]): Promise<void> {
     name: "Scheduler binary",
     status: schedulerExists ? "ok" : "warn",
     message: schedulerExists
-      ? existsSync(schedulerRelease) ? "release build found" : "debug build found"
+      ? existsSync(schedulerRelease)
+        ? "release build found"
+        : "debug build found"
       : "not built -- will use 'cargo run' (run setup.sh to build)",
   });
 
@@ -82,7 +94,9 @@ export async function execute(_args: string[]): Promise<void> {
   results.push({
     name: "Gateway binary",
     status: gatewayExists ? "ok" : "warn",
-    message: gatewayExists ? "built binary found" : "not built -- will use 'go run' (run setup.sh to build)",
+    message: gatewayExists
+      ? "built binary found"
+      : "not built -- will use 'go run' (run setup.sh to build)",
   });
 
   step("checking configuration");
@@ -97,13 +111,19 @@ export async function execute(_args: string[]): Promise<void> {
 
   const globalEnv = join(KRAKEN_HOME, ".env");
   const hasEnvFile = existsSync(globalEnv);
-  const hasEnvVar = !!(Bun.env.OPENROUTER_API_KEY || Bun.env.ANTHROPIC_API_KEY || Bun.env.OPENAI_API_KEY);
+  const hasEnvVar = !!(
+    Bun.env.OPENROUTER_API_KEY ||
+    Bun.env.ANTHROPIC_API_KEY ||
+    Bun.env.OPENAI_API_KEY
+  );
   results.push({
     name: "API Key",
     status: hasEnvFile || hasEnvVar ? "ok" : "warn",
-    message: hasEnvVar ? "found in environment"
-      : hasEnvFile ? `found in ${globalEnv}`
-      : "not configured -- run 'kraken init'",
+    message: hasEnvVar
+      ? "found in environment"
+      : hasEnvFile
+        ? `found in ${globalEnv}`
+        : "not configured -- run 'kraken init'",
   });
 
   step("checking services");
@@ -112,7 +132,9 @@ export async function execute(_args: string[]): Promise<void> {
   results.push({
     name: "Scheduler (:50051)",
     status: schedulerHealthy ? "ok" : "warn",
-    message: schedulerHealthy ? "responding" : "not running (will start automatically with 'kraken')",
+    message: schedulerHealthy
+      ? "responding"
+      : "not running (will start automatically with 'kraken')",
   });
 
   const gatewayHealthy = await checkServiceHealth("http://localhost:50052");
@@ -129,7 +151,7 @@ export async function execute(_args: string[]): Promise<void> {
     if (apiKey) {
       try {
         const response = await fetch("https://openrouter.ai/api/v1/models", {
-          headers: { "Authorization": `Bearer ${apiKey}` },
+          headers: { Authorization: `Bearer ${apiKey}` },
           signal: AbortSignal.timeout(5000),
         });
         results.push({
@@ -156,7 +178,9 @@ export async function execute(_args: string[]): Promise<void> {
   const warnings = results.filter((r) => r.status === "warn");
   const passing = results.filter((r) => r.status === "ok");
 
-  console.log(`\n  ${colorize(`${passing.length} passed`, "green")}, ${colorize(`${warnings.length} warnings`, "yellow")}, ${colorize(`${failures.length} errors`, failures.length > 0 ? "red" : "dim")}\n`);
+  console.log(
+    `\n  ${colorize(`${passing.length} passed`, "green")}, ${colorize(`${warnings.length} warnings`, "yellow")}, ${colorize(`${failures.length} errors`, failures.length > 0 ? "red" : "dim")}\n`,
+  );
 
   if (failures.length > 0) {
     process.exit(1);

@@ -79,9 +79,10 @@ const servicesConfigurationSchema = z.object({
 export const agentConfigurationSchema = z
   .object({
     repo: z.string().default("."),
-    databasePath: z.string().default(resolve(KRAKEN_HOME, "agent.db")).transform((p) =>
-      isAbsolute(p) ? p : resolve(KRAKEN_HOME, p),
-    ),
+    databasePath: z
+      .string()
+      .default(resolve(KRAKEN_HOME, "agent.db"))
+      .transform((p) => (isAbsolute(p) ? p : resolve(KRAKEN_HOME, p))),
     languageModel: languageModelConfigurationSchema.optional(),
     security: securityConfigurationSchema.optional(),
     scheduler: schedulerConfigurationSchema.optional(),

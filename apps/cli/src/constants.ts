@@ -46,7 +46,9 @@ export function step(message: string): void {
 }
 
 export function printBanner(): void {
-  console.log(colorize(` ██ ▄█▀ ██▀███   ▄▄▄       ██ ▄█▀▓█████  ███▄    █ 
+  console.log(
+    colorize(
+      ` ██ ▄█▀ ██▀███   ▄▄▄       ██ ▄█▀▓█████  ███▄    █ 
  ██▄█▒ ▓██ ▒ ██▒▒████▄     ██▄█▒ ▓█   ▀  ██ ▀█   █ 
 ▓███▄░ ▓██ ░▄█ ▒▒██  ▀█▄  ▓███▄░ ▒███   ▓██  ▀█ ██▒
 ▓██ █▄ ▒██▀▀█▄  ░██▄▄▄▄██ ▓██ █▄ ▒▓█  ▄ ▓██▒  ▐▌██▒
@@ -54,6 +56,11 @@ export function printBanner(): void {
 ▒ ▒▒ ▓▒░ ▒▓ ░▒▓░ ▒▒   ▓▒█░▒ ▒▒ ▓▒░░ ▒░ ░░ ▒░   ▒ ▒ 
 ░ ░▒ ▒░  ░▒ ░ ▒░  ▒   ▒▒ ░░ ░▒ ▒░ ░ ░  ░░ ░░   ░ ▒░
 ░ ░░ ░   ░░   ░   ░   ▒   ░ ░░ ░    ░      ░   ░ ░ 
-░  ░      ░           ░  ░░  ░      ░  ░         ░ `, "cyan"));
-  console.log(`\n  ${colorize("autonomous developer agent", "dim")}  ${colorize(`v${VERSION}`, "dim")}\n`);
+░  ░      ░           ░  ░░  ░      ░  ░         ░ `,
+      "cyan",
+    ),
+  );
+  console.log(
+    `\n  ${colorize("autonomous developer agent", "dim")}  ${colorize(`v${VERSION}`, "dim")}\n`,
+  );
 }

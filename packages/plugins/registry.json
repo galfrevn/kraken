@@ -6,7 +6,15 @@
       "version": "0.1.0",
       "description": "Browser automation using Vercel's agent-browser CLI. Open pages, take snapshots, click, type, fill forms, and take screenshots.",
       "author": "kraken",
-      "tools": ["browser_open", "browser_snapshot", "browser_click", "browser_type", "browser_fill", "browser_screenshot", "browser_close"],
+      "tools": [
+        "browser_open",
+        "browser_snapshot",
+        "browser_click",
+        "browser_type",
+        "browser_fill",
+        "browser_screenshot",
+        "browser_close"
+      ],
       "requires": ["agent-browser"],
       "directory": "browser"
     },
@@ -15,7 +23,17 @@
       "version": "0.1.0",
       "description": "Native browser automation using Playwright. No external CLI needed — open pages, snapshots, click, type, fill, screenshot, and eval JS.",
       "author": "kraken",
-      "tools": ["browser_setup", "browser_open", "browser_snapshot", "browser_click", "browser_type", "browser_fill", "browser_screenshot", "browser_eval", "browser_close"],
+      "tools": [
+        "browser_setup",
+        "browser_open",
+        "browser_snapshot",
+        "browser_click",
+        "browser_type",
+        "browser_fill",
+        "browser_screenshot",
+        "browser_eval",
+        "browser_close"
+      ],
       "requires": [],
       "directory": "playwright"
     },
@@ -33,7 +51,16 @@
       "version": "0.1.0",
       "description": "Manage Docker containers and Compose stacks. List, inspect, start, stop, restart, view logs, and exec into containers.",
       "author": "kraken",
-      "tools": ["docker_ps", "docker_logs", "docker_exec", "docker_restart", "docker_stop", "docker_images", "docker_compose_up", "docker_compose_down"],
+      "tools": [
+        "docker_ps",
+        "docker_logs",
+        "docker_exec",
+        "docker_restart",
+        "docker_stop",
+        "docker_images",
+        "docker_compose_up",
+        "docker_compose_down"
+      ],
       "requires": ["docker"],
       "directory": "docker"
     },
@@ -42,7 +69,13 @@
       "version": "0.1.0",
       "description": "System monitoring tools. Run processes with timeout, check ports, tail log files, watch command output, and list running processes.",
       "author": "kraken",
-      "tools": ["monitor_process", "monitor_port", "monitor_tail", "monitor_watch", "monitor_processes"],
+      "tools": [
+        "monitor_process",
+        "monitor_port",
+        "monitor_tail",
+        "monitor_watch",
+        "monitor_processes"
+      ],
       "requires": [],
       "directory": "monitor"
     },
@@ -51,7 +84,17 @@
       "version": "0.1.0",
       "description": "GitHub integration via the gh CLI. Manage issues, pull requests, reviews, and view repository info.",
       "author": "kraken",
-      "tools": ["gh_issue_list", "gh_issue_create", "gh_issue_view", "gh_pr_list", "gh_pr_create", "gh_pr_view", "gh_pr_merge", "gh_pr_review", "gh_repo_view"],
+      "tools": [
+        "gh_issue_list",
+        "gh_issue_create",
+        "gh_issue_view",
+        "gh_pr_list",
+        "gh_pr_create",
+        "gh_pr_view",
+        "gh_pr_merge",
+        "gh_pr_review",
+        "gh_repo_view"
+      ],
       "requires": ["gh"],
       "directory": "github"
     },
@@ -78,7 +121,14 @@
       "version": "0.1.0",
       "description": "Remote server management over SSH. Execute commands, upload/download files via SCP, manage SSH tunnels, and list SSH config hosts.",
       "author": "kraken",
-      "tools": ["ssh_exec", "ssh_upload", "ssh_download", "ssh_tunnel", "ssh_tunnel_close", "ssh_config_list"],
+      "tools": [
+        "ssh_exec",
+        "ssh_upload",
+        "ssh_download",
+        "ssh_tunnel",
+        "ssh_tunnel_close",
+        "ssh_config_list"
+      ],
       "requires": ["ssh"],
       "directory": "ssh"
     },

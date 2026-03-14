@@ -47,7 +47,14 @@ export {
 export { createSessionCommandTool } from "@/tools/session.ts";
 export type { SessionCommandExecutor, SessionCommandDefinition } from "@/tools/session.ts";
 export { createPluginManagerTool, type PluginManagerDependencies } from "@/tools/plugins.ts";
-export { createAskQuestionTool, type PendingQuestions, type QuestionItem, type QuestionOption, type QuestionAnswer, type QuestionHandler } from "@/tools/question.ts";
+export {
+  createAskQuestionTool,
+  type PendingQuestions,
+  type QuestionItem,
+  type QuestionOption,
+  type QuestionAnswer,
+  type QuestionHandler,
+} from "@/tools/question.ts";
 export { viewImageTool } from "@/tools/vision.ts";
 
 export type {

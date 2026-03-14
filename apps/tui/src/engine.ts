@@ -20,9 +20,16 @@ export interface PendingSetup {
 export type SetupHandler = (pending: PendingSetup) => void;
 
 const MAX_ITERATIONS_PER_MESSAGE = 40;
-const CONTINUE_PROMPT = "Continue from where you left off. Complete any remaining steps without repeating what was already done.";
+const CONTINUE_PROMPT =
+  "Continue from where you left off. Complete any remaining steps without repeating what was already done.";
 
-export type ChatMessageRole = "user" | "assistant" | "tool_call" | "tool_result" | "error" | "status";
+export type ChatMessageRole =
+  | "user"
+  | "assistant"
+  | "tool_call"
+  | "tool_result"
+  | "error"
+  | "status";
 
 export interface FileAttachment {
   path: string;
@@ -157,7 +164,11 @@ export class ChatEngine {
   private pendingSetup: PendingSetup | null = null;
   private setupListeners: Set<(s: PendingSetup | null) => void> = new Set();
   private promptOptions: PromptOptions;
-  private tokenUsage: TokenUsageSummary = { totalPromptTokens: 0, totalCompletionTokens: 0, requestCount: 0 };
+  private tokenUsage: TokenUsageSummary = {
+    totalPromptTokens: 0,
+    totalCompletionTokens: 0,
+    requestCount: 0,
+  };
   private debugLog: DebugLogEntry[] = [];
   private logPersister?: (level: string, source: string, message: string) => void;
 
@@ -236,7 +247,10 @@ export class ChatEngine {
   }
 
   updatePluginPromptExtensions(extensions: string[]): void {
-    this.promptOptions = { ...this.promptOptions, pluginPromptExtensions: extensions.length > 0 ? extensions : undefined };
+    this.promptOptions = {
+      ...this.promptOptions,
+      pluginPromptExtensions: extensions.length > 0 ? extensions : undefined,
+    };
     this.rebuildSystemPrompt();
   }
 
@@ -321,7 +335,10 @@ export class ChatEngine {
     this.pendingConfirmation.resolve(decision);
   }
 
-  private requestConfirmation(toolName: string, parameters: Record<string, unknown>): Promise<ConfirmationDecision> {
+  private requestConfirmation(
+    toolName: string,
+    parameters: Record<string, unknown>,
+  ): Promise<ConfirmationDecision> {
     return new Promise<ConfirmationDecision>((resolve, reject) => {
       const id = Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
 
@@ -393,7 +410,12 @@ export class ChatEngine {
     toolCall: ToolCallEntry,
     parameters: Record<string, unknown>,
     toolContext: ToolExecutionContext,
-  ): Promise<{ toolCall: ToolCallEntry; parameters: Record<string, unknown>; toolResult: import("@core/tools/schema.ts").ToolResult | null; error: string | null }> {
+  ): Promise<{
+    toolCall: ToolCallEntry;
+    parameters: Record<string, unknown>;
+    toolResult: import("@core/tools/schema.ts").ToolResult | null;
+    error: string | null;
+  }> {
     const tool = this.toolRegistry.getTool(toolCall.function.name);
     if (tool?.definition.requiresConfirmation) {
       const decision = await this.requestConfirmation(toolCall.function.name, parameters);
@@ -414,7 +436,11 @@ export class ChatEngine {
       );
 
       if (this.hookDispatcher) {
-        await this.hookDispatcher.dispatchAfterToolCall(toolCall.function.name, parameters, toolResult);
+        await this.hookDispatcher.dispatchAfterToolCall(
+          toolCall.function.name,
+          parameters,
+          toolResult,
+        );
       }
 
       return { toolCall, parameters, toolResult, error: null };
@@ -503,7 +529,11 @@ export class ChatEngine {
 
       plan.status = plan.steps.some((s) => s.status === "failed") ? "failed" : "completed";
       this.notifyPlanListeners();
-      this.log("info", "plan", `plan ${plan.status}: ${plan.steps.filter((s) => s.status === "completed").length}/${plan.steps.length} steps completed`);
+      this.log(
+        "info",
+        "plan",
+        `plan ${plan.status}: ${plan.steps.filter((s) => s.status === "completed").length}/${plan.steps.length} steps completed`,
+      );
     } finally {
       this.processing = false;
       this.abortController = null;
@@ -540,8 +570,15 @@ export class ChatEngine {
       this.checkCancelled();
       iterations += 1;
 
-      if (completionResult.finishReason !== "tool_calls" || completionResult.toolCalls.length === 0) {
-        this.log("info", "plan", `step loop exiting: finishReason=${completionResult.finishReason}, toolCalls=${completionResult.toolCalls.length}, iterations=${iterations}`);
+      if (
+        completionResult.finishReason !== "tool_calls" ||
+        completionResult.toolCalls.length === 0
+      ) {
+        this.log(
+          "info",
+          "plan",
+          `step loop exiting: finishReason=${completionResult.finishReason}, toolCalls=${completionResult.toolCalls.length}, iterations=${iterations}`,
+        );
         break;
       }
 
@@ -556,12 +593,19 @@ export class ChatEngine {
           try {
             parameters = JSON.parse(toolCall.function.arguments);
           } catch (parseError) {
-            this.log("warn", "plan", `failed to parse tool parameters for ${toolCall.function.name}: ${parseError instanceof Error ? parseError.message : String(parseError)}, raw: ${toolCall.function.arguments.slice(0, 200)}`);
+            this.log(
+              "warn",
+              "plan",
+              `failed to parse tool parameters for ${toolCall.function.name}: ${parseError instanceof Error ? parseError.message : String(parseError)}, raw: ${toolCall.function.arguments.slice(0, 200)}`,
+            );
             parameters = {};
           }
 
           if (this.hookDispatcher) {
-            parameters = await this.hookDispatcher.dispatchBeforeToolCall(toolCall.function.name, parameters);
+            parameters = await this.hookDispatcher.dispatchBeforeToolCall(
+              toolCall.function.name,
+              parameters,
+            );
           }
 
           this.pushMessage({
@@ -588,9 +632,8 @@ export class ChatEngine {
           const resultText = toolResult.success
             ? toolResult.output
             : (toolResult.error ?? toolResult.output);
-          const resultPreview = resultText.length > 3000
-            ? resultText.slice(0, 3000) + "..."
-            : resultText;
+          const resultPreview =
+            resultText.length > 3000 ? resultText.slice(0, 3000) + "..." : resultText;
 
           this.pushMessage({
             role: "tool_result",
@@ -601,11 +644,7 @@ export class ChatEngine {
             timestamp: new Date(),
           });
 
-          this.conversation.addToolResultMessage(
-            toolCall.id,
-            toolCall.function.name,
-            resultText,
-          );
+          this.conversation.addToolResultMessage(toolCall.id, toolCall.function.name, resultText);
 
           if (!toolResult.success) {
             this.log("error", "plan", `${toolCall.function.name}: ${resultText.slice(0, 200)}`);
@@ -629,7 +668,8 @@ export class ChatEngine {
         completionResult = await this.getResponseContinuation();
       } catch (followUpError) {
         if (followUpError instanceof CancelledError) throw followUpError;
-        const errorDetail = followUpError instanceof Error ? followUpError.message : String(followUpError);
+        const errorDetail =
+          followUpError instanceof Error ? followUpError.message : String(followUpError);
         this.pushMessage({
           role: "error",
           content: `step follow-up failed: ${errorDetail}`,
@@ -726,10 +766,19 @@ export class ChatEngine {
         ? { id: this.pendingQuestions.id, items: this.pendingQuestions.items }
         : undefined,
       pendingConfirmation: this.pendingConfirmation
-        ? { id: this.pendingConfirmation.id, toolName: this.pendingConfirmation.toolName, parameters: this.pendingConfirmation.parameters }
+        ? {
+            id: this.pendingConfirmation.id,
+            toolName: this.pendingConfirmation.toolName,
+            parameters: this.pendingConfirmation.parameters,
+          }
         : undefined,
       plan: this.currentPlan
-        ? { goal: this.currentPlan.goal, steps: this.currentPlan.steps, status: this.currentPlan.status, feedback: this.currentPlan.feedback }
+        ? {
+            goal: this.currentPlan.goal,
+            steps: this.currentPlan.steps,
+            status: this.currentPlan.status,
+            feedback: this.currentPlan.feedback,
+          }
         : undefined,
       planMode: this.planMode || undefined,
     };
@@ -752,7 +801,10 @@ export class ChatEngine {
         this.conversation.addUserMessage(conversationMessage.content);
       } else if (conversationMessage.role === "assistant") {
         if (conversationMessage.toolCalls && conversationMessage.toolCalls.length > 0) {
-          this.conversation.addAssistantToolCallMessage(conversationMessage.content, conversationMessage.toolCalls);
+          this.conversation.addAssistantToolCallMessage(
+            conversationMessage.content,
+            conversationMessage.toolCalls,
+          );
         } else {
           this.conversation.addAssistantMessage(conversationMessage.content);
         }
@@ -881,7 +933,11 @@ export class ChatEngine {
 
   private async getResponse(inputMessage: string): Promise<CompletionResult> {
     this.checkCancelled();
-    this.log("info", "engine", `getResponse: starting streamed response (conversationLength=${this.conversation.getMessageCount()})`);
+    this.log(
+      "info",
+      "engine",
+      `getResponse: starting streamed response (conversationLength=${this.conversation.getMessageCount()})`,
+    );
 
     this.pushMessage({
       role: "assistant",
@@ -895,7 +951,16 @@ export class ChatEngine {
       let reasoningDirty = false;
       let cachedRawPrefix = "";
 
-      { const compactResult = this.conversation.compactIfNeeded(); if (compactResult.didCompact) { this.log("warn", "engine", `conversation compacted: removed ${compactResult.removedCount} messages, ${this.conversation.getMessageCount()} remaining`); } }
+      {
+        const compactResult = this.conversation.compactIfNeeded();
+        if (compactResult.didCompact) {
+          this.log(
+            "warn",
+            "engine",
+            `conversation compacted: removed ${compactResult.removedCount} messages, ${this.conversation.getMessageCount()} remaining`,
+          );
+        }
+      }
 
       const completionResult = await this.languageModelClient.streamConversation(
         this.conversation,
@@ -946,7 +1011,11 @@ export class ChatEngine {
 
       return completionResult;
     } catch (streamError) {
-      this.log("error", "engine", `getResponse failed: ${streamError instanceof Error ? streamError.message : String(streamError)}`);
+      this.log(
+        "error",
+        "engine",
+        `getResponse failed: ${streamError instanceof Error ? streamError.message : String(streamError)}`,
+      );
       this.removeLastMessage();
       throw streamError;
     }
@@ -974,12 +1043,22 @@ export class ChatEngine {
       workingDirectory: this.workingDirectory,
     };
 
-    this.log("info", "engine", `processing message (planMode=${this.planMode}, queueLength=${this.messageQueue.length})`);
+    this.log(
+      "info",
+      "engine",
+      `processing message (planMode=${this.planMode}, queueLength=${this.messageQueue.length})`,
+    );
 
     if (this.hookDispatcher && this.pluginContext) {
-      await this.hookDispatcher.dispatchConversationStart(this.pluginContext).catch((e: unknown) => {
-        this.log("warn", "hook", `conversationStart failed: ${e instanceof Error ? e.message : String(e)}`);
-      });
+      await this.hookDispatcher
+        .dispatchConversationStart(this.pluginContext)
+        .catch((e: unknown) => {
+          this.log(
+            "warn",
+            "hook",
+            `conversationStart failed: ${e instanceof Error ? e.message : String(e)}`,
+          );
+        });
     }
 
     try {
@@ -1001,13 +1080,24 @@ export class ChatEngine {
       }
 
       let completionResult = await this.getResponse(llmInput);
-      this.log("info", "engine", `initial response: finishReason=${completionResult.finishReason}, toolCalls=${completionResult.toolCalls.length}, contentLength=${completionResult.content.length}`);
+      this.log(
+        "info",
+        "engine",
+        `initial response: finishReason=${completionResult.finishReason}, toolCalls=${completionResult.toolCalls.length}, contentLength=${completionResult.content.length}`,
+      );
 
       // Normalize: if LLM says "tool_calls" but no tool calls were parsed, treat as "stop".
       // This happens when the provider returns finish_reason=tool_calls natively but kraken
       // uses XML-based tool calling, so no native tool calls are present.
-      if (completionResult.finishReason === "tool_calls" && completionResult.toolCalls.length === 0) {
-        this.log("warn", "engine", `finishReason was tool_calls but no tool calls found — normalizing to stop`);
+      if (
+        completionResult.finishReason === "tool_calls" &&
+        completionResult.toolCalls.length === 0
+      ) {
+        this.log(
+          "warn",
+          "engine",
+          `finishReason was tool_calls but no tool calls found — normalizing to stop`,
+        );
         completionResult.finishReason = "stop";
       }
 
@@ -1017,8 +1107,15 @@ export class ChatEngine {
         this.checkCancelled();
         iterations += 1;
 
-        if (completionResult.finishReason !== "tool_calls" || completionResult.toolCalls.length === 0) {
-          this.log("info", "engine", `loop exiting: finishReason=${completionResult.finishReason}, toolCalls=${completionResult.toolCalls.length}, iterations=${iterations}`);
+        if (
+          completionResult.finishReason !== "tool_calls" ||
+          completionResult.toolCalls.length === 0
+        ) {
+          this.log(
+            "info",
+            "engine",
+            `loop exiting: finishReason=${completionResult.finishReason}, toolCalls=${completionResult.toolCalls.length}, iterations=${iterations}`,
+          );
           break;
         }
 
@@ -1029,19 +1126,30 @@ export class ChatEngine {
         }
 
         // Parse parameters and push tool_call messages first
-        this.log("info", "engine", `iteration ${iterations}: executing ${completionResult.toolCalls.length} tool call(s): ${completionResult.toolCalls.map((tc) => tc.function.name).join(", ")}`);
+        this.log(
+          "info",
+          "engine",
+          `iteration ${iterations}: executing ${completionResult.toolCalls.length} tool call(s): ${completionResult.toolCalls.map((tc) => tc.function.name).join(", ")}`,
+        );
         const preparedCalls = await Promise.all(
           completionResult.toolCalls.map(async (toolCall) => {
             let parameters: Record<string, unknown>;
             try {
               parameters = JSON.parse(toolCall.function.arguments);
             } catch (parseError) {
-              this.log("warn", "engine", `failed to parse parameters for ${toolCall.function.name}: ${parseError instanceof Error ? parseError.message : String(parseError)}, raw: ${toolCall.function.arguments.slice(0, 200)}`);
+              this.log(
+                "warn",
+                "engine",
+                `failed to parse parameters for ${toolCall.function.name}: ${parseError instanceof Error ? parseError.message : String(parseError)}, raw: ${toolCall.function.arguments.slice(0, 200)}`,
+              );
               parameters = {};
             }
 
             if (this.hookDispatcher) {
-              parameters = await this.hookDispatcher.dispatchBeforeToolCall(toolCall.function.name, parameters);
+              parameters = await this.hookDispatcher.dispatchBeforeToolCall(
+                toolCall.function.name,
+                parameters,
+              );
             }
 
             this.pushMessage({
@@ -1070,9 +1178,8 @@ export class ChatEngine {
             const resultText = toolResult.success
               ? toolResult.output
               : (toolResult.error ?? toolResult.output);
-            const resultPreview = resultText.length > 3000
-              ? resultText.slice(0, 3000) + "..."
-              : resultText;
+            const resultPreview =
+              resultText.length > 3000 ? resultText.slice(0, 3000) + "..." : resultText;
 
             this.pushMessage({
               role: "tool_result",
@@ -1083,11 +1190,7 @@ export class ChatEngine {
               timestamp: new Date(),
             });
 
-            this.conversation.addToolResultMessage(
-              toolCall.id,
-              toolCall.function.name,
-              resultText,
-            );
+            this.conversation.addToolResultMessage(toolCall.id, toolCall.function.name, resultText);
 
             if (!toolResult.success) {
               this.log("error", "tool", `${toolCall.function.name}: ${resultText}`);
@@ -1104,24 +1207,32 @@ export class ChatEngine {
 
             this.log("error", "tool", `${toolCall.function.name} execution failed: ${error}`);
 
-            this.conversation.addToolResultMessage(
-              toolCall.id,
-              toolCall.function.name,
-              error!,
-            );
+            this.conversation.addToolResultMessage(toolCall.id, toolCall.function.name, error!);
           }
         }
 
         try {
           completionResult = await this.getResponseContinuation();
-          if (completionResult.finishReason === "tool_calls" && completionResult.toolCalls.length === 0) {
-            this.log("warn", "engine", `continuation finishReason was tool_calls but no tool calls found — normalizing to stop`);
+          if (
+            completionResult.finishReason === "tool_calls" &&
+            completionResult.toolCalls.length === 0
+          ) {
+            this.log(
+              "warn",
+              "engine",
+              `continuation finishReason was tool_calls but no tool calls found — normalizing to stop`,
+            );
             completionResult.finishReason = "stop";
           }
-          this.log("info", "engine", `continuation response: finishReason=${completionResult.finishReason}, toolCalls=${completionResult.toolCalls.length}, contentLength=${completionResult.content.length}`);
+          this.log(
+            "info",
+            "engine",
+            `continuation response: finishReason=${completionResult.finishReason}, toolCalls=${completionResult.toolCalls.length}, contentLength=${completionResult.content.length}`,
+          );
         } catch (followUpError) {
           if (followUpError instanceof CancelledError) throw followUpError;
-          const errorDetail = followUpError instanceof Error ? followUpError.message : String(followUpError);
+          const errorDetail =
+            followUpError instanceof Error ? followUpError.message : String(followUpError);
           this.pushMessage({
             role: "error",
             content: `follow-up response failed: ${errorDetail}`,
@@ -1132,7 +1243,11 @@ export class ChatEngine {
         }
       }
 
-      this.log("info", "engine", `message processing complete: ${iterations} iterations, planGeneration=${isPlanGeneration}`);
+      this.log(
+        "info",
+        "engine",
+        `message processing complete: ${iterations} iterations, planGeneration=${isPlanGeneration}`,
+      );
 
       if (isPlanGeneration) {
         // Scan all assistant messages for a <plan> block (the last one wins)
@@ -1188,12 +1303,9 @@ export class ChatEngine {
           timestamp: new Date(),
         });
       } else {
-        const errorMessage = executionError instanceof Error
-          ? executionError.message
-          : String(executionError);
-        const errorStack = executionError instanceof Error
-          ? executionError.stack ?? ""
-          : "";
+        const errorMessage =
+          executionError instanceof Error ? executionError.message : String(executionError);
+        const errorStack = executionError instanceof Error ? (executionError.stack ?? "") : "";
         this.pushMessage({
           role: "error",
           content: errorMessage,
@@ -1206,12 +1318,22 @@ export class ChatEngine {
       }
     } finally {
       if (this.hookDispatcher && this.pluginContext) {
-        await this.hookDispatcher.dispatchConversationEnd(this.pluginContext).catch((e: unknown) => {
-          this.log("warn", "hook", `conversationEnd failed: ${e instanceof Error ? e.message : String(e)}`);
-        });
+        await this.hookDispatcher
+          .dispatchConversationEnd(this.pluginContext)
+          .catch((e: unknown) => {
+            this.log(
+              "warn",
+              "hook",
+              `conversationEnd failed: ${e instanceof Error ? e.message : String(e)}`,
+            );
+          });
       }
 
-      this.log("info", "engine", `processMessage finished (queueRemaining=${this.messageQueue.length})`);
+      this.log(
+        "info",
+        "engine",
+        `processMessage finished (queueRemaining=${this.messageQueue.length})`,
+      );
       this.processing = false;
       this.abortController = null;
       this.emitImmediate();
@@ -1224,7 +1346,11 @@ export class ChatEngine {
 
   private async getResponseContinuation(): Promise<CompletionResult> {
     this.checkCancelled();
-    this.log("info", "engine", `getResponseContinuation: requesting follow-up (conversationLength=${this.conversation.getMessageCount()})`);
+    this.log(
+      "info",
+      "engine",
+      `getResponseContinuation: requesting follow-up (conversationLength=${this.conversation.getMessageCount()})`,
+    );
 
     this.pushMessage({
       role: "assistant",
@@ -1234,7 +1360,16 @@ export class ChatEngine {
     });
 
     try {
-      { const compactResult = this.conversation.compactIfNeeded(); if (compactResult.didCompact) { this.log("warn", "engine", `conversation compacted: removed ${compactResult.removedCount} messages, ${this.conversation.getMessageCount()} remaining`); } }
+      {
+        const compactResult = this.conversation.compactIfNeeded();
+        if (compactResult.didCompact) {
+          this.log(
+            "warn",
+            "engine",
+            `conversation compacted: removed ${compactResult.removedCount} messages, ${this.conversation.getMessageCount()} remaining`,
+          );
+        }
+      }
       const messages = this.conversation.getMessagesWithSystemPrompt();
       const completionResult = await this.languageModelClient.complete(messages);
       this.trackTokenUsage(completionResult);
@@ -1242,7 +1377,10 @@ export class ChatEngine {
       this.checkCancelled();
 
       if (completionResult.toolCalls.length > 0) {
-        this.conversation.addAssistantToolCallMessage(completionResult.content, completionResult.toolCalls);
+        this.conversation.addAssistantToolCallMessage(
+          completionResult.content,
+          completionResult.toolCalls,
+        );
       } else {
         this.conversation.addAssistantMessage(completionResult.content);
       }
@@ -1264,7 +1402,11 @@ export class ChatEngine {
 
       return completionResult;
     } catch (error) {
-      this.log("error", "engine", `getResponseContinuation failed: ${error instanceof Error ? error.message : String(error)}`);
+      this.log(
+        "error",
+        "engine",
+        `getResponseContinuation failed: ${error instanceof Error ? error.message : String(error)}`,
+      );
       this.removeLastMessage();
       throw error;
     }

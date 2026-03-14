@@ -14,12 +14,16 @@ import type { PendingQuestions, QuestionAnswer } from "@core/tools/question.ts";
 import type { PendingConfirmation, ConfirmationDecision } from "@core/tools/confirmation.ts";
 import type { ThreadManager } from "@/threads.ts";
 import type { PluginRegistry, LoadedPlugin } from "@core/plugins/registry.ts";
-import {
-  installPluginFromRegistry,
-  type PluginRegistryManifest,
-} from "@core/plugins/installer.ts";
+import { installPluginFromRegistry, type PluginRegistryManifest } from "@core/plugins/installer.ts";
 
-import { handleSlashCommand, ALL_COMMANDS, commandRequiresArguments, setPendingProviderSwitch, type SlashCommand, type CommandResult } from "@/commands.ts";
+import {
+  handleSlashCommand,
+  ALL_COMMANDS,
+  commandRequiresArguments,
+  setPendingProviderSwitch,
+  type SlashCommand,
+  type CommandResult,
+} from "@/commands.ts";
 import { fetchAllAvailableModels, type ProviderModel } from "@core/tools/model.ts";
 import { Avatar, type AvatarState } from "@/avatar.tsx";
 import { loadImagePreview, generatePreviewRows } from "@/images.ts";
@@ -68,9 +72,13 @@ function isImagePath(filePath: string): boolean {
   return IMAGE_EXTENSIONS.has(ext);
 }
 
-function extractFileAttachments(text: string): { cleanText: string; attachments: FileAttachment[] } {
+function extractFileAttachments(text: string): {
+  cleanText: string;
+  attachments: FileAttachment[];
+} {
   // Match absolute paths (Windows: C:\... or Unix: /...) or quoted paths
-  const pathPattern = /(?:"([^"]+\.[a-zA-Z0-9]+)"|'([^']+\.[a-zA-Z0-9]+)'|([A-Za-z]:\\[^\s,]+\.[a-zA-Z0-9]+)|(\/[^\s,]+\.[a-zA-Z0-9]+))/g;
+  const pathPattern =
+    /(?:"([^"]+\.[a-zA-Z0-9]+)"|'([^']+\.[a-zA-Z0-9]+)'|([A-Za-z]:\\[^\s,]+\.[a-zA-Z0-9]+)|(\/[^\s,]+\.[a-zA-Z0-9]+))/g;
   const attachments: FileAttachment[] = [];
   const seen = new Set<string>();
 
@@ -93,7 +101,10 @@ function extractFileAttachments(text: string): { cleanText: string; attachments:
   // Remove the file paths from the display text, keep only the message
   let cleanText = text;
   for (const att of attachments) {
-    cleanText = cleanText.replace(`"${att.path}"`, "").replace(`'${att.path}'`, "").replace(att.path, "");
+    cleanText = cleanText
+      .replace(`"${att.path}"`, "")
+      .replace(`'${att.path}'`, "")
+      .replace(att.path, "");
   }
   cleanText = cleanText.replace(/\s+/g, " ").trim();
   if (!cleanText) cleanText = attachments.map((a) => a.name).join(", ");
@@ -161,9 +172,7 @@ interface ToolGroup {
   result?: ChatMessage;
 }
 
-type RenderItem =
-  | { type: "message"; message: ChatMessage }
-  | ToolGroup;
+type RenderItem = { type: "message"; message: ChatMessage } | ToolGroup;
 
 function groupMessages(messages: ChatMessage[]): RenderItem[] {
   const items: RenderItem[] = [];
@@ -177,7 +186,11 @@ function groupMessages(messages: ChatMessage[]): RenderItem[] {
       let matchedResult: ChatMessage | undefined;
       for (let j = index + 1; j < messages.length; j++) {
         const candidate = messages[j]!;
-        if (candidate.role === "tool_result" && candidate.toolName === message.toolName && !consumedResults.has(j)) {
+        if (
+          candidate.role === "tool_result" &&
+          candidate.toolName === message.toolName &&
+          !consumedResults.has(j)
+        ) {
           matchedResult = candidate;
           consumedResults.add(j);
           break;
@@ -301,7 +314,10 @@ function stripXmlTags(content: string): string {
     .replace(/<invoke\s+name="[^"]*"[^>]*>[\s\S]*?<\/invoke>/g, "")
     .replace(/<invoke\s+name="[^"]*"\s*\/>/g, "")
     .replace(/<(?:antml:)?parameter\s+name="[^"]*"[^>]*>[\s\S]*?<\/(?:antml:)?parameter>/g, "")
-    .replace(/<\/?(?:thinking|tool_call|result|name|parameters|model|command|path|content|query|pattern)>/g, "")
+    .replace(
+      /<\/?(?:thinking|tool_call|result|name|parameters|model|command|path|content|query|pattern)>/g,
+      "",
+    )
     .trim();
 }
 
@@ -315,7 +331,13 @@ interface ChatViewProps {
 
 const DOUBLE_ESCAPE_THRESHOLD_MILLISECONDS = 500;
 
-export function ChatView({ threadManager, focused, onRequestFocus, onRequestBlur, onQuestionStateChange }: ChatViewProps) {
+export function ChatView({
+  threadManager,
+  focused,
+  onRequestFocus,
+  onRequestBlur,
+  onQuestionStateChange,
+}: ChatViewProps) {
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [inputValue, setInputValue] = useState("");
   const [processing, setProcessing] = useState(false);
@@ -331,7 +353,9 @@ export function ChatView({ threadManager, focused, onRequestFocus, onRequestBlur
   const [providerSetupData, setProviderSetupData] = useState<ProviderOption[] | null>(null);
 
   useEffect(() => {
-    onQuestionStateChange?.(pendingQuestions !== null || pendingConfirmation !== null || pendingSetup !== null);
+    onQuestionStateChange?.(
+      pendingQuestions !== null || pendingConfirmation !== null || pendingSetup !== null,
+    );
   }, [pendingQuestions, pendingConfirmation, pendingSetup, onQuestionStateChange]);
 
   const scrollboxRef = useRef<any>(null);
@@ -366,8 +390,8 @@ export function ChatView({ threadManager, focused, onRequestFocus, onRequestBlur
   const filteredCommands = useMemo(() => {
     if (commandFilter === null) return [];
     const query = commandFilter.toLowerCase();
-    return ALL_COMMANDS.filter((cmd) =>
-      cmd.name.startsWith(query) || cmd.aliases.some((a) => a.startsWith(query)),
+    return ALL_COMMANDS.filter(
+      (cmd) => cmd.name.startsWith(query) || cmd.aliases.some((a) => a.startsWith(query)),
     );
   }, [commandFilter]);
 
@@ -394,55 +418,61 @@ export function ChatView({ threadManager, focused, onRequestFocus, onRequestBlur
   const dialog = useDialog();
   const dialogIsOpen = useDialogState((state) => state.isOpen);
 
-  const showCommandResult = useCallback((result: CommandResult) => {
-    if (result.displayMode === "plugin-browser") {
-      const registry = result.data as PluginRegistry;
-      dialog.show({
-        content: () => <PluginBrowserContent registry={registry} />,
-        size: "large",
-      });
-    } else if (result.displayMode === "plugin-store") {
-      const { registry, pluginRegistry } = result.data as {
-        registry: PluginRegistryManifest;
-        pluginRegistry: PluginRegistry;
-      };
-      dialog.show({
-        content: () => <PluginStoreContent registry={registry} pluginRegistry={pluginRegistry} />,
-        size: "large",
-      });
-    } else if (result.displayMode === "provider-setup") {
-      setProviderSetupData(result.data as ProviderOption[]);
-    } else if (result.displayMode === "dialog") {
-      dialog.show({
-        content: () => (
-          <box flexDirection="column" width="100%">
-            <text>{result.output}</text>
-          </box>
-        ),
-        size: "large",
-      });
-    } else {
-      toast.info(result.output);
-    }
+  const showCommandResult = useCallback(
+    (result: CommandResult) => {
+      if (result.displayMode === "plugin-browser") {
+        const registry = result.data as PluginRegistry;
+        dialog.show({
+          content: () => <PluginBrowserContent registry={registry} />,
+          size: "large",
+        });
+      } else if (result.displayMode === "plugin-store") {
+        const { registry, pluginRegistry } = result.data as {
+          registry: PluginRegistryManifest;
+          pluginRegistry: PluginRegistry;
+        };
+        dialog.show({
+          content: () => <PluginStoreContent registry={registry} pluginRegistry={pluginRegistry} />,
+          size: "large",
+        });
+      } else if (result.displayMode === "provider-setup") {
+        setProviderSetupData(result.data as ProviderOption[]);
+      } else if (result.displayMode === "dialog") {
+        dialog.show({
+          content: () => (
+            <box flexDirection="column" width="100%">
+              <text>{result.output}</text>
+            </box>
+          ),
+          size: "large",
+        });
+      } else {
+        toast.info(result.output);
+      }
 
-    if (result.switchedThread) {
-      setThreadTitle(threadManager.getActiveThreadTitle());
-      setThreadCount(threadManager.getThreadCount());
-      setActiveThreadId(threadManager.getActiveThreadIdentifier());
-      const newEngine = threadManager.getActiveEngine();
-      setMessages([...newEngine.getMessages()]);
-    }
+      if (result.switchedThread) {
+        setThreadTitle(threadManager.getActiveThreadTitle());
+        setThreadCount(threadManager.getThreadCount());
+        setActiveThreadId(threadManager.getActiveThreadIdentifier());
+        const newEngine = threadManager.getActiveEngine();
+        setMessages([...newEngine.getMessages()]);
+      }
 
-    // Sync plan mode indicator after any command (e.g. /plan toggle)
-    setInPlanMode(threadManager.getActiveEngine().isPlanMode());
-  }, [dialog, threadManager]);
+      // Sync plan mode indicator after any command (e.g. /plan toggle)
+      setInPlanMode(threadManager.getActiveEngine().isPlanMode());
+    },
+    [dialog, threadManager],
+  );
 
-  const executeCommandDirectly = useCallback(async (command: SlashCommand) => {
-    const result = await handleSlashCommand("/" + command.name, threadManager);
-    if (result) {
-      showCommandResult(result);
-    }
-  }, [threadManager, showCommandResult]);
+  const executeCommandDirectly = useCallback(
+    async (command: SlashCommand) => {
+      const result = await handleSlashCommand("/" + command.name, threadManager);
+      if (result) {
+        showCommandResult(result);
+      }
+    },
+    [threadManager, showCommandResult],
+  );
 
   const openCommandPalette = useCallback(() => {
     dialog.show({
@@ -477,7 +507,11 @@ export function ChatView({ threadManager, focused, onRequestFocus, onRequestBlur
       return;
     }
     const textarea = textareaReference.current;
-    if (!textarea) { setCommandFilter(null); setModelFilter(null); return; }
+    if (!textarea) {
+      setCommandFilter(null);
+      setModelFilter(null);
+      return;
+    }
     const text = textarea.plainText;
 
     // Check for /model <partial> pattern
@@ -492,9 +526,14 @@ export function ChatView({ threadManager, focused, onRequestFocus, onRequestBlur
       if (cachedModelIds.current.length === 0 && !modelFetchInFlight.current) {
         modelFetchInFlight.current = true;
         fetchAllAvailableModels()
-          .then((models) => { cachedModelIds.current = models; setModelFilter((prev) => prev); })
+          .then((models) => {
+            cachedModelIds.current = models;
+            setModelFilter((prev) => prev);
+          })
           .catch(() => {})
-          .finally(() => { modelFetchInFlight.current = false; });
+          .finally(() => {
+            modelFetchInFlight.current = false;
+          });
       }
       return;
     }
@@ -706,7 +745,10 @@ export function ChatView({ threadManager, focused, onRequestFocus, onRequestBlur
 
         // Messages changed structurally (new message, removed, or streaming finished)
         if (updatedMessages.length !== lastMessageCount || (lastMsg && !isStreaming)) {
-          if (streamingUpdateTimer) { clearTimeout(streamingUpdateTimer); streamingUpdateTimer = null; }
+          if (streamingUpdateTimer) {
+            clearTimeout(streamingUpdateTimer);
+            streamingUpdateTimer = null;
+          }
           setMessages([...updatedMessages]);
           lastMessageCount = updatedMessages.length;
         } else if (isStreaming) {
@@ -867,31 +909,33 @@ export function ChatView({ threadManager, focused, onRequestFocus, onRequestBlur
     }
 
     const { cleanText, attachments } = extractFileAttachments(currentText);
-    engine.sendMessage(attachments.length > 0 ? cleanText : currentText, attachments.length > 0 ? attachments : undefined);
+    engine.sendMessage(
+      attachments.length > 0 ? cleanText : currentText,
+      attachments.length > 0 ? attachments : undefined,
+    );
     setQueuedMessages(engine.getQueuedMessages());
 
     // Update mode indicator immediately (planMode is consumed per-message)
     setInPlanMode(engine.isPlanMode());
-
   }, [inputValue, threadManager]);
 
   const engine = threadManager.getActiveEngine();
   const tokenUsage = engine.getTokenUsage();
-  const tokenLabel = tokenUsage.requestCount > 0
-    ? `${tokenUsage.totalPromptTokens + tokenUsage.totalCompletionTokens} tokens · ${tokenUsage.requestCount} requests`
-    : "";
+  const tokenLabel =
+    tokenUsage.requestCount > 0
+      ? `${tokenUsage.totalPromptTokens + tokenUsage.totalCompletionTokens} tokens · ${tokenUsage.requestCount} requests`
+      : "";
 
   const isStreaming = messages.some((m) => m.streaming);
 
-  const avatarState: AvatarState = processing
-    ? isStreaming ? "working" : "thinking"
-    : "idle";
+  const avatarState: AvatarState = processing ? (isStreaming ? "working" : "thinking") : "idle";
 
-  const threadLabel = threadCount > 1
-    ? `${threadTitle} (${threadCount} threads)`
-    : threadTitle;
+  const threadLabel = threadCount > 1 ? `${threadTitle} (${threadCount} threads)` : threadTitle;
 
-  const isPlanActive = inPlanMode || (currentPlan !== null && (currentPlan.status === "draft" || currentPlan.status === "executing"));
+  const isPlanActive =
+    inPlanMode ||
+    (currentPlan !== null &&
+      (currentPlan.status === "draft" || currentPlan.status === "executing"));
   const modeColor = isPlanActive ? COLORS.green : COLORS.blue;
   const modeLabel = isPlanActive ? "Plan" : "Build";
 
@@ -902,9 +946,7 @@ export function ChatView({ threadManager, focused, onRequestFocus, onRequestBlur
         <text fg={COLORS.textMuted}>{"  ·  "}</text>
         <text fg={COLORS.textSecondary}>{threadLabel}</text>
         <box flexGrow={1} />
-        {tokenLabel ? (
-          <text fg={COLORS.textMuted}>{tokenLabel}</text>
-        ) : null}
+        {tokenLabel ? <text fg={COLORS.textMuted}>{tokenLabel}</text> : null}
       </box>
 
       <scrollbox
@@ -917,11 +959,7 @@ export function ChatView({ threadManager, focused, onRequestFocus, onRequestBlur
         stickyStart="bottom"
         onMouseUp={onRequestBlur}
       >
-        {messages.length === 0 ? (
-          <EmptyState />
-        ) : (
-          <MessageList messages={messages} />
-        )}
+        {messages.length === 0 ? <EmptyState /> : <MessageList messages={messages} />}
       </scrollbox>
 
       <box flexDirection="column" width="100%" flexShrink={0} marginTop={1}>
@@ -960,12 +998,8 @@ export function ChatView({ threadManager, focused, onRequestFocus, onRequestBlur
                   backgroundColor={isSelected ? COLORS.cyan : undefined}
                   onMouseUp={() => acceptModel(model)}
                 >
-                  <text fg={isSelected ? COLORS.background : COLORS.textMuted}>
-                    {"  " + tag}
-                  </text>
-                  <text fg={isSelected ? COLORS.background : COLORS.text}>
-                    {model.modelId}
-                  </text>
+                  <text fg={isSelected ? COLORS.background : COLORS.textMuted}>{"  " + tag}</text>
+                  <text fg={isSelected ? COLORS.background : COLORS.text}>{model.modelId}</text>
                 </box>
               );
             })}
@@ -1069,11 +1103,7 @@ export function ChatView({ threadManager, focused, onRequestFocus, onRequestBlur
   );
 }
 
-function CommandPaletteContent({
-  onSelect,
-}: {
-  onSelect: (command: SlashCommand) => void;
-}) {
+function CommandPaletteContent({ onSelect }: { onSelect: (command: SlashCommand) => void }) {
   const [selectedIndex, setSelectedIndex] = useState(0);
   const topDialog = useDialogState((state) => state.topDialog);
 
@@ -1106,9 +1136,10 @@ function CommandPaletteContent({
       {ALL_COMMANDS.map((command, index) => {
         const isSelected = index === selectedIndex;
         const needsArguments = commandRequiresArguments(command);
-        const aliasLabel = command.aliases.length > 0
-          ? "  " + command.aliases.map((alias) => "/" + alias).join(" ")
-          : "";
+        const aliasLabel =
+          command.aliases.length > 0
+            ? "  " + command.aliases.map((alias) => "/" + alias).join(" ")
+            : "";
 
         return (
           <box
@@ -1123,14 +1154,10 @@ function CommandPaletteContent({
                 {(isSelected ? "→ " : "  ") + command.usage}
               </text>
               <text fg={COLORS.textMuted}>{aliasLabel}</text>
-              {needsArguments ? (
-                <text fg={COLORS.textMuted}>{"  (opens input)"}</text>
-              ) : null}
+              {needsArguments ? <text fg={COLORS.textMuted}>{"  (opens input)"}</text> : null}
             </box>
             <box paddingLeft={4}>
-              <text fg={isSelected ? COLORS.text : COLORS.textMuted}>
-                {command.description}
-              </text>
+              <text fg={isSelected ? COLORS.text : COLORS.textMuted}>{command.description}</text>
             </box>
           </box>
         );
@@ -1229,9 +1256,7 @@ function PluginBrowserContent({ registry }: { registry: PluginRegistry }) {
                 {isSelected ? "→ " : "  "}
               </text>
               <text fg={statusColor}>{statusIcon + " "}</text>
-              <text fg={isSelected ? COLORS.text : COLORS.textSecondary}>
-                {entry.plugin.name}
-              </text>
+              <text fg={isSelected ? COLORS.text : COLORS.textSecondary}>{entry.plugin.name}</text>
               <text fg={COLORS.textMuted}>{" v" + entry.plugin.version + extraLabel}</text>
             </box>
             {entry.plugin.description ? (
@@ -1303,24 +1328,29 @@ function PluginDetailView({ entry }: { entry: LoadedPlugin }) {
         </box>
       ) : null}
 
-      {plugin.hooks ? (() => {
-        const hookNames = Object.keys(plugin.hooks!).filter(
-          (key) => typeof (plugin.hooks as Record<string, unknown>)[key] === "function",
-        );
-        return hookNames.length > 0 ? (
-          <box paddingBottom={1}>
-            <text fg={COLORS.purple}>{"hooks: "}</text>
-            <text fg={COLORS.textSecondary}>{hookNames.join(", ")}</text>
-          </box>
-        ) : null;
-      })() : null}
+      {plugin.hooks
+        ? (() => {
+            const hookNames = Object.keys(plugin.hooks!).filter(
+              (key) => typeof (plugin.hooks as Record<string, unknown>)[key] === "function",
+            );
+            return hookNames.length > 0 ? (
+              <box paddingBottom={1}>
+                <text fg={COLORS.purple}>{"hooks: "}</text>
+                <text fg={COLORS.textSecondary}>{hookNames.join(", ")}</text>
+              </box>
+            ) : null;
+          })()
+        : null}
 
       {plugin.promptExtension ? (
         <box flexDirection="column">
           <text fg={COLORS.purple}>{"prompt extension"}</text>
           <box paddingLeft={2}>
             <text fg={COLORS.textMuted}>
-              {'"' + plugin.promptExtension.slice(0, 120) + (plugin.promptExtension.length > 120 ? "..." : "") + '"'}
+              {'"' +
+                plugin.promptExtension.slice(0, 120) +
+                (plugin.promptExtension.length > 120 ? "..." : "") +
+                '"'}
             </text>
           </box>
         </box>
@@ -1369,9 +1399,7 @@ function PluginStoreContent({
         .then((result) => {
           if (result.success) {
             setInstalledSet((previous) => new Set([...previous, entry.name]));
-            const warningText = result.warnings.length > 0
-              ? `\n${result.warnings.join("\n")}`
-              : "";
+            const warningText = result.warnings.length > 0 ? `\n${result.warnings.join("\n")}` : "";
             setInstallMessage(`${entry.name} installed${warningText}`);
           } else {
             setInstallMessage(`failed: ${result.error}`);
@@ -1401,9 +1429,8 @@ function PluginStoreContent({
         const statusIcon = installed ? "✓" : "○";
         const statusColor = installed ? COLORS.green : COLORS.textMuted;
         const toolLabel = `${entry.tools.length} tool${entry.tools.length !== 1 ? "s" : ""}`;
-        const requiresLabel = entry.requires.length > 0
-          ? `  requires: ${entry.requires.join(", ")}`
-          : "";
+        const requiresLabel =
+          entry.requires.length > 0 ? `  requires: ${entry.requires.join(", ")}` : "";
 
         return (
           <box
@@ -1419,9 +1446,7 @@ function PluginStoreContent({
                 {isSelected ? "→ " : "  "}
               </text>
               <text fg={statusColor}>{statusIcon + " "}</text>
-              <text fg={isSelected ? COLORS.text : COLORS.textSecondary}>
-                {entry.name}
-              </text>
+              <text fg={isSelected ? COLORS.text : COLORS.textSecondary}>{entry.name}</text>
               <text fg={COLORS.textMuted}>
                 {" v" + entry.version + "  " + toolLabel + requiresLabel}
               </text>
@@ -1446,7 +1471,6 @@ function PluginStoreContent({
     </box>
   );
 }
-
 
 function QuestionPanel({
   questions,
@@ -1480,7 +1504,7 @@ function QuestionPanel({
   const currentAnswers = answers[activeStep] ?? [];
   const isCursorOnCustom = currentCursor === customIdx;
 
-  const formatAnswer = (ans: string[]): string => ans.length > 0 ? ans.join(", ") : "(no answer)";
+  const formatAnswer = (ans: string[]): string => (ans.length > 0 ? ans.join(", ") : "(no answer)");
 
   const resolve = useCallback(() => {
     const result: QuestionAnswer[] = items.map((item, i) => ({
@@ -1490,23 +1514,26 @@ function QuestionPanel({
     onResolve(result);
   }, [items, answers, onResolve]);
 
-  const toggleOption = useCallback((label: string) => {
-    setAnswers((prev) => {
-      const next = [...prev];
-      const current = next[activeStep] ?? [];
-      if (isMultiple) {
-        next[activeStep] = current.includes(label)
-          ? current.filter((l) => l !== label)
-          : [...current, label];
-      } else {
-        next[activeStep] = [label];
+  const toggleOption = useCallback(
+    (label: string) => {
+      setAnswers((prev) => {
+        const next = [...prev];
+        const current = next[activeStep] ?? [];
+        if (isMultiple) {
+          next[activeStep] = current.includes(label)
+            ? current.filter((l) => l !== label)
+            : [...current, label];
+        } else {
+          next[activeStep] = [label];
+        }
+        return next;
+      });
+      if (!isMultiple && activeStep < stepCount) {
+        setActiveStep((prev) => prev + 1);
       }
-      return next;
-    });
-    if (!isMultiple && activeStep < stepCount) {
-      setActiveStep((prev) => prev + 1);
-    }
-  }, [activeStep, stepCount, isMultiple]);
+    },
+    [activeStep, stepCount, isMultiple],
+  );
 
   const submitCustomText = useCallback(() => {
     const text = customInputRef.current?.plainText?.trim() ?? "";
@@ -1601,7 +1628,13 @@ function QuestionPanel({
   });
 
   return (
-    <box flexDirection="column" width="100%" flexShrink={0} backgroundColor={COLORS.inputBackground} padding={1}>
+    <box
+      flexDirection="column"
+      width="100%"
+      flexShrink={0}
+      backgroundColor={COLORS.inputBackground}
+      padding={1}
+    >
       {/* Tab bar */}
       <box flexDirection="row" width="100%" paddingBottom={1}>
         {items.map((item, idx) => {
@@ -1643,9 +1676,7 @@ function QuestionPanel({
             );
           })}
           <text>{""}</text>
-          <text fg={COLORS.textMuted}>
-            {"enter confirm  ← go back  esc dismiss"}
-          </text>
+          <text fg={COLORS.textMuted}>{"enter confirm  ← go back  esc dismiss"}</text>
         </box>
       ) : currentItem ? (
         <box flexDirection="column" width="100%">
@@ -1656,9 +1687,7 @@ function QuestionPanel({
           {currentItem.options.map((opt, idx) => {
             const isCursor = idx === currentCursor;
             const isChecked = currentAnswers.includes(opt.label);
-            const checkbox = isMultiple
-              ? (isChecked ? "◉ " : "○ ")
-              : (isChecked ? "● " : "○ ");
+            const checkbox = isMultiple ? (isChecked ? "◉ " : "○ ") : isChecked ? "● " : "○ ";
             const prefix = isCursor ? "→ " : "  ";
             return (
               <box key={idx} flexDirection="column" width="100%">
@@ -1674,15 +1703,22 @@ function QuestionPanel({
           {/* Custom text option */}
           {(() => {
             const customText = customTexts[activeStep] ?? "";
-            const hasCustom = currentAnswers.some((a) => !currentItem.options.some((o) => o.label === a));
-            const checkbox = isMultiple
-              ? (hasCustom ? "◉ " : "○ ")
-              : (hasCustom ? "● " : "○ ");
+            const hasCustom = currentAnswers.some(
+              (a) => !currentItem.options.some((o) => o.label === a),
+            );
+            const checkbox = isMultiple ? (hasCustom ? "◉ " : "○ ") : hasCustom ? "● " : "○ ";
             const prefix = isCursorOnCustom ? "→ " : "  ";
             return (
               <box flexDirection="column" width="100%">
-                <text fg={hasCustom ? COLORS.green : isCursorOnCustom ? COLORS.text : COLORS.textSecondary}>
-                  {prefix + checkbox + "Other..." + (customText && !editingCustom ? " (" + customText + ")" : "")}
+                <text
+                  fg={
+                    hasCustom ? COLORS.green : isCursorOnCustom ? COLORS.text : COLORS.textSecondary
+                  }
+                >
+                  {prefix +
+                    checkbox +
+                    "Other..." +
+                    (customText && !editingCustom ? " (" + customText + ")" : "")}
                 </text>
               </box>
             );
@@ -1732,9 +1768,12 @@ function ConfirmationPanel({
     onResolve({ approved: true });
   }, [onResolve]);
 
-  const reject = useCallback((reason?: string) => {
-    onResolve({ approved: false, reason: reason || undefined });
-  }, [onResolve]);
+  const reject = useCallback(
+    (reason?: string) => {
+      onResolve({ approved: false, reason: reason || undefined });
+    },
+    [onResolve],
+  );
 
   useKeyboard((key) => {
     if (showReason) {
@@ -1761,15 +1800,25 @@ function ConfirmationPanel({
   const paramEntries = Object.entries(confirmation.parameters);
 
   return (
-    <box flexDirection="column" width="100%" flexShrink={0} backgroundColor={COLORS.inputBackground} padding={1}>
+    <box
+      flexDirection="column"
+      width="100%"
+      flexShrink={0}
+      backgroundColor={COLORS.inputBackground}
+      padding={1}
+    >
       <box flexDirection="row" width="100%" paddingBottom={1}>
         <text fg={COLORS.yellow}>{"⚠ "}</text>
-        <text fg={COLORS.text}><b>{"Tool requires confirmation"}</b></text>
+        <text fg={COLORS.text}>
+          <b>{"Tool requires confirmation"}</b>
+        </text>
       </box>
 
       <box flexDirection="row" width="100%" paddingBottom={1}>
         <text fg={COLORS.textMuted}>{"tool: "}</text>
-        <text fg={COLORS.purple}><b>{confirmation.toolName}</b></text>
+        <text fg={COLORS.purple}>
+          <b>{confirmation.toolName}</b>
+        </text>
       </box>
 
       {paramEntries.length > 0 ? (
@@ -1805,9 +1854,18 @@ function ConfirmationPanel({
         </box>
       ) : (
         <box flexDirection="row" width="100%" paddingTop={1} gap={2}>
-          <text fg={COLORS.green}><b>{"y/enter"}</b>{" approve"}</text>
-          <text fg={COLORS.red}><b>{"n/esc"}</b>{" reject"}</text>
-          <text fg={COLORS.textMuted}><b>{"r"}</b>{" reject with reason"}</text>
+          <text fg={COLORS.green}>
+            <b>{"y/enter"}</b>
+            {" approve"}
+          </text>
+          <text fg={COLORS.red}>
+            <b>{"n/esc"}</b>
+            {" reject"}
+          </text>
+          <text fg={COLORS.textMuted}>
+            <b>{"r"}</b>
+            {" reject with reason"}
+          </text>
         </box>
       )}
     </box>
@@ -1815,13 +1873,20 @@ function ConfirmationPanel({
 }
 
 function useIncrementalGrouping(messages: ChatMessage[]): RenderItem[] {
-  const cacheRef = useRef<{ length: number; items: RenderItem[]; boundaryMsg?: ChatMessage }>({ length: 0, items: [] });
+  const cacheRef = useRef<{ length: number; items: RenderItem[]; boundaryMsg?: ChatMessage }>({
+    length: 0,
+    items: [],
+  });
 
   return useMemo(() => {
     const cached = cacheRef.current;
     const recompute = () => {
       const items = groupMessages(messages);
-      cacheRef.current = { length: messages.length, items, boundaryMsg: messages[messages.length - 1] };
+      cacheRef.current = {
+        length: messages.length,
+        items,
+        boundaryMsg: messages[messages.length - 1],
+      };
       return items;
     };
 
@@ -1835,7 +1900,12 @@ function useIncrementalGrouping(messages: ChatMessage[]): RenderItem[] {
       const lastMsg = messages[messages.length - 1];
       const lastItem = cached.items[cached.items.length - 1];
       if (lastMsg && lastItem) {
-        const lastCachedMsg = lastItem.type === "message" ? lastItem.message : lastItem.type === "tool" ? lastItem.result : undefined;
+        const lastCachedMsg =
+          lastItem.type === "message"
+            ? lastItem.message
+            : lastItem.type === "tool"
+              ? lastItem.result
+              : undefined;
         if (lastCachedMsg && lastCachedMsg.content !== lastMsg.content) {
           return recompute();
         }
@@ -1869,13 +1939,21 @@ function useIncrementalGrouping(messages: ChatMessage[]): RenderItem[] {
       const remaining = newMessages.slice(1);
       const newItems = remaining.length > 0 ? groupMessages(remaining) : [];
       const items = [...prevItems, ...newItems];
-      cacheRef.current = { length: messages.length, items, boundaryMsg: messages[messages.length - 1] };
+      cacheRef.current = {
+        length: messages.length,
+        items,
+        boundaryMsg: messages[messages.length - 1],
+      };
       return items;
     }
 
     const newItems = groupMessages(newMessages);
     const items = [...prevItems, ...newItems];
-    cacheRef.current = { length: messages.length, items, boundaryMsg: messages[messages.length - 1] };
+    cacheRef.current = {
+      length: messages.length,
+      items,
+      boundaryMsg: messages[messages.length - 1],
+    };
     return items;
   }, [messages]);
 }
@@ -1910,11 +1988,13 @@ function EmptyState() {
         <text fg={COLORS.cyan}>{"┃"}</text>
       </box>
       <box flexDirection="column">
-        <text fg={COLORS.text}><b>{"kraken"}</b></text>
+        <text fg={COLORS.text}>
+          <b>{"kraken"}</b>
+        </text>
         <text fg={COLORS.textMuted}>{"autonomous developer agent"}</text>
-        <text fg={COLORS.textMuted}>{" "}</text>
+        <text fg={COLORS.textMuted}> </text>
         <text fg={COLORS.textMuted}>{"ask me anything about your codebase."}</text>
-        <text fg={COLORS.textMuted}>{" "}</text>
+        <text fg={COLORS.textMuted}> </text>
         <text fg={COLORS.textMuted}>{"examples:"}</text>
         <text fg={COLORS.textSecondary}>{'  "list the files in this project"'}</text>
         <text fg={COLORS.textSecondary}>{'  "read package.json and explain the project"'}</text>
@@ -1942,7 +2022,9 @@ function MessageBubble({ message }: { message: ChatMessage }) {
       return (
         <LeftBorder color={COLORS.blue}>
           <box flexDirection="column" width="100%">
-            <text fg={COLORS.text}><b>{message.content}</b></text>
+            <text fg={COLORS.text}>
+              <b>{message.content}</b>
+            </text>
             {message.attachments?.map((att, idx) => (
               <box key={idx} flexDirection="column" width="100%" paddingTop={1}>
                 {att.isImage ? (
@@ -1999,10 +2081,13 @@ function parseImageResult(content: string): ImageResultData | null {
     if (data && data.type === "image" && data.path) {
       return data as ImageResultData;
     }
-  } catch { /* not json, try path detection */ }
+  } catch {
+    /* not json, try path detection */
+  }
 
-  const pathMatch = content.match(/(?:^|\s)(\/[^\s]+(?:\.png|\.jpg|\.jpeg|\.gif|\.bmp|\.webp))/i)
-    ?? content.match(/(?:^|\s)(\.[^\s]+(?:\.png|\.jpg|\.jpeg|\.gif|\.bmp|\.webp))/i);
+  const pathMatch =
+    content.match(/(?:^|\s)(\/[^\s]+(?:\.png|\.jpg|\.jpeg|\.gif|\.bmp|\.webp))/i) ??
+    content.match(/(?:^|\s)(\.[^\s]+(?:\.png|\.jpg|\.jpeg|\.gif|\.bmp|\.webp))/i);
 
   if (pathMatch?.[1] && content.length < 500) {
     return { type: "image", path: pathMatch[1] };
@@ -2024,18 +2109,22 @@ function InlineImagePreview({ path, name }: { path: string; name: string }) {
       {rows.map((row, rowIndex) => (
         <box flexDirection="row" key={rowIndex}>
           {row.map((segment, segmentIndex) => (
-            <text key={segmentIndex} fg={segment.fg} bg={segment.bg}>{segment.text}</text>
+            <text key={segmentIndex} fg={segment.fg} bg={segment.bg}>
+              {segment.text}
+            </text>
           ))}
         </box>
       ))}
-      <text fg={COLORS.textMuted}>{name + " · " + preview.originalWidth + "×" + preview.originalHeight}</text>
+      <text fg={COLORS.textMuted}>
+        {name + " · " + preview.originalWidth + "×" + preview.originalHeight}
+      </text>
     </box>
   );
 }
 
 function ImageResultCard({ imageData }: { imageData: ImageResultData }) {
   const preview = useMemo(() => loadImagePreview(imageData.path, 50), [imageData.path]);
-  const rows = useMemo(() => preview ? generatePreviewRows(preview) : [], [preview]);
+  const rows = useMemo(() => (preview ? generatePreviewRows(preview) : []), [preview]);
 
   const sizeLabel = imageData.sizeBytes
     ? imageData.sizeBytes > 1024 * 1024
@@ -2043,11 +2132,12 @@ function ImageResultCard({ imageData }: { imageData: ImageResultData }) {
       : `${Math.round(imageData.sizeBytes / 1024)} KB`
     : "";
 
-  const dimensionLabel = imageData.width && imageData.height
-    ? `${imageData.width}×${imageData.height}`
-    : preview
-      ? `${preview.originalWidth}×${preview.originalHeight}`
-      : "";
+  const dimensionLabel =
+    imageData.width && imageData.height
+      ? `${imageData.width}×${imageData.height}`
+      : preview
+        ? `${preview.originalWidth}×${preview.originalHeight}`
+        : "";
 
   return (
     <box flexDirection="column" width="100%">
@@ -2063,7 +2153,9 @@ function ImageResultCard({ imageData }: { imageData: ImageResultData }) {
           {rows.map((row, rowIndex) => (
             <box flexDirection="row" key={rowIndex}>
               {row.map((segment, segmentIndex) => (
-                <text key={segmentIndex} fg={segment.fg} bg={segment.bg}>{segment.text}</text>
+                <text key={segmentIndex} fg={segment.fg} bg={segment.bg}>
+                  {segment.text}
+                </text>
               ))}
             </box>
           ))}
@@ -2081,7 +2173,15 @@ function ImageResultCard({ imageData }: { imageData: ImageResultData }) {
   );
 }
 
-function ToolExpandedContent({ call, result, toolName }: { call: ChatMessage; result?: ChatMessage; toolName: string }) {
+function ToolExpandedContent({
+  call,
+  result,
+  toolName,
+}: {
+  call: ChatMessage;
+  result?: ChatMessage;
+  toolName: string;
+}) {
   const hasResult = result !== undefined && result !== call;
   const succeeded = result?.toolSuccess ?? true;
   const params = parseToolCallParams(call.content);
@@ -2091,14 +2191,15 @@ function ToolExpandedContent({ call, result, toolName }: { call: ChatMessage; re
   if (!succeeded && hasResult && resultContent) {
     return (
       <box flexDirection="column" paddingLeft={2} width="100%">
-        {resultContent.split("\n").slice(0, 30).map((line, lineIndex) => (
-          <box key={lineIndex} width="100%">
-            <text fg={COLORS.red}>{line}</text>
-          </box>
-        ))}
-        {resultContent.split("\n").length > 30 ? (
-          <text fg={COLORS.red}>{"..."}</text>
-        ) : null}
+        {resultContent
+          .split("\n")
+          .slice(0, 30)
+          .map((line, lineIndex) => (
+            <box key={lineIndex} width="100%">
+              <text fg={COLORS.red}>{line}</text>
+            </box>
+          ))}
+        {resultContent.split("\n").length > 30 ? <text fg={COLORS.red}>{"..."}</text> : null}
       </box>
     );
   }
@@ -2139,7 +2240,7 @@ function ToolExpandedContent({ call, result, toolName }: { call: ChatMessage; re
 
   // read_file / read_lines → show result with syntax highlighting
   if ((toolName === "read_file" || toolName === "read_lines") && hasResult) {
-    const filePath = params?.path as string ?? "";
+    const filePath = (params?.path as string) ?? "";
     const fileType = detectFileType(filePath);
     return (
       <box flexDirection="column" paddingLeft={2} width="100%">
@@ -2185,21 +2286,25 @@ function ToolExpandedContent({ call, result, toolName }: { call: ChatMessage; re
   // Default: plain text input/output
   return (
     <box flexDirection="column" paddingLeft={2} width="100%">
-      {call.content.split("\n").slice(0, 20).map((line, lineIndex) => (
-        <box key={lineIndex} width="100%">
-          <text fg={COLORS.textMuted}>{line}</text>
-        </box>
-      ))}
-      {call.content.split("\n").length > 20 ? (
-        <text fg={COLORS.textMuted}>{"..."}</text>
-      ) : null}
+      {call.content
+        .split("\n")
+        .slice(0, 20)
+        .map((line, lineIndex) => (
+          <box key={lineIndex} width="100%">
+            <text fg={COLORS.textMuted}>{line}</text>
+          </box>
+        ))}
+      {call.content.split("\n").length > 20 ? <text fg={COLORS.textMuted}>{"..."}</text> : null}
       {hasResult ? (
         <box flexDirection="column" marginTop={1} width="100%">
-          {resultContent.split("\n").slice(0, 20).map((line, lineIndex) => (
-            <box key={lineIndex} width="100%">
-              <text fg={succeeded ? COLORS.textMuted : COLORS.red}>{line}</text>
-            </box>
-          ))}
+          {resultContent
+            .split("\n")
+            .slice(0, 20)
+            .map((line, lineIndex) => (
+              <box key={lineIndex} width="100%">
+                <text fg={succeeded ? COLORS.textMuted : COLORS.red}>{line}</text>
+              </box>
+            ))}
           {resultContent.split("\n").length > 20 ? (
             <text fg={COLORS.textMuted}>{"..."}</text>
           ) : null}
@@ -2225,12 +2330,20 @@ function QuestionResultBlock({ content }: { content: string }) {
   }
 
   return (
-    <box flexDirection="column" width="100%" backgroundColor={COLORS.inputBackground} padding={1} marginTop={1}>
+    <box
+      flexDirection="column"
+      width="100%"
+      backgroundColor={COLORS.inputBackground}
+      padding={1}
+      marginTop={1}
+    >
       <text fg={COLORS.textMuted}>{"# Questions"}</text>
       {pairs.map((pair, idx) => (
         <box key={idx} flexDirection="column" width="100%" paddingTop={1}>
           <text fg={COLORS.textMuted}>{pair.question}</text>
-          <text fg={COLORS.text}><b>{pair.answer}</b></text>
+          <text fg={COLORS.text}>
+            <b>{pair.answer}</b>
+          </text>
         </box>
       ))}
     </box>
@@ -2256,11 +2369,7 @@ function ToolAccordion({ call, result }: { call: ChatMessage; result?: ChatMessa
   }
 
   return (
-    <box
-      flexDirection="row"
-      paddingTop={1}
-      width="100%"
-    >
+    <box flexDirection="row" paddingTop={1} width="100%">
       <box flexShrink={0} width={2}>
         <text fg={COLORS.textMuted}>{"┃"}</text>
       </box>
@@ -2280,9 +2389,7 @@ function ToolAccordion({ call, result }: { call: ChatMessage; result?: ChatMessa
                 <text fg={statusColor}>{statusIcon}</text>
               )}
               <text fg={COLORS.purple}>{" " + name}</text>
-              {summary ? (
-                <text fg={COLORS.textMuted}>{"  " + summary}</text>
-              ) : null}
+              {summary ? <text fg={COLORS.textMuted}>{"  " + summary}</text> : null}
             </box>
 
             {expanded ? (
@@ -2303,11 +2410,21 @@ function buildToolSummary(call: ChatMessage): string {
     const toolName = call.toolName ?? "";
 
     if (parameters.path) return parameters.path;
-    if (parameters.command) return parameters.command.length > 40 ? parameters.command.slice(0, 40) + "..." : parameters.command;
-    if (parameters.query) return parameters.query.length > 40 ? parameters.query.slice(0, 40) + "..." : parameters.query;
+    if (parameters.command)
+      return parameters.command.length > 40
+        ? parameters.command.slice(0, 40) + "..."
+        : parameters.command;
+    if (parameters.query)
+      return parameters.query.length > 40
+        ? parameters.query.slice(0, 40) + "..."
+        : parameters.query;
     if (parameters.pattern) return parameters.pattern;
-    if (parameters.url) return parameters.url.length > 40 ? parameters.url.slice(0, 40) + "..." : parameters.url;
-    if (parameters.message && toolName === "git_commit") return parameters.message.length > 40 ? parameters.message.slice(0, 40) + "..." : parameters.message;
+    if (parameters.url)
+      return parameters.url.length > 40 ? parameters.url.slice(0, 40) + "..." : parameters.url;
+    if (parameters.message && toolName === "git_commit")
+      return parameters.message.length > 40
+        ? parameters.message.slice(0, 40) + "..."
+        : parameters.message;
     if (parameters.name) return parameters.name;
     if (parameters.model) return parameters.model;
     if (parameters.title) return parameters.title;
@@ -2334,20 +2451,37 @@ function detectFileType(filePath: string): string | undefined {
   const ext = filePath.split(".").pop()?.toLowerCase();
   const map: Record<string, string> = {
     // Native parsers
-    ts: "typescript", tsx: "typescript", js: "javascript", jsx: "javascript",
-    md: "markdown", zig: "zig",
+    ts: "typescript",
+    tsx: "typescript",
+    js: "javascript",
+    jsx: "javascript",
+    md: "markdown",
+    zig: "zig",
     // JSON → javascript (compatible: strings, numbers, booleans, brackets)
     json: "javascript",
     // C-family → javascript (reasonable keyword/brace highlighting)
-    go: "javascript", rs: "javascript", java: "javascript",
-    c: "javascript", cpp: "javascript", h: "javascript", hpp: "javascript",
-    css: "javascript", scss: "javascript",
+    go: "javascript",
+    rs: "javascript",
+    java: "javascript",
+    c: "javascript",
+    cpp: "javascript",
+    h: "javascript",
+    hpp: "javascript",
+    css: "javascript",
+    scss: "javascript",
     // Scripting → javascript
-    py: "javascript", rb: "javascript",
-    sh: "javascript", bash: "javascript", zsh: "javascript",
+    py: "javascript",
+    rb: "javascript",
+    sh: "javascript",
+    bash: "javascript",
+    zsh: "javascript",
     // Config/data → javascript (better than nothing)
-    yaml: "javascript", yml: "javascript", toml: "javascript",
-    sql: "javascript", html: "javascript", xml: "javascript",
+    yaml: "javascript",
+    yml: "javascript",
+    toml: "javascript",
+    sql: "javascript",
+    html: "javascript",
+    xml: "javascript",
     proto: "javascript",
   };
   return ext ? map[ext] : undefined;
@@ -2389,9 +2523,8 @@ function AssistantBubble({ message }: { message: ChatMessage }) {
   const hasText = segments.some((s) => s.type === "text");
   const hasToolCall = segments.some((s) => s.type === "tool_call");
 
-  const pendingToolName = message.streaming && hasToolCall
-    ? extractToolNameFromPartialCall(displayContent)
-    : undefined;
+  const pendingToolName =
+    message.streaming && hasToolCall ? extractToolNameFromPartialCall(displayContent) : undefined;
 
   const streamingHint = message.streaming
     ? hasThinking && !hasText
@@ -2411,9 +2544,7 @@ function AssistantBubble({ message }: { message: ChatMessage }) {
       <box flexDirection="column" flexGrow={1} flexShrink={1} width="100%">
         {streamingHint ? (
           <box flexDirection="row">
-            {message.streaming ? (
-              <spinner name="dots" color={COLORS.cyan} />
-            ) : null}
+            {message.streaming ? <spinner name="dots" color={COLORS.cyan} /> : null}
             <text fg={COLORS.textMuted}>{" " + streamingHint}</text>
           </box>
         ) : null}
@@ -2442,7 +2573,13 @@ function AssistantBubble({ message }: { message: ChatMessage }) {
               <box flexDirection="row" width="100%" paddingTop={1} paddingBottom={1}>
                 <box flexShrink={0} width={1} backgroundColor={COLORS.green} />
                 <box flexGrow={1} paddingLeft={1} width="100%">
-                  <markdown content={planMd} syntaxStyle={syntaxStyle} conceal={true} streaming={false} width="100%" />
+                  <markdown
+                    content={planMd}
+                    syntaxStyle={syntaxStyle}
+                    conceal={true}
+                    streaming={false}
+                    width="100%"
+                  />
                 </box>
               </box>
             );

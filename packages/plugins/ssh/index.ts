@@ -4,21 +4,10 @@ import { resolve, isAbsolute } from "node:path";
 import { homedir } from "node:os";
 import { readFileSync, existsSync } from "node:fs";
 
-const tunnels = new Map<
-  number,
-  { subprocess: ReturnType<typeof Bun.spawn>; host: string }
->();
+const tunnels = new Map<number, { subprocess: ReturnType<typeof Bun.spawn>; host: string }>();
 
-function buildSshArgs(params: {
-  port?: number;
-  identity_file?: string;
-}): string[] {
-  const args: string[] = [
-    "-o",
-    "StrictHostKeyChecking=accept-new",
-    "-o",
-    "ConnectTimeout=10",
-  ];
+function buildSshArgs(params: { port?: number; identity_file?: string }): string[] {
+  const args: string[] = ["-o", "StrictHostKeyChecking=accept-new", "-o", "ConnectTimeout=10"];
   if (params.port !== undefined) {
     args.push("-p", String(params.port));
   }
@@ -28,16 +17,8 @@ function buildSshArgs(params: {
   return args;
 }
 
-function buildScpArgs(params: {
-  port?: number;
-  identity_file?: string;
-}): string[] {
-  const args: string[] = [
-    "-o",
-    "StrictHostKeyChecking=accept-new",
-    "-o",
-    "ConnectTimeout=10",
-  ];
+function buildScpArgs(params: { port?: number; identity_file?: string }): string[] {
+  const args: string[] = ["-o", "StrictHostKeyChecking=accept-new", "-o", "ConnectTimeout=10"];
   if (params.port !== undefined) {
     args.push("-P", String(params.port));
   }
@@ -52,9 +33,7 @@ function resolvePath(path: string, workingDirectory: string): string {
   return resolve(workingDirectory, path);
 }
 
-async function run(
-  args: string[],
-): Promise<{ stdout: string; stderr: string; exitCode: number }> {
+async function run(args: string[]): Promise<{ stdout: string; stderr: string; exitCode: number }> {
   const proc = Bun.spawn(args, { stdout: "pipe", stderr: "pipe" });
   const exitCode = await proc.exited;
   const stdout = await new Response(proc.stdout).text();
@@ -75,8 +54,7 @@ const sshExecTool: Tool = {
       {
         name: "host",
         type: "string",
-        description:
-          'Remote host in the form "user@hostname" or an SSH config alias.',
+        description: 'Remote host in the form "user@hostname" or an SSH config alias.',
         required: true,
       },
       {
@@ -103,18 +81,12 @@ const sshExecTool: Tool = {
     const host = parameters["host"] as string;
     const command = parameters["command"] as string;
     if (!host) return { success: false, output: "host parameter is required" };
-    if (!command)
-      return { success: false, output: "command parameter is required" };
+    if (!command) return { success: false, output: "command parameter is required" };
 
     const port = parameters["port"] as number | undefined;
     const identity_file = parameters["identity_file"] as string | undefined;
 
-    const args = [
-      "ssh",
-      ...buildSshArgs({ port, identity_file }),
-      host,
-      command,
-    ];
+    const args = ["ssh", ...buildSshArgs({ port, identity_file }), host, command];
 
     try {
       const { stdout, stderr, exitCode } = await run(args);
@@ -142,8 +114,7 @@ const sshUploadTool: Tool = {
       {
         name: "host",
         type: "string",
-        description:
-          'Remote host in the form "user@hostname" or an SSH config alias.',
+        description: 'Remote host in the form "user@hostname" or an SSH config alias.',
         required: true,
       },
       {
@@ -177,10 +148,8 @@ const sshUploadTool: Tool = {
     const local_path = parameters["local_path"] as string;
     const remote_path = parameters["remote_path"] as string;
     if (!host) return { success: false, output: "host parameter is required" };
-    if (!local_path)
-      return { success: false, output: "local_path parameter is required" };
-    if (!remote_path)
-      return { success: false, output: "remote_path parameter is required" };
+    if (!local_path) return { success: false, output: "local_path parameter is required" };
+    if (!remote_path) return { success: false, output: "remote_path parameter is required" };
 
     const port = parameters["port"] as number | undefined;
     const identity_file = parameters["identity_file"] as string | undefined;
@@ -222,8 +191,7 @@ const sshDownloadTool: Tool = {
       {
         name: "host",
         type: "string",
-        description:
-          'Remote host in the form "user@hostname" or an SSH config alias.',
+        description: 'Remote host in the form "user@hostname" or an SSH config alias.',
         required: true,
       },
       {
@@ -257,10 +225,8 @@ const sshDownloadTool: Tool = {
     const remote_path = parameters["remote_path"] as string;
     const local_path = parameters["local_path"] as string;
     if (!host) return { success: false, output: "host parameter is required" };
-    if (!remote_path)
-      return { success: false, output: "remote_path parameter is required" };
-    if (!local_path)
-      return { success: false, output: "local_path parameter is required" };
+    if (!remote_path) return { success: false, output: "remote_path parameter is required" };
+    if (!local_path) return { success: false, output: "local_path parameter is required" };
 
     const port = parameters["port"] as number | undefined;
     const identity_file = parameters["identity_file"] as string | undefined;
@@ -302,8 +268,7 @@ const sshTunnelTool: Tool = {
       {
         name: "host",
         type: "string",
-        description:
-          'Remote host in the form "user@hostname" or an SSH config alias.',
+        description: 'Remote host in the form "user@hostname" or an SSH config alias.',
         required: true,
       },
       {
@@ -370,8 +335,7 @@ const sshTunnelTool: Tool = {
 
       return {
         success: true,
-        output:
-          `SSH tunnel opened: localhost:${local_port} -> ${host}:${remote_port} (PID ${subprocess.pid})`,
+        output: `SSH tunnel opened: localhost:${local_port} -> ${host}:${remote_port} (PID ${subprocess.pid})`,
       };
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);

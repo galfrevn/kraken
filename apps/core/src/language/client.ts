@@ -49,7 +49,16 @@ export class LanguageModelClient {
     this.nativeTools = tools;
   }
 
-  private buildGatewayTools(): { type: string; function: { name: string; description: string; parameters: { type: string; propertiesJson: string; required: string[] } } }[] | undefined {
+  private buildGatewayTools():
+    | {
+        type: string;
+        function: {
+          name: string;
+          description: string;
+          parameters: { type: string; propertiesJson: string; required: string[] };
+        };
+      }[]
+    | undefined {
     if (this.nativeTools.length === 0) return undefined;
     return this.nativeTools.map((tool) => ({
       type: tool.type,
@@ -65,11 +74,23 @@ export class LanguageModelClient {
     }));
   }
 
-  private buildGatewayMessages(messages: ConversationMessage[]): { role: string; content: string; toolCalls?: { id: string; type: string; function: { name: string; arguments: string } }[]; toolCallId?: string; name?: string }[] {
+  private buildGatewayMessages(messages: ConversationMessage[]): {
+    role: string;
+    content: string;
+    toolCalls?: { id: string; type: string; function: { name: string; arguments: string } }[];
+    toolCallId?: string;
+    name?: string;
+  }[] {
     return messages
       .filter((message) => message.role !== "system")
       .map((message) => {
-        const msg: { role: string; content: string; toolCalls?: { id: string; type: string; function: { name: string; arguments: string } }[]; toolCallId?: string; name?: string } = {
+        const msg: {
+          role: string;
+          content: string;
+          toolCalls?: { id: string; type: string; function: { name: string; arguments: string } }[];
+          toolCallId?: string;
+          name?: string;
+        } = {
           role: message.role,
           content: message.content,
         };
@@ -102,7 +123,10 @@ export class LanguageModelClient {
 
         if (isRetryable && attempt < maxRetries) {
           const delayMs = (attempt + 1) * 2000;
-          this.clientLog("warn", `retryable error (attempt ${attempt + 1}/${maxRetries + 1}): ${errorMsg}, retrying in ${delayMs}ms`);
+          this.clientLog(
+            "warn",
+            `retryable error (attempt ${attempt + 1}/${maxRetries + 1}): ${errorMsg}, retrying in ${delayMs}ms`,
+          );
           await new Promise((resolve) => setTimeout(resolve, delayMs));
           continue;
         }
@@ -123,7 +147,10 @@ export class LanguageModelClient {
     const systemMessage = messages.find((message) => message.role === "system");
     const systemPrompt = options?.systemPrompt ?? systemMessage?.content;
 
-    this.clientLog("info", `complete: model=${options?.model ?? this.model}, messages=${gatewayMessages.length}`);
+    this.clientLog(
+      "info",
+      `complete: model=${options?.model ?? this.model}, messages=${gatewayMessages.length}`,
+    );
 
     const response = await this.gatewayClient.complete({
       model: options?.model ?? this.model,
@@ -148,7 +175,10 @@ export class LanguageModelClient {
     }));
 
     const finishReason = response.finishReason || "stop";
-    this.clientLog("info", `complete finished: finishReason=${finishReason}, toolCalls=${toolCalls.length}, contentLength=${(response.message?.content ?? "").length}, promptTokens=${response.promptTokens}, completionTokens=${response.completionTokens}`);
+    this.clientLog(
+      "info",
+      `complete finished: finishReason=${finishReason}, toolCalls=${toolCalls.length}, contentLength=${(response.message?.content ?? "").length}, promptTokens=${response.promptTokens}, completionTokens=${response.completionTokens}`,
+    );
 
     return {
       id: response.id,
@@ -192,7 +222,8 @@ export class LanguageModelClient {
       return await this.executeStreamConversation(conversation, onDelta, options, signal);
     } catch (streamError) {
       if (signal?.aborted) throw streamError;
-      const streamErrorMsg = streamError instanceof Error ? streamError.message : String(streamError);
+      const streamErrorMsg =
+        streamError instanceof Error ? streamError.message : String(streamError);
       this.clientLog("warn", `streaming failed, falling back to non-streaming: ${streamErrorMsg}`);
       try {
         const messages = conversation.getMessagesWithSystemPrompt();
@@ -202,12 +233,20 @@ export class LanguageModelClient {
         } else {
           conversation.addAssistantMessage(result.content);
         }
-        onDelta({ content: result.content, done: true, toolCalls: result.toolCalls, finishReason: result.finishReason });
+        onDelta({
+          content: result.content,
+          done: true,
+          toolCalls: result.toolCalls,
+          finishReason: result.finishReason,
+        });
         return result;
       } catch (fallbackError) {
-        const fallbackMsg = fallbackError instanceof Error ? fallbackError.message : String(fallbackError);
+        const fallbackMsg =
+          fallbackError instanceof Error ? fallbackError.message : String(fallbackError);
         this.clientLog("error", `non-streaming fallback also failed: ${fallbackMsg}`);
-        throw new Error(`streaming failed (${streamErrorMsg}), non-streaming fallback also failed: ${fallbackMsg}`);
+        throw new Error(
+          `streaming failed (${streamErrorMsg}), non-streaming fallback also failed: ${fallbackMsg}`,
+        );
       }
     }
   }
@@ -226,14 +265,17 @@ export class LanguageModelClient {
     const systemMessage = allMessages.find((message) => message.role === "system");
     const systemPrompt = options?.systemPrompt ?? systemMessage?.content;
 
-    const stream = this.gatewayClient.streamComplete({
-      model: this.model,
-      messages: gatewayMessages,
-      temperature: options?.temperature ?? this.defaultTemperature,
-      maxTokens: options?.maxTokens ?? this.defaultMaxTokens,
-      systemPrompt,
-      tools: this.buildGatewayTools() ?? [],
-    }, signal ? { signal } : undefined);
+    const stream = this.gatewayClient.streamComplete(
+      {
+        model: this.model,
+        messages: gatewayMessages,
+        temperature: options?.temperature ?? this.defaultTemperature,
+        maxTokens: options?.maxTokens ?? this.defaultMaxTokens,
+        systemPrompt,
+        tools: this.buildGatewayTools() ?? [],
+      },
+      signal ? { signal } : undefined,
+    );
 
     let fullContent = "";
     let fullReasoning = "";
@@ -256,9 +298,13 @@ export class LanguageModelClient {
     }
 
     if (signal) {
-      signal.addEventListener("abort", () => {
-        if (inactivityTimer !== null) clearTimeout(inactivityTimer);
-      }, { once: true });
+      signal.addEventListener(
+        "abort",
+        () => {
+          if (inactivityTimer !== null) clearTimeout(inactivityTimer);
+        },
+        { once: true },
+      );
     }
 
     while (true) {
@@ -276,7 +322,10 @@ export class LanguageModelClient {
       } catch (raceError) {
         if (signal?.aborted) break;
         if (raceError instanceof Error && raceError.message === "stream inactivity timeout") {
-          this.clientLog("error", `stream inactivity timeout after ${timeoutMs}ms — ending stream with partial content (${fullContent.length} chars)`);
+          this.clientLog(
+            "error",
+            `stream inactivity timeout after ${timeoutMs}ms — ending stream with partial content (${fullContent.length} chars)`,
+          );
           onDelta({ content: "", done: true });
           break;
         }

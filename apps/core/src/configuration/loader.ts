@@ -59,10 +59,11 @@ function applyEnvironmentOverrides(
     };
   }
 
-  const apiKey = Bun.env[ENVIRONMENT_VARIABLE.openrouterApiKey]
-    ?? Bun.env.OPENROUTER_API_KEY
-    ?? Bun.env.ANTHROPIC_API_KEY
-    ?? Bun.env.OPENAI_API_KEY;
+  const apiKey =
+    Bun.env[ENVIRONMENT_VARIABLE.openrouterApiKey] ??
+    Bun.env.OPENROUTER_API_KEY ??
+    Bun.env.ANTHROPIC_API_KEY ??
+    Bun.env.OPENAI_API_KEY;
   if (apiKey) {
     overrides["languageModel"] = {
       ...(overrides["languageModel"] as Record<string, unknown>),

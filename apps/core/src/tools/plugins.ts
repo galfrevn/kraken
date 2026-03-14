@@ -5,7 +5,11 @@ import type { Tool, ToolResult } from "@/tools/schema.ts";
 import type { ToolRegistry } from "@/tools/registry.ts";
 import { PluginRegistry, type MissingConfigField } from "@/plugins/registry.ts";
 import type { PluginContext, PluginConfigField } from "@kraken/sdk";
-import { fetchRegistry, installPluginFromRegistry, isPluginInstalled } from "@/plugins/installer.ts";
+import {
+  fetchRegistry,
+  installPluginFromRegistry,
+  isPluginInstalled,
+} from "@/plugins/installer.ts";
 import { appendToGlobalEnvFile } from "@/configuration/loader.ts";
 
 export interface SetupFieldForPrompt {
@@ -24,8 +28,14 @@ export interface PluginManagerDependencies {
 }
 
 export function createPluginManagerTool(dependencies: PluginManagerDependencies): Tool {
-  const { pluginRegistry, toolRegistry, workingDirectory, baseContext, onToolDisplayNamesChanged, onSetupRequired } =
-    dependencies;
+  const {
+    pluginRegistry,
+    toolRegistry,
+    workingDirectory,
+    baseContext,
+    onToolDisplayNamesChanged,
+    onSetupRequired,
+  } = dependencies;
 
   return {
     definition: {
@@ -269,7 +279,11 @@ async function handleConfigure(
     fieldDef = missing?.field;
   }
   if (!fieldDef) {
-    return { success: false, output: "", error: `unknown config field "${fieldName}" for plugin "${pluginName}"` };
+    return {
+      success: false,
+      output: "",
+      error: `unknown config field "${fieldName}" for plugin "${pluginName}"`,
+    };
   }
 
   // Save the value
@@ -292,7 +306,11 @@ async function handleConfigure(
       if (activateResult.loaded.length > 0) {
         for (const tool of registry.getTools()) {
           if (!toolReg.getTool(tool.definition.name)) {
-            try { toolReg.register(tool); } catch { /* skip */ }
+            try {
+              toolReg.register(tool);
+            } catch {
+              /* skip */
+            }
           }
         }
         if (onToolDisplayNamesChanged) {
@@ -355,7 +373,9 @@ async function promptAndActivateDeferred(
       if (!toolReg.getTool(tool.definition.name)) {
         try {
           toolReg.register(tool);
-        } catch { /* skip */ }
+        } catch {
+          /* skip */
+        }
       }
     }
     if (onToolDisplayNamesChanged) {
@@ -392,8 +412,12 @@ async function handleInstall(
 
   if (result.missingConfig && result.missingConfig.length > 0) {
     const setupError = await promptAndActivateDeferred(
-      registry, toolReg, plugin.name, result.missingConfig,
-      onToolDisplayNamesChanged, onSetupRequired,
+      registry,
+      toolReg,
+      plugin.name,
+      result.missingConfig,
+      onToolDisplayNamesChanged,
+      onSetupRequired,
     );
     const toolNames = plugin.tools?.map((t) => t.definition.name).join(", ") ?? "none";
     return {
@@ -525,12 +549,9 @@ async function handleStore(localRegistry: PluginRegistry, query: string): Promis
     if (query) {
       const terms = query.toLowerCase().split(/\s+/);
       plugins = plugins.filter((entry) => {
-        const searchable = [
-          entry.name,
-          entry.description,
-          entry.author,
-          ...entry.tools,
-        ].join(" ").toLowerCase();
+        const searchable = [entry.name, entry.description, entry.author, ...entry.tools]
+          .join(" ")
+          .toLowerCase();
         return terms.every((term) => searchable.includes(term));
       });
     }
@@ -538,9 +559,7 @@ async function handleStore(localRegistry: PluginRegistry, query: string): Promis
     if (plugins.length === 0) {
       return {
         success: true,
-        output: query
-          ? `No plugins found matching "${query}".`
-          : "The plugin store is empty.",
+        output: query ? `No plugins found matching "${query}".` : "The plugin store is empty.",
       };
     }
 
@@ -552,7 +571,8 @@ async function handleStore(localRegistry: PluginRegistry, query: string): Promis
       else if (installed) status = "installed (not loaded)";
 
       const toolsList = entry.tools.join(", ");
-      const requiresList = entry.requires.length > 0 ? `\n  requires: ${entry.requires.join(", ")}` : "";
+      const requiresList =
+        entry.requires.length > 0 ? `\n  requires: ${entry.requires.join(", ")}` : "";
 
       return (
         `- ${entry.name} v${entry.version} [${status}]\n` +
@@ -617,14 +637,19 @@ async function handleInstallFromStore(
   }
 
   const plugin = loadResult.plugin;
-  const warningLines = installResult.warnings.length > 0
-    ? "\n\nWarnings:\n" + installResult.warnings.map((w) => `  - ${w}`).join("\n")
-    : "";
+  const warningLines =
+    installResult.warnings.length > 0
+      ? "\n\nWarnings:\n" + installResult.warnings.map((w) => `  - ${w}`).join("\n")
+      : "";
 
   if (loadResult.missingConfig && loadResult.missingConfig.length > 0) {
     const setupError = await promptAndActivateDeferred(
-      registry, toolReg, plugin.name, loadResult.missingConfig,
-      onToolDisplayNamesChanged, onSetupRequired,
+      registry,
+      toolReg,
+      plugin.name,
+      loadResult.missingConfig,
+      onToolDisplayNamesChanged,
+      onSetupRequired,
     );
     const toolNames = plugin.tools?.map((t) => t.definition.name).join(", ") ?? "none";
     return {
@@ -721,16 +746,19 @@ async function handleCheckUpdates(localRegistry: PluginRegistry): Promise<ToolRe
       }
 
       if (remote.version !== local.plugin.version) {
-        lines.push(`- ${local.plugin.name}: v${local.plugin.version} → v${remote.version} (update available)`);
+        lines.push(
+          `- ${local.plugin.name}: v${local.plugin.version} → v${remote.version} (update available)`,
+        );
         updatesAvailable++;
       } else {
         lines.push(`- ${local.plugin.name}: v${local.plugin.version} (up to date)`);
       }
     }
 
-    const summary = updatesAvailable > 0
-      ? `\n\n${updatesAvailable} update(s) available. Use action "update" with the plugin name to update.`
-      : "\n\nAll plugins are up to date.";
+    const summary =
+      updatesAvailable > 0
+        ? `\n\n${updatesAvailable} update(s) available. Use action "update" with the plugin name to update.`
+        : "\n\nAll plugins are up to date.";
 
     return { success: true, output: lines.join("\n") + summary };
   } catch (error) {
@@ -753,7 +781,11 @@ async function handleUpdate(
 
   const existing = registry.getPluginByName(pluginName);
   if (!existing) {
-    return { success: false, output: "", error: `Plugin "${pluginName}" is not installed. Use install_from_store to install it.` };
+    return {
+      success: false,
+      output: "",
+      error: `Plugin "${pluginName}" is not installed. Use install_from_store to install it.`,
+    };
   }
 
   const oldVersion = existing.plugin.version;
@@ -771,7 +803,11 @@ async function handleUpdate(
   // Re-download from the store
   const installResult = await installPluginFromRegistry(pluginName);
   if (!installResult.success) {
-    return { success: false, output: "", error: `Failed to download update: ${installResult.error}` };
+    return {
+      success: false,
+      output: "",
+      error: `Failed to download update: ${installResult.error}`,
+    };
   }
 
   // Re-load the updated plugin
@@ -805,9 +841,10 @@ async function handleUpdate(
   }
 
   const toolNames = plugin.tools?.map((t) => t.definition.name).join(", ") ?? "none";
-  const versionChange = oldVersion !== plugin.version
-    ? `v${oldVersion} → v${plugin.version}`
-    : `v${plugin.version} (re-installed)`;
+  const versionChange =
+    oldVersion !== plugin.version
+      ? `v${oldVersion} → v${plugin.version}`
+      : `v${plugin.version} (re-installed)`;
 
   return {
     success: true,

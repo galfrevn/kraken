@@ -19,14 +19,19 @@ async function runAgentBrowser(args: string[]): Promise<ToolResult> {
     const stderr = await new Response(spawnedProcess.stderr).text();
 
     if (exitCode !== 0) {
-      const errorOutput = stderr.trim() || stdout.trim() || `agent-browser exited with code ${exitCode}`;
+      const errorOutput =
+        stderr.trim() || stdout.trim() || `agent-browser exited with code ${exitCode}`;
       return { success: false, output: errorOutput };
     }
 
     return { success: true, output: stdout.trim() };
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
-    if (message.includes("ENOENT") || message.includes("not found") || message.includes("program not foun")) {
+    if (
+      message.includes("ENOENT") ||
+      message.includes("not found") ||
+      message.includes("program not foun")
+    ) {
       return {
         success: false,
         output: "agent-browser is not installed. Install it with: npm install -g agent-browser",
@@ -62,7 +67,8 @@ const browserSnapshotTool: Tool = {
       {
         name: "interactive_only",
         type: "boolean",
-        description: "If true, only return interactive elements (buttons, links, inputs). Default: true.",
+        description:
+          "If true, only return interactive elements (buttons, links, inputs). Default: true.",
         required: false,
       },
     ],
@@ -79,7 +85,12 @@ const browserClickTool: Tool = {
     name: "browser_click",
     description: "Click an element on the page identified by its ref from a snapshot (e.g. @e1).",
     parameters: [
-      { name: "ref", type: "string", description: "Element ref from snapshot (e.g. '@e1').", required: true },
+      {
+        name: "ref",
+        type: "string",
+        description: "Element ref from snapshot (e.g. '@e1').",
+        required: true,
+      },
     ],
   },
   async execute(parameters) {
@@ -92,10 +103,21 @@ const browserClickTool: Tool = {
 const browserTypeTool: Tool = {
   definition: {
     name: "browser_type",
-    description: "Type text into an element (appends to existing content). Use browser_fill to replace content instead.",
+    description:
+      "Type text into an element (appends to existing content). Use browser_fill to replace content instead.",
     parameters: [
-      { name: "ref", type: "string", description: "Element ref from snapshot (e.g. '@e3').", required: true },
-      { name: "text", type: "string", description: "Text to type into the element.", required: true },
+      {
+        name: "ref",
+        type: "string",
+        description: "Element ref from snapshot (e.g. '@e3').",
+        required: true,
+      },
+      {
+        name: "text",
+        type: "string",
+        description: "Text to type into the element.",
+        required: true,
+      },
     ],
   },
   async execute(parameters) {
@@ -109,10 +131,21 @@ const browserTypeTool: Tool = {
 const browserFillTool: Tool = {
   definition: {
     name: "browser_fill",
-    description: "Clear an element and fill it with new text. Unlike browser_type, this replaces existing content.",
+    description:
+      "Clear an element and fill it with new text. Unlike browser_type, this replaces existing content.",
     parameters: [
-      { name: "ref", type: "string", description: "Element ref from snapshot (e.g. '@e3').", required: true },
-      { name: "text", type: "string", description: "Text to fill into the element.", required: true },
+      {
+        name: "ref",
+        type: "string",
+        description: "Element ref from snapshot (e.g. '@e3').",
+        required: true,
+      },
+      {
+        name: "text",
+        type: "string",
+        description: "Text to fill into the element.",
+        required: true,
+      },
     ],
   },
   async execute(parameters) {
@@ -131,13 +164,15 @@ const browserScreenshotTool: Tool = {
       {
         name: "filename",
         type: "string",
-        description: "Filename for the screenshot (saved in ~/.kraken/screenshots/). Default: auto-generated.",
+        description:
+          "Filename for the screenshot (saved in ~/.kraken/screenshots/). Default: auto-generated.",
         required: false,
       },
       {
         name: "full_page",
         type: "boolean",
-        description: "Capture the full scrollable page instead of just the viewport. Default: false.",
+        description:
+          "Capture the full scrollable page instead of just the viewport. Default: false.",
         required: false,
       },
     ],
@@ -247,7 +282,8 @@ function checkAgentBrowserInstalled(): boolean {
 export default definePlugin({
   name: "browser",
   version: "0.2.0",
-  description: "Browser automation using Vercel's agent-browser CLI. Open pages, take snapshots, click, type, fill forms, and take screenshots.",
+  description:
+    "Browser automation using Vercel's agent-browser CLI. Open pages, take snapshots, click, type, fill forms, and take screenshots.",
   author: "kraken",
 
   toolDisplayNames: {
@@ -287,7 +323,9 @@ export default definePlugin({
   activate: async () => {
     agentBrowserAvailable = checkAgentBrowserInstalled();
     if (!agentBrowserAvailable) {
-      console.log("[browser] WARNING: agent-browser CLI is not installed. Install it with: npm install -g agent-browser");
+      console.log(
+        "[browser] WARNING: agent-browser CLI is not installed. Install it with: npm install -g agent-browser",
+      );
     } else {
       console.log("[browser] activated (agent-browser found)");
     }

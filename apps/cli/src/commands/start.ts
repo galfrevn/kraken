@@ -41,14 +41,29 @@ function spawnScheduler(dev: boolean): Subprocess {
   const schedulerDirectory = join(KRAKEN_ROOT, "apps", "scheduler");
 
   if (!dev && existsSync(releaseBinary)) {
-    return spawn({ cmd: [releaseBinary], cwd: schedulerDirectory, stdout: "ignore", stderr: "ignore" });
+    return spawn({
+      cmd: [releaseBinary],
+      cwd: schedulerDirectory,
+      stdout: "ignore",
+      stderr: "ignore",
+    });
   }
 
   if (!dev && existsSync(debugBinary)) {
-    return spawn({ cmd: [debugBinary], cwd: schedulerDirectory, stdout: "ignore", stderr: "ignore" });
+    return spawn({
+      cmd: [debugBinary],
+      cwd: schedulerDirectory,
+      stdout: "ignore",
+      stderr: "ignore",
+    });
   }
 
-  return spawn({ cmd: ["cargo", "run", "--quiet"], cwd: schedulerDirectory, stdout: "ignore", stderr: "ignore" });
+  return spawn({
+    cmd: ["cargo", "run", "--quiet"],
+    cwd: schedulerDirectory,
+    stdout: "ignore",
+    stderr: "ignore",
+  });
 }
 
 function buildGatewayEnv(configuration: AgentConfiguration): Record<string, string | undefined> {
@@ -100,19 +115,39 @@ function spawnGateway(dev: boolean, configuration: AgentConfiguration): Subproce
   const envVars = buildGatewayEnv(configuration);
 
   if (!dev && existsSync(builtBinary)) {
-    return spawn({ cmd: [builtBinary], cwd: gatewayDirectory, stdout: "ignore", stderr: "ignore", env: envVars });
+    return spawn({
+      cmd: [builtBinary],
+      cwd: gatewayDirectory,
+      stdout: "ignore",
+      stderr: "ignore",
+      env: envVars,
+    });
   }
 
-  return spawn({ cmd: ["go", "run", "./cmd/gateway"], cwd: gatewayDirectory, stdout: "ignore", stderr: "ignore", env: envVars });
+  return spawn({
+    cmd: ["go", "run", "./cmd/gateway"],
+    cwd: gatewayDirectory,
+    stdout: "ignore",
+    stderr: "ignore",
+    env: envVars,
+  });
 }
 
 export async function execute(args: string[]): Promise<void> {
   const flags = parseStartFlags(args);
   const configuration = await loadConfiguration();
 
-  process.on("SIGINT", () => { killAllChildren(); process.exit(0); });
-  process.on("SIGTERM", () => { killAllChildren(); process.exit(0); });
-  process.on("exit", () => { killAllChildren(); });
+  process.on("SIGINT", () => {
+    killAllChildren();
+    process.exit(0);
+  });
+  process.on("SIGTERM", () => {
+    killAllChildren();
+    process.exit(0);
+  });
+  process.on("exit", () => {
+    killAllChildren();
+  });
 
   if (!flags.noScheduler) {
     childProcesses.push(spawnScheduler(flags.dev));

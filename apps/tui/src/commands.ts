@@ -214,13 +214,19 @@ const modelCommand: SlashCommand = {
     try {
       if (provider) {
         await persistProviderAndModel(provider, trimmed);
-        return { output: `model switched: ${previous} → ${trimmed}\nprovider: ${provider}\nsaved to ~/.kraken/kraken.yml` };
+        return {
+          output: `model switched: ${previous} → ${trimmed}\nprovider: ${provider}\nsaved to ~/.kraken/kraken.yml`,
+        };
       } else {
         await persistModelToConfiguration(trimmed);
-        return { output: `model switched: ${previous} → ${trimmed}\nsaved to ~/.kraken/kraken.yml` };
+        return {
+          output: `model switched: ${previous} → ${trimmed}\nsaved to ~/.kraken/kraken.yml`,
+        };
       }
     } catch {
-      return { output: `model switched: ${previous} → ${trimmed} (runtime only, config save failed)` };
+      return {
+        output: `model switched: ${previous} → ${trimmed} (runtime only, config save failed)`,
+      };
     }
   },
 };
@@ -243,7 +249,9 @@ const setupCommand: SlashCommand = {
       data: KNOWN_PROVIDERS.map((p) => ({
         name: p.name,
         label: p.label,
-        description: process.env[p.envVar] ? `${p.label} (configured)` : `Configure ${p.label} API key`,
+        description: process.env[p.envVar]
+          ? `${p.label} (configured)`
+          : `Configure ${p.label} API key`,
         envVar: p.envVar,
       })),
     };
@@ -289,9 +297,7 @@ export const ALL_COMMANDS: SlashCommand[] = [
   exitCommand,
 ];
 
-export function registerPluginsCommand(
-  pluginRegistry: PluginRegistry,
-): void {
+export function registerPluginsCommand(pluginRegistry: PluginRegistry): void {
   const pluginsCommand: SlashCommand = {
     name: "plugins",
     aliases: ["p", "plugin"],
@@ -337,7 +343,9 @@ export function registerPluginsCommand(
           : { output: `could not disable "${pluginName}" — not found or already inactive` };
       }
 
-      return { output: `unknown subcommand: ${subcommand}\nusage: /plugins [list|store|inspect|enable|disable] [name]` };
+      return {
+        output: `unknown subcommand: ${subcommand}\nusage: /plugins [list|store|inspect|enable|disable] [name]`,
+      };
     },
   };
 
@@ -351,9 +359,7 @@ function formatPluginInspection(registry: PluginRegistry, name: string): Command
   }
 
   const { plugin, source, enabled, pluginContext } = entry;
-  const lines: string[] = [
-    `${plugin.name} v${plugin.version}`,
-  ];
+  const lines: string[] = [`${plugin.name} v${plugin.version}`];
 
   if (plugin.description) {
     lines.push(plugin.description);
@@ -399,16 +405,16 @@ function formatPluginInspection(registry: PluginRegistry, name: string): Command
 
   if (plugin.promptExtension) {
     lines.push("");
-    lines.push(`prompt extension: "${plugin.promptExtension.slice(0, 80)}${plugin.promptExtension.length > 80 ? "..." : ""}"`);
+    lines.push(
+      `prompt extension: "${plugin.promptExtension.slice(0, 80)}${plugin.promptExtension.length > 80 ? "..." : ""}"`,
+    );
   }
 
   return { output: lines.join("\n") };
 }
 
 function findCommand(name: string): SlashCommand | undefined {
-  return ALL_COMMANDS.find(
-    (command) => command.name === name || command.aliases.includes(name),
-  );
+  return ALL_COMMANDS.find((command) => command.name === name || command.aliases.includes(name));
 }
 
 export function commandRequiresArguments(command: SlashCommand): boolean {
@@ -424,7 +430,9 @@ export async function handleSlashCommand(
 
   const command = findCommand(parsed.commandName);
   if (!command) {
-    return { output: `unknown command: /${parsed.commandName}. type /help for available commands.` };
+    return {
+      output: `unknown command: /${parsed.commandName}. type /help for available commands.`,
+    };
   }
 
   return command.execute(parsed.args, threadManager);

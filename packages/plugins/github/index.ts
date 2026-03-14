@@ -17,7 +17,11 @@ async function run(
 
 function ghResult(r: { stdout: string; stderr: string; exitCode: number }): ToolResult {
   if (r.exitCode !== 0) {
-    return { success: false, output: r.stderr || r.stdout || `gh exited with code ${r.exitCode}`, error: r.stderr };
+    return {
+      success: false,
+      output: r.stderr || r.stdout || `gh exited with code ${r.exitCode}`,
+      error: r.stderr,
+    };
   }
   return { success: true, output: r.stdout };
 }
@@ -29,11 +33,27 @@ function ghResult(r: { stdout: string; stderr: string; exitCode: number }): Tool
 const ghIssueListTool: Tool = {
   definition: {
     name: "gh_issue_list",
-    description: "List issues in the current GitHub repository. Returns a table of issues with number, title, labels, and state.",
+    description:
+      "List issues in the current GitHub repository. Returns a table of issues with number, title, labels, and state.",
     parameters: [
-      { name: "labels", type: "string", description: "Comma-separated list of labels to filter by (e.g. 'bug,help wanted').", required: false },
-      { name: "state", type: "string", description: "Filter by state: open, closed, or all. Default: open.", required: false },
-      { name: "limit", type: "number", description: "Maximum number of issues to return. Default: 30.", required: false },
+      {
+        name: "labels",
+        type: "string",
+        description: "Comma-separated list of labels to filter by (e.g. 'bug,help wanted').",
+        required: false,
+      },
+      {
+        name: "state",
+        type: "string",
+        description: "Filter by state: open, closed, or all. Default: open.",
+        required: false,
+      },
+      {
+        name: "limit",
+        type: "number",
+        description: "Maximum number of issues to return. Default: 30.",
+        required: false,
+      },
     ],
   },
   async execute(parameters, context) {
@@ -51,14 +71,25 @@ const ghIssueCreateTool: Tool = {
     description: "Create a new issue in the current GitHub repository.",
     parameters: [
       { name: "title", type: "string", description: "Issue title.", required: true },
-      { name: "body", type: "string", description: "Issue body (supports Markdown).", required: true },
-      { name: "labels", type: "string", description: "Comma-separated list of labels to apply.", required: false },
+      {
+        name: "body",
+        type: "string",
+        description: "Issue body (supports Markdown).",
+        required: true,
+      },
+      {
+        name: "labels",
+        type: "string",
+        description: "Comma-separated list of labels to apply.",
+        required: false,
+      },
     ],
   },
   async execute(parameters, context) {
     const title = parameters["title"] as string;
     const body = parameters["body"] as string;
-    if (!title || !body) return { success: false, output: "title and body parameters are required" };
+    if (!title || !body)
+      return { success: false, output: "title and body parameters are required" };
 
     const args = ["gh", "issue", "create", "--title", title, "--body", body];
     if (parameters["labels"]) args.push("--label", String(parameters["labels"]));
@@ -69,10 +100,9 @@ const ghIssueCreateTool: Tool = {
 const ghIssueViewTool: Tool = {
   definition: {
     name: "gh_issue_view",
-    description: "View details of a specific issue by number, including title, body, labels, assignees, and comments.",
-    parameters: [
-      { name: "number", type: "number", description: "Issue number.", required: true },
-    ],
+    description:
+      "View details of a specific issue by number, including title, body, labels, assignees, and comments.",
+    parameters: [{ name: "number", type: "number", description: "Issue number.", required: true }],
   },
   async execute(parameters, context) {
     const num = parameters["number"];
@@ -87,8 +117,18 @@ const ghPrListTool: Tool = {
     name: "gh_pr_list",
     description: "List pull requests in the current GitHub repository.",
     parameters: [
-      { name: "state", type: "string", description: "Filter by state: open, closed, merged, or all. Default: open.", required: false },
-      { name: "limit", type: "number", description: "Maximum number of PRs to return. Default: 30.", required: false },
+      {
+        name: "state",
+        type: "string",
+        description: "Filter by state: open, closed, merged, or all. Default: open.",
+        required: false,
+      },
+      {
+        name: "limit",
+        type: "number",
+        description: "Maximum number of PRs to return. Default: 30.",
+        required: false,
+      },
     ],
   },
   async execute(parameters, context) {
@@ -105,16 +145,37 @@ const ghPrCreateTool: Tool = {
     description: "Create a new pull request from the current or specified branch.",
     parameters: [
       { name: "title", type: "string", description: "PR title.", required: true },
-      { name: "body", type: "string", description: "PR body/description (supports Markdown).", required: true },
-      { name: "base", type: "string", description: "Base branch to merge into (e.g. 'main'). Default: repo default branch.", required: false },
-      { name: "head", type: "string", description: "Head branch containing the changes. Default: current branch.", required: false },
-      { name: "draft", type: "boolean", description: "Create as a draft PR. Default: false.", required: false },
+      {
+        name: "body",
+        type: "string",
+        description: "PR body/description (supports Markdown).",
+        required: true,
+      },
+      {
+        name: "base",
+        type: "string",
+        description: "Base branch to merge into (e.g. 'main'). Default: repo default branch.",
+        required: false,
+      },
+      {
+        name: "head",
+        type: "string",
+        description: "Head branch containing the changes. Default: current branch.",
+        required: false,
+      },
+      {
+        name: "draft",
+        type: "boolean",
+        description: "Create as a draft PR. Default: false.",
+        required: false,
+      },
     ],
   },
   async execute(parameters, context) {
     const title = parameters["title"] as string;
     const body = parameters["body"] as string;
-    if (!title || !body) return { success: false, output: "title and body parameters are required" };
+    if (!title || !body)
+      return { success: false, output: "title and body parameters are required" };
 
     const args = ["gh", "pr", "create", "--title", title, "--body", body];
     if (parameters["base"]) args.push("--base", String(parameters["base"]));
@@ -127,7 +188,8 @@ const ghPrCreateTool: Tool = {
 const ghPrViewTool: Tool = {
   definition: {
     name: "gh_pr_view",
-    description: "View details of a specific pull request by number, including title, body, review status, and CI checks.",
+    description:
+      "View details of a specific pull request by number, including title, body, review status, and CI checks.",
     parameters: [
       { name: "number", type: "number", description: "Pull request number.", required: true },
     ],
@@ -159,10 +221,16 @@ const ghPrViewTool: Tool = {
 const ghPrMergeTool: Tool = {
   definition: {
     name: "gh_pr_merge",
-    description: "Merge a pull request by number. The PR must be mergeable (approved, checks passing).",
+    description:
+      "Merge a pull request by number. The PR must be mergeable (approved, checks passing).",
     parameters: [
       { name: "number", type: "number", description: "Pull request number.", required: true },
-      { name: "method", type: "string", description: "Merge method: merge, squash, or rebase. Default: merge.", required: false },
+      {
+        name: "method",
+        type: "string",
+        description: "Merge method: merge, squash, or rebase. Default: merge.",
+        required: false,
+      },
     ],
   },
   async execute(parameters, context) {
@@ -171,7 +239,10 @@ const ghPrMergeTool: Tool = {
 
     const method = String(parameters["method"] ?? "merge");
     if (!["merge", "squash", "rebase"].includes(method)) {
-      return { success: false, output: `Invalid merge method '${method}'. Must be merge, squash, or rebase.` };
+      return {
+        success: false,
+        output: `Invalid merge method '${method}'. Must be merge, squash, or rebase.`,
+      };
     }
 
     const args = ["gh", "pr", "merge", String(num), `--${method}`];
@@ -186,13 +257,19 @@ const ghPrReviewTool: Tool = {
     parameters: [
       { name: "number", type: "number", description: "Pull request number.", required: true },
       { name: "body", type: "string", description: "Review comment body.", required: true },
-      { name: "event", type: "string", description: "Review event: approve, comment, or request-changes. Default: comment.", required: false },
+      {
+        name: "event",
+        type: "string",
+        description: "Review event: approve, comment, or request-changes. Default: comment.",
+        required: false,
+      },
     ],
   },
   async execute(parameters, context) {
     const num = parameters["number"];
     const body = parameters["body"] as string;
-    if (num === undefined || !body) return { success: false, output: "number and body parameters are required" };
+    if (num === undefined || !body)
+      return { success: false, output: "number and body parameters are required" };
 
     const event = String(parameters["event"] ?? "comment");
     const eventMap: Record<string, string> = {
@@ -202,7 +279,10 @@ const ghPrReviewTool: Tool = {
     };
     const flag = eventMap[event];
     if (!flag) {
-      return { success: false, output: `Invalid event '${event}'. Must be approve, comment, or request-changes.` };
+      return {
+        success: false,
+        output: `Invalid event '${event}'. Must be approve, comment, or request-changes.`,
+      };
     }
 
     const args = ["gh", "pr", "review", String(num), flag, "--body", body];
@@ -213,7 +293,8 @@ const ghPrReviewTool: Tool = {
 const ghRepoViewTool: Tool = {
   definition: {
     name: "gh_repo_view",
-    description: "View information about the current GitHub repository including description, visibility, default branch, and stats.",
+    description:
+      "View information about the current GitHub repository including description, visibility, default branch, and stats.",
     parameters: [],
   },
   async execute(_parameters, context) {
@@ -228,7 +309,8 @@ const ghRepoViewTool: Tool = {
 export default definePlugin({
   name: "github",
   version: "0.1.0",
-  description: "GitHub integration via the gh CLI. Manage issues, pull requests, and repository info.",
+  description:
+    "GitHub integration via the gh CLI. Manage issues, pull requests, and repository info.",
   author: "kraken",
 
   toolDisplayNames: {
@@ -268,12 +350,16 @@ export default definePlugin({
     try {
       const result = await run(["gh", "auth", "status"]);
       if (result.exitCode !== 0) {
-        console.log("[github] WARNING: gh CLI is not authenticated. Run 'gh auth login' to authenticate.");
+        console.log(
+          "[github] WARNING: gh CLI is not authenticated. Run 'gh auth login' to authenticate.",
+        );
       } else {
         console.log("[github] activated (gh CLI authenticated)");
       }
     } catch {
-      console.log("[github] WARNING: gh CLI is not installed. Install it from https://cli.github.com/");
+      console.log(
+        "[github] WARNING: gh CLI is not installed. Install it from https://cli.github.com/",
+      );
     }
   },
 });

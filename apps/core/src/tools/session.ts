@@ -18,7 +18,8 @@ export function createSessionCommandTool(executor: SessionCommandExecutor): Tool
   return {
     definition: {
       name: "session_command",
-      description: "Execute a session command. Commands: new, clear, delete, purge, rename, threads.",
+      description:
+        "Execute a session command. Commands: new, clear, delete, purge, rename, threads.",
       requiresConfirmation: true,
       parameters: [
         {

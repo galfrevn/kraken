@@ -9,7 +9,12 @@ import { loadConfiguration } from "@core/configuration/loader.ts";
 import { createSchedulerClient } from "@core/clients/scheduler.ts";
 import { createGatewayClient } from "@core/clients/gateway.ts";
 import { LanguageModelClient } from "@core/language/client.ts";
-import { createDefaultToolRegistry, createSessionCommandTool, createPluginManagerTool, createAskQuestionTool } from "@core/tools/index.ts";
+import {
+  createDefaultToolRegistry,
+  createSessionCommandTool,
+  createPluginManagerTool,
+  createAskQuestionTool,
+} from "@core/tools/index.ts";
 import { AgentExecutionLoop } from "@core/agent/loop.ts";
 import { TaskRunnerDaemon } from "@core/agent/daemon.ts";
 import { TimerManager } from "@core/scheduling/timers.ts";
@@ -32,7 +37,8 @@ function discoverPluginsInDirectory(pluginsDirectory: string): PluginEntry[] {
     for (const entry of entries) {
       if (!entry.isDirectory()) continue;
       const pluginPath = resolve(pluginsDirectory, entry.name);
-      const hasIndex = existsSync(join(pluginPath, "index.ts")) || existsSync(join(pluginPath, "index.js"));
+      const hasIndex =
+        existsSync(join(pluginPath, "index.ts")) || existsSync(join(pluginPath, "index.js"));
       if (hasIndex) {
         discovered.push({ path: pluginPath, config: {} });
       }
@@ -48,7 +54,11 @@ function discoverAllPlugins(): PluginEntry[] {
   return discoverPluginsInDirectory(globalPluginsDirectory);
 }
 
-function mergePluginEntries(configured: PluginEntry[], discovered: PluginEntry[], repoDirectory: string): PluginEntry[] {
+function mergePluginEntries(
+  configured: PluginEntry[],
+  discovered: PluginEntry[],
+  repoDirectory: string,
+): PluginEntry[] {
   const configuredAbsolutePaths = new Set(
     configured.map((entry) => resolve(repoDirectory, entry.path)),
   );
@@ -87,7 +97,11 @@ export async function main(): Promise<void> {
   };
 
   const discoveredPlugins = discoverAllPlugins();
-  const allPluginEntries = mergePluginEntries(configuration.plugins, discoveredPlugins, configuration.repo);
+  const allPluginEntries = mergePluginEntries(
+    configuration.plugins,
+    discoveredPlugins,
+    configuration.repo,
+  );
 
   const pluginResult = await pluginRegistry.loadAll(
     allPluginEntries,
@@ -155,29 +169,37 @@ export async function main(): Promise<void> {
 
   const sessionExecutor = createSessionExecutor(threadManager);
   toolRegistry.register(createSessionCommandTool(sessionExecutor));
-  toolRegistry.register(createPluginManagerTool({
-    pluginRegistry,
-    toolRegistry,
-    workingDirectory: configuration.repo,
-    baseContext: basePluginContext,
-    onToolDisplayNamesChanged: (names) => {
-      registerToolDisplayNames(names);
-      threadManager.refreshPluginPromptExtensions();
-    },
-    onSetupRequired: (fields) => {
-      return new Promise<void>((resolve) => {
-        const engine = threadManager.getActiveEngine();
-        engine.handleSetupRequired({
-          id: Date.now().toString(36) + Math.random().toString(36).slice(2, 6),
-          fields: fields.map((f) => ({ pluginName: f.pluginName, fieldName: f.fieldName, field: f.field })),
-          resolve,
+  toolRegistry.register(
+    createPluginManagerTool({
+      pluginRegistry,
+      toolRegistry,
+      workingDirectory: configuration.repo,
+      baseContext: basePluginContext,
+      onToolDisplayNamesChanged: (names) => {
+        registerToolDisplayNames(names);
+        threadManager.refreshPluginPromptExtensions();
+      },
+      onSetupRequired: (fields) => {
+        return new Promise<void>((resolve) => {
+          const engine = threadManager.getActiveEngine();
+          engine.handleSetupRequired({
+            id: Date.now().toString(36) + Math.random().toString(36).slice(2, 6),
+            fields: fields.map((f) => ({
+              pluginName: f.pluginName,
+              fieldName: f.fieldName,
+              field: f.field,
+            })),
+            resolve,
+          });
         });
-      });
-    },
-  }));
-  toolRegistry.register(createAskQuestionTool((pending) => {
-    threadManager.getActiveEngine().handleQuestionsAsked(pending);
-  }));
+      },
+    }),
+  );
+  toolRegistry.register(
+    createAskQuestionTool((pending) => {
+      threadManager.getActiveEngine().handleQuestionsAsked(pending);
+    }),
+  );
 
   threadManager.initialize();
 
@@ -187,9 +209,12 @@ export async function main(): Promise<void> {
     indexer.indexProject(configuration.repo).catch(() => {});
   }
 
-  setInterval(() => {
-    database.pruneEngineLogs(5000);
-  }, 10 * 60 * 1000);
+  setInterval(
+    () => {
+      database.pruneEngineLogs(5000);
+    },
+    10 * 60 * 1000,
+  );
 
   const renderer = await createCliRenderer({
     exitOnCtrlC: false,
@@ -204,8 +229,12 @@ export async function main(): Promise<void> {
     process.exit(0);
   };
 
-  process.on("SIGINT", () => { shutdown(); });
-  process.on("SIGTERM", () => { shutdown(); });
+  process.on("SIGINT", () => {
+    shutdown();
+  });
+  process.on("SIGTERM", () => {
+    shutdown();
+  });
 
   const handleSetupComplete = async () => {
     const deferredResult = await pluginRegistry.activateDeferred();

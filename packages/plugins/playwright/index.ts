@@ -21,9 +21,7 @@ async function loadPlaywright(): Promise<any> {
     pw = await import("playwright" as string);
     return pw;
   } catch {
-    throw new Error(
-      "playwright is not installed. Use the browser_setup tool to install it.",
-    );
+    throw new Error("playwright is not installed. Use the browser_setup tool to install it.");
   }
 }
 
@@ -60,9 +58,22 @@ let refCounter = 0;
 
 function isInteractive(role: string): boolean {
   const interactiveRoles = new Set([
-    "button", "link", "textbox", "checkbox", "radio", "combobox",
-    "menuitem", "menuitemcheckbox", "menuitemradio", "option",
-    "searchbox", "slider", "spinbutton", "switch", "tab", "treeitem",
+    "button",
+    "link",
+    "textbox",
+    "checkbox",
+    "radio",
+    "combobox",
+    "menuitem",
+    "menuitemcheckbox",
+    "menuitemradio",
+    "option",
+    "searchbox",
+    "slider",
+    "spinbutton",
+    "switch",
+    "tab",
+    "treeitem",
   ]);
   return interactiveRoles.has(role);
 }
@@ -79,14 +90,11 @@ type AXNode = {
   children?: AXNode[];
 };
 
-async function buildSnapshot(
-  page: any,
-  interactiveOnly: boolean,
-): Promise<string> {
+async function buildSnapshot(page: any, interactiveOnly: boolean): Promise<string> {
   refMap.clear();
   refCounter = 0;
 
-  const tree = await page.accessibility.snapshot() as AXNode | null;
+  const tree = (await page.accessibility.snapshot()) as AXNode | null;
   if (!tree) return "(empty page — no accessibility tree)";
 
   const lines: string[] = [];
@@ -144,7 +152,9 @@ function getLocator(ref: string): any {
 // Shell helper for setup commands
 // ---------------------------------------------------------------------------
 
-async function runShell(args: string[]): Promise<{ stdout: string; stderr: string; exitCode: number }> {
+async function runShell(
+  args: string[],
+): Promise<{ stdout: string; stderr: string; exitCode: number }> {
   const cmd = IS_WINDOWS ? ["cmd", "/c", ...args] : args;
   const proc = Bun.spawn(cmd, { stdout: "pipe", stderr: "pipe" });
   const exitCode = await proc.exited;
@@ -172,7 +182,10 @@ const browserSetupTool: Tool = {
     try {
       const result = await runShell(["bun", "i", "-g", "playwright"]);
       if (result.exitCode !== 0) {
-        return { success: false, output: `Failed to install playwright: ${result.stderr || result.stdout}` };
+        return {
+          success: false,
+          output: `Failed to install playwright: ${result.stderr || result.stdout}`,
+        };
       }
       steps.push("installed playwright globally");
     } catch (error) {
@@ -184,12 +197,18 @@ const browserSetupTool: Tool = {
     try {
       const result = await runShell(["bunx", "playwright", "install", "chromium"]);
       if (result.exitCode !== 0) {
-        return { success: false, output: `playwright installed but Chromium download failed: ${result.stderr || result.stdout}` };
+        return {
+          success: false,
+          output: `playwright installed but Chromium download failed: ${result.stderr || result.stdout}`,
+        };
       }
       steps.push("Chromium downloaded");
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);
-      return { success: false, output: `playwright installed but Chromium download failed: ${message}` };
+      return {
+        success: false,
+        output: `playwright installed but Chromium download failed: ${message}`,
+      };
     }
 
     // Reset module cache so next import picks up the install
@@ -202,7 +221,8 @@ const browserSetupTool: Tool = {
 const browserOpenTool: Tool = {
   definition: {
     name: "browser_open",
-    description: "Open a URL in the browser. Starts a new Chromium session or reuses the existing one.",
+    description:
+      "Open a URL in the browser. Starts a new Chromium session or reuses the existing one.",
     parameters: [
       { name: "url", type: "string", description: "The URL to navigate to.", required: true },
     ],
@@ -233,7 +253,8 @@ const browserSnapshotTool: Tool = {
       {
         name: "interactive_only",
         type: "boolean",
-        description: "If true, only return interactive elements (buttons, links, inputs). Default: true.",
+        description:
+          "If true, only return interactive elements (buttons, links, inputs). Default: true.",
         required: false,
       },
     ],
@@ -257,7 +278,12 @@ const browserClickTool: Tool = {
     name: "browser_click",
     description: "Click an element on the page identified by its ref from a snapshot (e.g. @e1).",
     parameters: [
-      { name: "ref", type: "string", description: "Element ref from snapshot (e.g. '@e1').", required: true },
+      {
+        name: "ref",
+        type: "string",
+        description: "Element ref from snapshot (e.g. '@e1').",
+        required: true,
+      },
     ],
   },
   async execute(parameters): Promise<ToolResult> {
@@ -266,7 +292,8 @@ const browserClickTool: Tool = {
 
     try {
       const locator = getLocator(ref);
-      if (!locator) return { success: false, output: `ref ${ref} not found. Run browser_snapshot first.` };
+      if (!locator)
+        return { success: false, output: `ref ${ref} not found. Run browser_snapshot first.` };
 
       await locator.click({ timeout: 10_000 });
 
@@ -285,10 +312,21 @@ const browserClickTool: Tool = {
 const browserTypeTool: Tool = {
   definition: {
     name: "browser_type",
-    description: "Type text into an element (appends to existing content). Use browser_fill to replace content instead.",
+    description:
+      "Type text into an element (appends to existing content). Use browser_fill to replace content instead.",
     parameters: [
-      { name: "ref", type: "string", description: "Element ref from snapshot (e.g. '@e3').", required: true },
-      { name: "text", type: "string", description: "Text to type into the element.", required: true },
+      {
+        name: "ref",
+        type: "string",
+        description: "Element ref from snapshot (e.g. '@e3').",
+        required: true,
+      },
+      {
+        name: "text",
+        type: "string",
+        description: "Text to type into the element.",
+        required: true,
+      },
     ],
   },
   async execute(parameters): Promise<ToolResult> {
@@ -298,7 +336,8 @@ const browserTypeTool: Tool = {
 
     try {
       const locator = getLocator(ref);
-      if (!locator) return { success: false, output: `ref ${ref} not found. Run browser_snapshot first.` };
+      if (!locator)
+        return { success: false, output: `ref ${ref} not found. Run browser_snapshot first.` };
 
       await locator.pressSequentially(text, { delay: 30 });
       return { success: true, output: `Typed "${text}" into ${ref}` };
@@ -312,10 +351,21 @@ const browserTypeTool: Tool = {
 const browserFillTool: Tool = {
   definition: {
     name: "browser_fill",
-    description: "Clear an element and fill it with new text. Unlike browser_type, this replaces existing content.",
+    description:
+      "Clear an element and fill it with new text. Unlike browser_type, this replaces existing content.",
     parameters: [
-      { name: "ref", type: "string", description: "Element ref from snapshot (e.g. '@e3').", required: true },
-      { name: "text", type: "string", description: "Text to fill into the element.", required: true },
+      {
+        name: "ref",
+        type: "string",
+        description: "Element ref from snapshot (e.g. '@e3').",
+        required: true,
+      },
+      {
+        name: "text",
+        type: "string",
+        description: "Text to fill into the element.",
+        required: true,
+      },
     ],
   },
   async execute(parameters): Promise<ToolResult> {
@@ -325,7 +375,8 @@ const browserFillTool: Tool = {
 
     try {
       const locator = getLocator(ref);
-      if (!locator) return { success: false, output: `ref ${ref} not found. Run browser_snapshot first.` };
+      if (!locator)
+        return { success: false, output: `ref ${ref} not found. Run browser_snapshot first.` };
 
       await locator.fill(text);
       return { success: true, output: `Filled ${ref} with "${text}"` };
@@ -344,13 +395,15 @@ const browserScreenshotTool: Tool = {
       {
         name: "filename",
         type: "string",
-        description: "Filename for the screenshot (saved in ~/.kraken/screenshots/). Default: auto-generated.",
+        description:
+          "Filename for the screenshot (saved in ~/.kraken/screenshots/). Default: auto-generated.",
         required: false,
       },
       {
         name: "full_page",
         type: "boolean",
-        description: "Capture the full scrollable page instead of just the viewport. Default: false.",
+        description:
+          "Capture the full scrollable page instead of just the viewport. Default: false.",
         required: false,
       },
     ],
@@ -409,7 +462,8 @@ const browserEvalTool: Tool = {
       {
         name: "expression",
         type: "string",
-        description: "JavaScript expression to evaluate in the page (e.g. 'document.title', 'document.querySelectorAll(\"a\").length').",
+        description:
+          "JavaScript expression to evaluate in the page (e.g. 'document.title', 'document.querySelectorAll(\"a\").length').",
         required: true,
       },
     ],
@@ -490,7 +544,9 @@ export default definePlugin({
   activate: async () => {
     const available = checkPlaywrightAvailable();
     if (!available) {
-      console.log("[playwright] WARNING: playwright is not installed. Use browser_setup tool to install it.");
+      console.log(
+        "[playwright] WARNING: playwright is not installed. Use browser_setup tool to install it.",
+      );
     } else {
       console.log("[playwright] activated");
     }

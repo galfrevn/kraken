@@ -187,7 +187,7 @@ export async function fetchOpenAIModelIds(apiKey: string): Promise<string[]> {
 
   const response = await fetch(OPENAI_MODELS_ENDPOINT, {
     headers: {
-      "Authorization": `Bearer ${apiKey}`,
+      Authorization: `Bearer ${apiKey}`,
       "Content-Type": "application/json",
     },
   });
@@ -240,9 +240,7 @@ export async function fetchAnthropicModelIds(apiKey: string): Promise<string[]> 
   }
 
   const payload = (await response.json()) as AnthropicModelsResponse;
-  cachedAnthropicModelIds = payload.data
-    .map((m) => m.id)
-    .sort();
+  cachedAnthropicModelIds = payload.data.map((m) => m.id).sort();
   anthropicCacheTimestamp = now;
   return cachedAnthropicModelIds;
 }
@@ -258,24 +256,27 @@ export async function fetchAllAvailableModels(): Promise<ProviderModel[]> {
   const openrouterKey = Bun.env["OPENROUTER_API_KEY"] ?? Bun.env["KRAKEN_OPENROUTER_API_KEY"];
   if (openrouterKey) {
     fetches.push(
-      fetchOpenRouterModelIds()
-        .then((ids) => ids.map((id) => ({ provider: "openrouter", modelId: id })))
+      fetchOpenRouterModelIds().then((ids) =>
+        ids.map((id) => ({ provider: "openrouter", modelId: id })),
+      ),
     );
   }
 
   const openaiKey = Bun.env["OPENAI_API_KEY"];
   if (openaiKey) {
     fetches.push(
-      fetchOpenAIModelIds(openaiKey)
-        .then((ids) => ids.map((id) => ({ provider: "openai", modelId: id })))
+      fetchOpenAIModelIds(openaiKey).then((ids) =>
+        ids.map((id) => ({ provider: "openai", modelId: id })),
+      ),
     );
   }
 
   const anthropicKey = Bun.env["ANTHROPIC_API_KEY"];
   if (anthropicKey) {
     fetches.push(
-      fetchAnthropicModelIds(anthropicKey)
-        .then((ids) => ids.map((id) => ({ provider: "anthropic", modelId: id })))
+      fetchAnthropicModelIds(anthropicKey).then((ids) =>
+        ids.map((id) => ({ provider: "anthropic", modelId: id })),
+      ),
     );
   }
 
@@ -375,9 +376,7 @@ export function createModelSwitchTool(languageModelClient: LanguageModelClient):
       ],
     },
 
-    async execute(
-      parameters: Record<string, unknown>,
-    ): Promise<ToolResult> {
+    async execute(parameters: Record<string, unknown>): Promise<ToolResult> {
       const requestedModel = parameters["model"] as string | undefined;
 
       if (!requestedModel) {

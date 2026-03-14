@@ -3,9 +3,7 @@ import type { Tool, ToolResult } from "@kraken/sdk";
 
 const IS_WINDOWS = process.platform === "win32";
 
-async function run(
-  args: string[],
-): Promise<{ stdout: string; stderr: string; exitCode: number }> {
+async function run(args: string[]): Promise<{ stdout: string; stderr: string; exitCode: number }> {
   const cmd = IS_WINDOWS ? ["cmd", "/c", ...args] : args;
   const proc = Bun.spawn(cmd, { stdout: "pipe", stderr: "pipe" });
   const exitCode = await proc.exited;
@@ -33,11 +31,7 @@ async function dockerRun(args: string[]): Promise<ToolResult> {
 
 async function composeRun(args: string[]): Promise<ToolResult> {
   try {
-    const { stdout, stderr, exitCode } = await run([
-      "docker",
-      "compose",
-      ...args,
-    ]);
+    const { stdout, stderr, exitCode } = await run(["docker", "compose", ...args]);
     if (exitCode !== 0) {
       return {
         success: false,
@@ -64,8 +58,7 @@ const dockerPsTool: Tool = {
       {
         name: "all",
         type: "boolean",
-        description:
-          "If true, show all containers (including stopped). Default: false.",
+        description: "If true, show all containers (including stopped). Default: false.",
         required: false,
       },
     ],
@@ -80,8 +73,7 @@ const dockerPsTool: Tool = {
 const dockerLogsTool: Tool = {
   definition: {
     name: "docker_logs",
-    description:
-      "Get logs from a Docker container. Optionally limit the number of lines returned.",
+    description: "Get logs from a Docker container. Optionally limit the number of lines returned.",
     parameters: [
       {
         name: "container",
@@ -92,8 +84,7 @@ const dockerLogsTool: Tool = {
       {
         name: "tail",
         type: "number",
-        description:
-          "Number of lines to show from the end of the logs. Default: all lines.",
+        description: "Number of lines to show from the end of the logs. Default: all lines.",
         required: false,
       },
     ],
@@ -123,8 +114,7 @@ const dockerExecTool: Tool = {
       {
         name: "command",
         type: "string",
-        description:
-          "The command to execute inside the container (e.g. 'ls -la /app').",
+        description: "The command to execute inside the container (e.g. 'ls -la /app').",
         required: true,
       },
     ],
@@ -192,14 +182,12 @@ const dockerImagesTool: Tool = {
 const dockerComposeUpTool: Tool = {
   definition: {
     name: "docker_compose_up",
-    description:
-      "Run docker compose up to start services defined in a compose file.",
+    description: "Run docker compose up to start services defined in a compose file.",
     parameters: [
       {
         name: "service",
         type: "string",
-        description:
-          "Specific service name to start. If omitted, all services are started.",
+        description: "Specific service name to start. If omitted, all services are started.",
         required: false,
       },
       {
@@ -283,14 +271,10 @@ export default definePlugin({
         const version = new TextDecoder().decode(result.stdout).trim();
         console.log(`[docker] activated (Docker ${version})`);
       } else {
-        console.log(
-          "[docker] WARNING: Docker CLI not found or daemon not running.",
-        );
+        console.log("[docker] WARNING: Docker CLI not found or daemon not running.");
       }
     } catch {
-      console.log(
-        "[docker] WARNING: Could not detect Docker installation.",
-      );
+      console.log("[docker] WARNING: Could not detect Docker installation.");
     }
   },
 

@@ -5,24 +5,24 @@ import { KRAKEN_HOME, printBanner } from "@/constants.ts";
 
 const LLM_PROVIDERS = [
   { value: "openrouter", label: "OpenRouter", hint: "access to all models" },
-  { value: "anthropic",  label: "Anthropic",  hint: "Claude direct" },
-  { value: "openai",     label: "OpenAI",     hint: "GPT direct" },
+  { value: "anthropic", label: "Anthropic", hint: "Claude direct" },
+  { value: "openai", label: "OpenAI", hint: "GPT direct" },
 ];
 
 const MODELS_BY_PROVIDER: Record<string, { value: string; label: string; hint?: string }[]> = {
   openrouter: [
-    { value: "anthropic/claude-sonnet-4",   label: "Claude Sonnet 4",   hint: "recommended" },
-    { value: "moonshotai/kimi-k2.5",        label: "Kimi K2.5",         hint: "reasoning, fast" },
-    { value: "deepseek/deepseek-v3.2",      label: "DeepSeek V3.2",     hint: "fast, cheap" },
+    { value: "anthropic/claude-sonnet-4", label: "Claude Sonnet 4", hint: "recommended" },
+    { value: "moonshotai/kimi-k2.5", label: "Kimi K2.5", hint: "reasoning, fast" },
+    { value: "deepseek/deepseek-v3.2", label: "DeepSeek V3.2", hint: "fast, cheap" },
     { value: "anthropic/claude-sonnet-4.6", label: "Claude Sonnet 4.6" },
-    { value: "google/gemini-2.5-pro",       label: "Gemini 2.5 Pro" },
+    { value: "google/gemini-2.5-pro", label: "Gemini 2.5 Pro" },
   ],
   anthropic: [
-    { value: "claude-sonnet-4",   label: "Claude Sonnet 4" },
+    { value: "claude-sonnet-4", label: "Claude Sonnet 4" },
     { value: "claude-sonnet-4.6", label: "Claude Sonnet 4.6" },
   ],
   openai: [
-    { value: "gpt-4o",  label: "GPT-4o" },
+    { value: "gpt-4o", label: "GPT-4o" },
     { value: "o3-mini", label: "o3-mini" },
   ],
 };
@@ -34,8 +34,12 @@ const API_KEY_ENV_BY_PROVIDER: Record<string, string> = {
 };
 
 const SECURITY_POLICIES = [
-  { value: "review_required", label: "Review required", hint: "ask before executing — recommended" },
-  { value: "auto",            label: "Auto",            hint: "execute commands without asking" },
+  {
+    value: "review_required",
+    label: "Review required",
+    hint: "ask before executing — recommended",
+  },
+  { value: "auto", label: "Auto", hint: "execute commands without asking" },
 ];
 
 function generateKrakenYml(options: {
@@ -101,10 +105,12 @@ export async function execute(_args: string[]): Promise<void> {
   const pluginsPath = join(KRAKEN_HOME, "plugins");
 
   if (existsSync(configPath)) {
-    const shouldOverwrite = ensureCancel(await p.confirm({
-      message: `~/.kraken/kraken.yml already exists. Overwrite?`,
-      initialValue: false,
-    }));
+    const shouldOverwrite = ensureCancel(
+      await p.confirm({
+        message: `~/.kraken/kraken.yml already exists. Overwrite?`,
+        initialValue: false,
+      }),
+    );
 
     if (!shouldOverwrite) {
       p.cancel("Aborted.");
@@ -112,10 +118,12 @@ export async function execute(_args: string[]): Promise<void> {
     }
   }
 
-  const provider = ensureCancel(await p.select({
-    message: "Select LLM provider",
-    options: LLM_PROVIDERS,
-  }));
+  const provider = ensureCancel(
+    await p.select({
+      message: "Select LLM provider",
+      options: LLM_PROVIDERS,
+    }),
+  );
 
   const modelsForProvider = MODELS_BY_PROVIDER[provider];
   if (!modelsForProvider) {
@@ -123,10 +131,12 @@ export async function execute(_args: string[]): Promise<void> {
     process.exit(1);
   }
 
-  const model = ensureCancel(await p.select({
-    message: "Select model",
-    options: modelsForProvider,
-  }));
+  const model = ensureCancel(
+    await p.select({
+      message: "Select model",
+      options: modelsForProvider,
+    }),
+  );
 
   let apiKey = "";
   const envVarName = API_KEY_ENV_BY_PROVIDER[provider] ?? "OPENROUTER_API_KEY";
@@ -134,10 +144,12 @@ export async function execute(_args: string[]): Promise<void> {
 
   if (existingKey) {
     const masked = `${existingKey.slice(0, 10)}...${existingKey.slice(-4)}`;
-    const useExistingKey = ensureCancel(await p.confirm({
-      message: `Found ${envVarName} in environment (${masked}). Use it?`,
-      initialValue: true,
-    }));
+    const useExistingKey = ensureCancel(
+      await p.confirm({
+        message: `Found ${envVarName} in environment (${masked}). Use it?`,
+        initialValue: true,
+      }),
+    );
 
     if (useExistingKey) {
       apiKey = existingKey;
@@ -145,19 +157,23 @@ export async function execute(_args: string[]): Promise<void> {
   }
 
   if (!apiKey) {
-    apiKey = ensureCancel(await p.text({
-      message: `Enter your ${provider} API key`,
-      placeholder: "sk-...",
-      validate: (value = "") => {
-        if (!value.trim()) return "API key is required for LLM access";
-      },
-    }));
+    apiKey = ensureCancel(
+      await p.text({
+        message: `Enter your ${provider} API key`,
+        placeholder: "sk-...",
+        validate: (value = "") => {
+          if (!value.trim()) return "API key is required for LLM access";
+        },
+      }),
+    );
   }
 
-  const securityPolicy = ensureCancel(await p.select({
-    message: "Select default security policy",
-    options: SECURITY_POLICIES,
-  }));
+  const securityPolicy = ensureCancel(
+    await p.select({
+      message: "Select default security policy",
+      options: SECURITY_POLICIES,
+    }),
+  );
 
   const spinnerInstance = p.spinner();
   spinnerInstance.start("Creating configuration in ~/.kraken/");
@@ -178,13 +194,20 @@ export async function execute(_args: string[]): Promise<void> {
   p.log.success(`~/.kraken/plugins/`);
 
   // --- Plugin installation step ---
-  let registryPlugins: { name: string; version: string; description: string; tools: string[]; requires: string[] }[] = [];
+  let registryPlugins: {
+    name: string;
+    version: string;
+    description: string;
+    tools: string[];
+    requires: string[];
+  }[] = [];
 
   const pluginSpinner = p.spinner();
   pluginSpinner.start("Fetching plugin registry...");
 
   try {
-    const registryUrl = "https://raw.githubusercontent.com/galfrevn/kraken/main/packages/plugins/registry.json";
+    const registryUrl =
+      "https://raw.githubusercontent.com/galfrevn/kraken/main/packages/plugins/registry.json";
     const response = await fetch(registryUrl, { signal: AbortSignal.timeout(10_000) });
     if (response.ok) {
       const registry = (await response.json()) as { plugins: typeof registryPlugins };
@@ -204,11 +227,13 @@ export async function execute(_args: string[]): Promise<void> {
       hint: plugin.description,
     }));
 
-    const selectedPlugins = ensureCancel(await p.multiselect({
-      message: "Select plugins to install",
-      options: pluginChoices,
-      required: false,
-    }));
+    const selectedPlugins = ensureCancel(
+      await p.multiselect({
+        message: "Select plugins to install",
+        options: pluginChoices,
+        required: false,
+      }),
+    );
 
     if (selectedPlugins.length > 0) {
       const installSpinner = p.spinner();

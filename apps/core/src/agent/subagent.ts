@@ -73,7 +73,10 @@ export class SubagentRunner {
       while (iterations < maxIterations) {
         iterations += 1;
 
-        if (completionResult.finishReason !== "tool_calls" || completionResult.toolCalls.length === 0) {
+        if (
+          completionResult.finishReason !== "tool_calls" ||
+          completionResult.toolCalls.length === 0
+        ) {
           return {
             success: true,
             output: completionResult.content,
@@ -109,7 +112,10 @@ export class SubagentRunner {
         completionResult = await this.languageModelClient.complete(messages, completionOptions);
 
         if (completionResult.toolCalls.length > 0) {
-          conversation.addAssistantToolCallMessage(completionResult.content, completionResult.toolCalls);
+          conversation.addAssistantToolCallMessage(
+            completionResult.content,
+            completionResult.toolCalls,
+          );
         } else {
           conversation.addAssistantMessage(completionResult.content);
         }

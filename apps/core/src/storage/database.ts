@@ -515,8 +515,14 @@ export class AgentDatabase {
     }
   }
 
-  replaceThreadConversationFrom(threadId: string, fromPosition: number, messages: ThreadConversationRow[]): void {
-    this.database.prepare("DELETE FROM thread_conversation WHERE thread_id = ? AND position >= ?").run(threadId, fromPosition);
+  replaceThreadConversationFrom(
+    threadId: string,
+    fromPosition: number,
+    messages: ThreadConversationRow[],
+  ): void {
+    this.database
+      .prepare("DELETE FROM thread_conversation WHERE thread_id = ? AND position >= ?")
+      .run(threadId, fromPosition);
 
     const statement = this.database.prepare(`
       INSERT INTO thread_conversation (thread_id, role, content, position)

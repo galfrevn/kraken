@@ -69,7 +69,8 @@ const ttsSpeakTool: Tool = {
       {
         name: "rate",
         type: "number",
-        description: "Speech rate in words per minute. Optional. Windows: mapped to -10..10 range. macOS: passed directly to say -r. Linux/espeak: passed as -s value.",
+        description:
+          "Speech rate in words per minute. Optional. Windows: mapped to -10..10 range. macOS: passed directly to say -r. Linux/espeak: passed as -s value.",
         required: false,
       },
     ],
@@ -104,7 +105,8 @@ const ttsSpeakTool: Tool = {
     if (!linuxCmd) {
       return {
         success: false,
-        output: "No TTS engine found. Install espeak (apt install espeak) or spd-say (apt install speech-dispatcher).",
+        output:
+          "No TTS engine found. Install espeak (apt install espeak) or spd-say (apt install speech-dispatcher).",
       };
     }
 
@@ -137,11 +139,17 @@ const ttsSaveTool: Tool = {
       "Files are saved in ~/.kraken/audio/ by default. " +
       "Windows: WAV, macOS: AIFF, Linux: WAV.",
     parameters: [
-      { name: "text", type: "string", description: "The text to convert to audio.", required: true },
+      {
+        name: "text",
+        type: "string",
+        description: "The text to convert to audio.",
+        required: true,
+      },
       {
         name: "filename",
         type: "string",
-        description: "Output filename (saved in ~/.kraken/audio/). Defaults to tts-<timestamp>.wav (.aiff on macOS).",
+        description:
+          "Output filename (saved in ~/.kraken/audio/). Defaults to tts-<timestamp>.wav (.aiff on macOS).",
         required: false,
       },
     ],
@@ -186,7 +194,8 @@ const ttsSaveTool: Tool = {
     if (!linuxCmd) {
       return {
         success: false,
-        output: "No TTS engine found. Install espeak (apt install espeak) or spd-say (apt install speech-dispatcher).",
+        output:
+          "No TTS engine found. Install espeak (apt install espeak) or spd-say (apt install speech-dispatcher).",
       };
     }
 
@@ -203,7 +212,8 @@ const ttsSaveTool: Tool = {
     // spd-say does not support file output
     return {
       success: false,
-      output: "spd-say does not support saving to file. Install espeak for file output: apt install espeak",
+      output:
+        "spd-say does not support saving to file. Install espeak for file output: apt install espeak",
     };
   },
 };
@@ -235,7 +245,8 @@ const ttsVoicesTool: Tool = {
     if (!linuxCmd) {
       return {
         success: false,
-        output: "No TTS engine found. Install espeak (apt install espeak) or spd-say (apt install speech-dispatcher).",
+        output:
+          "No TTS engine found. Install espeak (apt install espeak) or spd-say (apt install speech-dispatcher).",
       };
     }
 

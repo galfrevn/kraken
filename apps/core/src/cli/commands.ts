@@ -395,7 +395,9 @@ export async function initCommand(): Promise<void> {
   console.log(`\ncreated ${targetPath}`);
   console.log("\nnext steps:");
   if (!openrouterApiKey) {
-    console.log("  1. add your openrouter api key to ~/.kraken/kraken.yml or set OPENROUTER_API_KEY");
+    console.log(
+      "  1. add your openrouter api key to ~/.kraken/kraken.yml or set OPENROUTER_API_KEY",
+    );
     console.log("  2. configure crons, watchers, and security rules as needed");
     console.log("  3. run: kraken start");
   } else {
@@ -445,7 +447,10 @@ export async function runCommand(prompt: string): Promise<void> {
     while (iterations < 40) {
       iterations += 1;
 
-      if (completionResult.finishReason !== "tool_calls" || completionResult.toolCalls.length === 0) {
+      if (
+        completionResult.finishReason !== "tool_calls" ||
+        completionResult.toolCalls.length === 0
+      ) {
         console.log(`  response:\n${completionResult.content}\n`);
         break;
       }
@@ -484,7 +489,10 @@ export async function runCommand(prompt: string): Promise<void> {
       completionResult = await languageModelClient.complete(messages);
 
       if (completionResult.toolCalls.length > 0) {
-        conversation.addAssistantToolCallMessage(completionResult.content, completionResult.toolCalls);
+        conversation.addAssistantToolCallMessage(
+          completionResult.content,
+          completionResult.toolCalls,
+        );
       } else {
         conversation.addAssistantMessage(completionResult.content);
       }

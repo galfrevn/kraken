@@ -52,7 +52,11 @@ export class PluginRegistry {
     workingDirectory: string,
     baseContext: Omit<PluginContext, "config">,
     deferActivation?: boolean,
-  ): Promise<{ loaded: string[]; failed: Array<{ entry: string; error: string }>; deferred: Array<{ name: string; missing: MissingConfigField[] }> }> {
+  ): Promise<{
+    loaded: string[];
+    failed: Array<{ entry: string; error: string }>;
+    deferred: Array<{ name: string; missing: MissingConfigField[] }>;
+  }> {
     if (entries.length === 0) {
       return { loaded: [], failed: [], deferred: [] };
     }
@@ -85,12 +89,19 @@ export class PluginRegistry {
           config: resolvedPlugin.config,
         };
 
-        const missingConfig = PluginRegistry.getMissingRequiredConfig(plugin, resolvedPlugin.config);
+        const missingConfig = PluginRegistry.getMissingRequiredConfig(
+          plugin,
+          resolvedPlugin.config,
+        );
 
         if (missingConfig.length > 0 && deferActivation) {
           this.deferredPlugins.push({
             plugin,
-            resolvedEntry: { entry: resolvedPlugin.entry, source: resolvedPlugin.source, config: resolvedPlugin.config },
+            resolvedEntry: {
+              entry: resolvedPlugin.entry,
+              source: resolvedPlugin.source,
+              config: resolvedPlugin.config,
+            },
             missing: missingConfig,
             baseContext,
           });
@@ -131,7 +142,10 @@ export class PluginRegistry {
     return this.deferredPlugins.map((d) => ({ name: d.plugin.name, missing: d.missing }));
   }
 
-  async activateDeferred(): Promise<{ loaded: string[]; failed: Array<{ name: string; error: string }> }> {
+  async activateDeferred(): Promise<{
+    loaded: string[];
+    failed: Array<{ name: string; error: string }>;
+  }> {
     const loaded: string[] = [];
     const failed: Array<{ name: string; error: string }> = [];
 
@@ -178,7 +192,10 @@ export class PluginRegistry {
     baseContext: Omit<PluginContext, "config">,
     config: Record<string, unknown> = {},
     deferIfMissingConfig?: boolean,
-  ): Promise<{ success: true; plugin: KrakenPlugin; missingConfig?: MissingConfigField[] } | { success: false; error: string }> {
+  ): Promise<
+    | { success: true; plugin: KrakenPlugin; missingConfig?: MissingConfigField[] }
+    | { success: false; error: string }
+  > {
     ensureSdkResolvable();
 
     const { resolved, failed } = resolvePluginPaths(
@@ -205,7 +222,11 @@ export class PluginRegistry {
       if (missingConfig.length > 0 && deferIfMissingConfig) {
         this.deferredPlugins.push({
           plugin,
-          resolvedEntry: { entry: resolvedPlugin.entry, source: resolvedPlugin.source, config: resolvedPlugin.config },
+          resolvedEntry: {
+            entry: resolvedPlugin.entry,
+            source: resolvedPlugin.source,
+            config: resolvedPlugin.config,
+          },
           missing: missingConfig,
           baseContext,
         });

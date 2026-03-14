@@ -144,9 +144,7 @@ const notifySendTool: Tool = {
         sent.push(platform);
       } else {
         const reason =
-          result.reason instanceof Error
-            ? result.reason.message
-            : String(result.reason);
+          result.reason instanceof Error ? result.reason.message : String(result.reason);
         failed.push(`${platform} (${reason})`);
       }
     }
@@ -217,18 +215,11 @@ export default definePlugin({
     "All are optional — only configure the platforms the user wants.",
 
   activate: async (context: PluginContext) => {
-    slackWebhookUrl =
-      (context.config.slack_webhook_url as string) ||
-      Bun.env.SLACK_WEBHOOK_URL;
+    slackWebhookUrl = (context.config.slack_webhook_url as string) || Bun.env.SLACK_WEBHOOK_URL;
     discordWebhookUrl =
-      (context.config.discord_webhook_url as string) ||
-      Bun.env.DISCORD_WEBHOOK_URL;
-    telegramBotToken =
-      (context.config.telegram_bot_token as string) ||
-      Bun.env.TELEGRAM_BOT_TOKEN;
-    telegramChatId =
-      (context.config.telegram_chat_id as string) ||
-      Bun.env.TELEGRAM_CHAT_ID;
+      (context.config.discord_webhook_url as string) || Bun.env.DISCORD_WEBHOOK_URL;
+    telegramBotToken = (context.config.telegram_bot_token as string) || Bun.env.TELEGRAM_BOT_TOKEN;
+    telegramChatId = (context.config.telegram_chat_id as string) || Bun.env.TELEGRAM_CHAT_ID;
 
     const configured = getConfiguredPlatforms();
     console.log(

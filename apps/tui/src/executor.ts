@@ -25,7 +25,10 @@ export function createSessionExecutor(threadManager: ThreadManager): SessionComm
       return exposedCommands.map(toSessionDefinition);
     },
 
-    async executeCommand(name: string, args: string): Promise<{ success: boolean; output: string }> {
+    async executeCommand(
+      name: string,
+      args: string,
+    ): Promise<{ success: boolean; output: string }> {
       const command = exposedCommands.find((c) => c.name === name);
       if (!command) {
         return { success: false, output: `unknown command: ${name}` };

@@ -48,43 +48,31 @@ export function DashboardView({ store, pluginRegistry }: DashboardViewProps) {
     return () => clearInterval(interval);
   }, [store]);
 
-  const connectedColor = (connected: boolean) =>
-    connected ? COLORS.green : COLORS.red;
-  const connectedLabel = (connected: boolean) =>
-    connected ? "connected" : "offline";
+  const connectedColor = (connected: boolean) => (connected ? COLORS.green : COLORS.red);
+  const connectedLabel = (connected: boolean) => (connected ? "connected" : "offline");
 
-  const avatarState = summary.running > 0 ? "working" as const : "idle" as const;
+  const avatarState = summary.running > 0 ? ("working" as const) : ("idle" as const);
 
   return (
     <box flexDirection="column" gap={1} width="100%" flexGrow={1}>
       <box flexDirection="row" gap={2}>
-        <box
-          backgroundColor={COLORS.card}
-          flexDirection="row"
-          padding={1}
-          flexGrow={1}
-        >
+        <box backgroundColor={COLORS.card} flexDirection="row" padding={1} flexGrow={1}>
           <box paddingRight={2}>
             <Avatar state={avatarState} />
           </box>
           <box flexDirection="column">
             <text fg={COLORS.textSecondary}>services</text>
-          <text fg={connectedColor(health.gateway)}>
-            {"  ● gateway:   " + connectedLabel(health.gateway)}
-            {health.gatewayVersion ? ` (v${health.gatewayVersion})` : ""}
-          </text>
-          <text fg={connectedColor(health.scheduler)}>
-            {"  ● scheduler: " + connectedLabel(health.scheduler)}
-          </text>
+            <text fg={connectedColor(health.gateway)}>
+              {"  ● gateway:   " + connectedLabel(health.gateway)}
+              {health.gatewayVersion ? ` (v${health.gatewayVersion})` : ""}
+            </text>
+            <text fg={connectedColor(health.scheduler)}>
+              {"  ● scheduler: " + connectedLabel(health.scheduler)}
+            </text>
           </box>
         </box>
 
-        <box
-          backgroundColor={COLORS.card}
-          flexDirection="column"
-          padding={1}
-          flexGrow={1}
-        >
+        <box backgroundColor={COLORS.card} flexDirection="column" padding={1} flexGrow={1}>
           <text fg={COLORS.textSecondary}>tasks</text>
           <text fg={COLORS.yellow}>{"  ○ pending:   " + summary.pending}</text>
           <text fg={COLORS.cyan}>{"  ◷ scheduled: " + summary.scheduled}</text>
@@ -93,12 +81,7 @@ export function DashboardView({ store, pluginRegistry }: DashboardViewProps) {
           <text fg={COLORS.red}>{"  ✗ failed:    " + summary.failed}</text>
         </box>
 
-        <box
-          backgroundColor={COLORS.card}
-          flexDirection="column"
-          padding={1}
-          flexGrow={1}
-        >
+        <box backgroundColor={COLORS.card} flexDirection="column" padding={1} flexGrow={1}>
           <text fg={COLORS.textSecondary}>plugins</text>
           {plugins.length === 0 ? (
             <text fg={COLORS.textMuted}>{"  no plugins installed"}</text>
@@ -113,12 +96,7 @@ export function DashboardView({ store, pluginRegistry }: DashboardViewProps) {
       </box>
 
       <box flexDirection="row" gap={2} flexGrow={1}>
-        <box
-          backgroundColor={COLORS.card}
-          flexDirection="column"
-          padding={1}
-          flexGrow={1}
-        >
+        <box backgroundColor={COLORS.card} flexDirection="column" padding={1} flexGrow={1}>
           <text fg={COLORS.textSecondary}>recent activity</text>
           {recentTasks.length === 0 ? (
             <text fg={COLORS.textMuted}>{"  no tasks yet"}</text>
@@ -127,31 +105,19 @@ export function DashboardView({ store, pluginRegistry }: DashboardViewProps) {
               const icon = STATUS_ICONS[task.status] ?? "?";
               const color = STATUS_COLORS[task.status] ?? COLORS.textMuted;
               const reviewTag =
-                task.approval_policy === "review_required" &&
-                task.status === "pending"
+                task.approval_policy === "review_required" && task.status === "pending"
                   ? " [review]"
                   : "";
               return (
                 <text key={task.id} fg={color}>
-                  {"  " +
-                    icon +
-                    " " +
-                    task.name +
-                    reviewTag +
-                    "  " +
-                    task.id.slice(0, 8)}
+                  {"  " + icon + " " + task.name + reviewTag + "  " + task.id.slice(0, 8)}
                 </text>
               );
             })
           )}
         </box>
 
-        <box
-          backgroundColor={COLORS.card}
-          flexDirection="column"
-          padding={1}
-          flexGrow={1}
-        >
+        <box backgroundColor={COLORS.card} flexDirection="column" padding={1} flexGrow={1}>
           <text fg={COLORS.textSecondary}>schedules</text>
           {scheduledItems.length === 0 ? (
             <text fg={COLORS.textMuted}>{"  no schedules active"}</text>
