@@ -3,6 +3,7 @@ mod cron;
 mod watcher;
 mod grpc;
 mod db;
+mod daemon;
 
 use std::sync::Arc;
 use tokio::sync::broadcast;
