@@ -334,20 +334,11 @@ if (Test-Path $ShimPath) {
 }
 
 # -------------------------------------------------------------------
-# Done
+# Done — run init
 # -------------------------------------------------------------------
 Write-Host ""
 Write-Host "  Installation complete!" -ForegroundColor Green
 Write-Host ""
-Write-Host "  Get started:" -ForegroundColor White
-Write-Host ""
-Write-Host "    kraken init      " -NoNewline -ForegroundColor Cyan; Write-Host "setup kraken in your project"
-Write-Host "    kraken           " -NoNewline -ForegroundColor Cyan; Write-Host "start the agent"
-Write-Host "    kraken doctor    " -NoNewline -ForegroundColor Cyan; Write-Host "check system health"
-Write-Host "    kraken help      " -NoNewline -ForegroundColor Cyan; Write-Host "see all commands"
-Write-Host ""
 
-if ($PathAdded) {
-    Write-Host "  Restart your terminal for PATH changes to take effect." -ForegroundColor Yellow
-    Write-Host ""
-}
+Step "running kraken init"
+& $ShimPath init
