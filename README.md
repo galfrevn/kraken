@@ -1,5 +1,5 @@
 <p align="center">
-  <img src="docs/assets/front.png" alt="Kraken" width="700" />
+  <img src="docs/assets/kraken.gif" alt="Kraken" width="700" />
 </p>
 
 <h1 align="center">Kraken</h1>
@@ -21,6 +21,10 @@ Kraken was born from a simple observation: tools like [Claude Code](https://gith
 However, most existing tools focus on a single interaction model: the developer asks, the agent responds. Kraken takes this further by introducing persistent autonomy. Rather than waiting for human input, Kraken can monitor file changes, respond to webhooks, execute scheduled tasks, and delegate work to sub-agents — all while maintaining a rich terminal interface for real-time collaboration. The goal is not to replace the developer but to act as a tireless companion that handles the repetitive, the mechanical, and the tedious, freeing the developer to focus on design, architecture, and the problems that actually require human judgment.
 
 This project is also an exercise in polyglot systems design. By combining Rust (for low-latency scheduling and OS-level file watching), Go (for high-throughput HTTP proxying and webhook handling), and TypeScript (for the agent brain, plugin system, and terminal UI), Kraken explores how each language's strengths can be composed into a cohesive whole through protobuf-defined contracts and local RPC.
+
+<p align="center">
+  <img src="docs/assets/front.png" alt="Kraken" width="700" />
+</p>
 
 ---
 
