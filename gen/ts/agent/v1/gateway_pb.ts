@@ -9,8 +9,9 @@ import type { Message } from "@bufbuild/protobuf";
 /**
  * Describes the file agent/v1/gateway.proto.
  */
-export const file_agent_v1_gateway: GenFile = /*@__PURE__*/
-  fileDesc("ChZhZ2VudC92MS9nYXRld2F5LnByb3RvEghhZ2VudC52MSJICg1Ub29sUGFyYW1ldGVyEgwKBHR5cGUYASABKAkSFwoPcHJvcGVydGllc19qc29uGAIgASgJEhAKCHJlcXVpcmVkGAMgAygJIl4KDFRvb2xGdW5jdGlvbhIMCgRuYW1lGAEgASgJEhMKC2Rlc2NyaXB0aW9uGAIgASgJEisKCnBhcmFtZXRlcnMYAyABKAsyFy5hZ2VudC52MS5Ub29sUGFyYW1ldGVyIj4KBFRvb2wSDAoEdHlwZRgBIAEoCRIoCghmdW5jdGlvbhgCIAEoCzIWLmFnZW50LnYxLlRvb2xGdW5jdGlvbiIzChBUb29sQ2FsbEZ1bmN0aW9uEgwKBG5hbWUYASABKAkSEQoJYXJndW1lbnRzGAIgASgJIlcKDVRvb2xDYWxsRW50cnkSCgoCaWQYASABKAkSDAoEdHlwZRgCIAEoCRIsCghmdW5jdGlvbhgDIAEoCzIaLmFnZW50LnYxLlRvb2xDYWxsRnVuY3Rpb24iiwEKC0NoYXRNZXNzYWdlEgwKBHJvbGUYASABKAkSDwoHY29udGVudBgCIAEoCRIrCgp0b29sX2NhbGxzGAMgAygLMhcuYWdlbnQudjEuVG9vbENhbGxFbnRyeRIUCgx0b29sX2NhbGxfaWQYBCABKAkSEQoEbmFtZRgFIAEoCUgAiAEBQgcKBV9uYW1lIowCCg9Db21wbGV0ZVJlcXVlc3QSDQoFbW9kZWwYASABKAkSJwoIbWVzc2FnZXMYAiADKAsyFS5hZ2VudC52MS5DaGF0TWVzc2FnZRIYCgt0ZW1wZXJhdHVyZRgDIAEoAkgAiAEBEhcKCm1heF90b2tlbnMYBCABKAVIAYgBARIaCg1zeXN0ZW1fcHJvbXB0GAUgASgJSAKIAQESHQoFdG9vbHMYBiADKAsyDi5hZ2VudC52MS5Ub29sEhUKCHByb3ZpZGVyGAcgASgJSAOIAQFCDgoMX3RlbXBlcmF0dXJlQg0KC19tYXhfdG9rZW5zQhAKDl9zeXN0ZW1fcHJvbXB0QgsKCV9wcm92aWRlciLLAQoQQ29tcGxldGVSZXNwb25zZRIKCgJpZBgBIAEoCRINCgVtb2RlbBgCIAEoCRImCgdtZXNzYWdlGAMgASgLMhUuYWdlbnQudjEuQ2hhdE1lc3NhZ2USFQoNcHJvbXB0X3Rva2VucxgEIAEoBRIZChFjb21wbGV0aW9uX3Rva2VucxgFIAEoBRIrCgp0b29sX2NhbGxzGAYgAygLMhcuYWdlbnQudjEuVG9vbENhbGxFbnRyeRIVCg1maW5pc2hfcmVhc29uGAcgASgJIpICChVTdHJlYW1Db21wbGV0ZVJlcXVlc3QSDQoFbW9kZWwYASABKAkSJwoIbWVzc2FnZXMYAiADKAsyFS5hZ2VudC52MS5DaGF0TWVzc2FnZRIYCgt0ZW1wZXJhdHVyZRgDIAEoAkgAiAEBEhcKCm1heF90b2tlbnMYBCABKAVIAYgBARIaCg1zeXN0ZW1fcHJvbXB0GAUgASgJSAKIAQESHQoFdG9vbHMYBiADKAsyDi5hZ2VudC52MS5Ub29sEhUKCHByb3ZpZGVyGAcgASgJSAOIAQFCDgoMX3RlbXBlcmF0dXJlQg0KC19tYXhfdG9rZW5zQhAKDl9zeXN0ZW1fcHJvbXB0QgsKCV9wcm92aWRlciLKAQoWU3RyZWFtQ29tcGxldGVSZXNwb25zZRIKCgJpZBgBIAEoCRINCgVkZWx0YRgCIAEoCRIMCgRkb25lGAMgASgIEhUKDXByb21wdF90b2tlbnMYBCABKAUSGQoRY29tcGxldGlvbl90b2tlbnMYBSABKAUSKwoKdG9vbF9jYWxscxgGIAMoCzIXLmFnZW50LnYxLlRvb2xDYWxsRW50cnkSFQoNZmluaXNoX3JlYXNvbhgHIAEoCRIRCglyZWFzb25pbmcYCCABKAkiWAoWUmVnaXN0ZXJXZWJob29rUmVxdWVzdBIMCgRuYW1lGAEgASgJEhAKCHByb3ZpZGVyGAIgASgJEg4KBnNlY3JldBgDIAEoCRIOCgZldmVudHMYBCADKAkiQwoXUmVnaXN0ZXJXZWJob29rUmVzcG9uc2USEgoKd2ViaG9va19pZBgBIAEoCRIUCgxlbmRwb2ludF91cmwYAiABKAkiLgoYVW5yZWdpc3RlcldlYmhvb2tSZXF1ZXN0EhIKCndlYmhvb2tfaWQYASABKAkiGwoZVW5yZWdpc3RlcldlYmhvb2tSZXNwb25zZSIVChNMaXN0V2ViaG9va3NSZXF1ZXN0ImgKDFdlYmhvb2tFbnRyeRISCgp3ZWJob29rX2lkGAEgASgJEgwKBG5hbWUYAiABKAkSEAoIcHJvdmlkZXIYAyABKAkSFAoMZW5kcG9pbnRfdXJsGAQgASgJEg4KBmV2ZW50cxgFIAMoCSJAChRMaXN0V2ViaG9va3NSZXNwb25zZRIoCgh3ZWJob29rcxgBIAMoCzIWLmFnZW50LnYxLldlYmhvb2tFbnRyeSK/AQoMV2ViaG9va0V2ZW50EhIKCndlYmhvb2tfaWQYASABKAkSEAoIcHJvdmlkZXIYAiABKAkSEgoKZXZlbnRfdHlwZRgDIAEoCRIPCgdwYXlsb2FkGAQgASgJEjQKB2hlYWRlcnMYBSADKAsyIy5hZ2VudC52MS5XZWJob29rRXZlbnQuSGVhZGVyc0VudHJ5Gi4KDEhlYWRlcnNFbnRyeRILCgNrZXkYASABKAkSDQoFdmFsdWUYAiABKAk6AjgBIhwKGlN0cmVhbVdlYmhvb2tFdmVudHNSZXF1ZXN0IkQKG1N0cmVhbVdlYmhvb2tFdmVudHNSZXNwb25zZRIlCgVldmVudBgBIAEoCzIWLmFnZW50LnYxLldlYmhvb2tFdmVudCIUChJIZWFsdGhDaGVja1JlcXVlc3QipwEKE0hlYWx0aENoZWNrUmVzcG9uc2USDwoHaGVhbHRoeRgBIAEoCBIPCgd2ZXJzaW9uGAIgASgJEj0KCHNlcnZpY2VzGAMgAygLMisuYWdlbnQudjEuSGVhbHRoQ2hlY2tSZXNwb25zZS5TZXJ2aWNlc0VudHJ5Gi8KDVNlcnZpY2VzRW50cnkSCwoDa2V5GAEgASgJEg0KBXZhbHVlGAIgASgIOgI4ATLhBAoOR2F0ZXdheVNlcnZpY2USQQoIQ29tcGxldGUSGS5hZ2VudC52MS5Db21wbGV0ZVJlcXVlc3QaGi5hZ2VudC52MS5Db21wbGV0ZVJlc3BvbnNlElUKDlN0cmVhbUNvbXBsZXRlEh8uYWdlbnQudjEuU3RyZWFtQ29tcGxldGVSZXF1ZXN0GiAuYWdlbnQudjEuU3RyZWFtQ29tcGxldGVSZXNwb25zZTABElYKD1JlZ2lzdGVyV2ViaG9vaxIgLmFnZW50LnYxLlJlZ2lzdGVyV2ViaG9va1JlcXVlc3QaIS5hZ2VudC52MS5SZWdpc3RlcldlYmhvb2tSZXNwb25zZRJcChFVbnJlZ2lzdGVyV2ViaG9vaxIiLmFnZW50LnYxLlVucmVnaXN0ZXJXZWJob29rUmVxdWVzdBojLmFnZW50LnYxLlVucmVnaXN0ZXJXZWJob29rUmVzcG9uc2USTQoMTGlzdFdlYmhvb2tzEh0uYWdlbnQudjEuTGlzdFdlYmhvb2tzUmVxdWVzdBoeLmFnZW50LnYxLkxpc3RXZWJob29rc1Jlc3BvbnNlEmQKE1N0cmVhbVdlYmhvb2tFdmVudHMSJC5hZ2VudC52MS5TdHJlYW1XZWJob29rRXZlbnRzUmVxdWVzdBolLmFnZW50LnYxLlN0cmVhbVdlYmhvb2tFdmVudHNSZXNwb25zZTABEkoKC0hlYWx0aENoZWNrEhwuYWdlbnQudjEuSGVhbHRoQ2hlY2tSZXF1ZXN0Gh0uYWdlbnQudjEuSGVhbHRoQ2hlY2tSZXNwb25zZUJ9Cgxjb20uYWdlbnQudjFCDEdhdGV3YXlQcm90b1ABWh5rcmFrZW4vZ2VuL2dvL2FnZW50L3YxO2FnZW50djGiAgNBWFiqAghBZ2VudC5WMcoCCEFnZW50XFYx4gIUQWdlbnRcVjFcR1BCTWV0YWRhdGHqAglBZ2VudDo6VjFiBnByb3RvMw");
+export const file_agent_v1_gateway: GenFile /*@__PURE__*/ = fileDesc(
+  "ChZhZ2VudC92MS9nYXRld2F5LnByb3RvEghhZ2VudC52MSJICg1Ub29sUGFyYW1ldGVyEgwKBHR5cGUYASABKAkSFwoPcHJvcGVydGllc19qc29uGAIgASgJEhAKCHJlcXVpcmVkGAMgAygJIl4KDFRvb2xGdW5jdGlvbhIMCgRuYW1lGAEgASgJEhMKC2Rlc2NyaXB0aW9uGAIgASgJEisKCnBhcmFtZXRlcnMYAyABKAsyFy5hZ2VudC52MS5Ub29sUGFyYW1ldGVyIj4KBFRvb2wSDAoEdHlwZRgBIAEoCRIoCghmdW5jdGlvbhgCIAEoCzIWLmFnZW50LnYxLlRvb2xGdW5jdGlvbiIzChBUb29sQ2FsbEZ1bmN0aW9uEgwKBG5hbWUYASABKAkSEQoJYXJndW1lbnRzGAIgASgJIlcKDVRvb2xDYWxsRW50cnkSCgoCaWQYASABKAkSDAoEdHlwZRgCIAEoCRIsCghmdW5jdGlvbhgDIAEoCzIaLmFnZW50LnYxLlRvb2xDYWxsRnVuY3Rpb24iiwEKC0NoYXRNZXNzYWdlEgwKBHJvbGUYASABKAkSDwoHY29udGVudBgCIAEoCRIrCgp0b29sX2NhbGxzGAMgAygLMhcuYWdlbnQudjEuVG9vbENhbGxFbnRyeRIUCgx0b29sX2NhbGxfaWQYBCABKAkSEQoEbmFtZRgFIAEoCUgAiAEBQgcKBV9uYW1lIowCCg9Db21wbGV0ZVJlcXVlc3QSDQoFbW9kZWwYASABKAkSJwoIbWVzc2FnZXMYAiADKAsyFS5hZ2VudC52MS5DaGF0TWVzc2FnZRIYCgt0ZW1wZXJhdHVyZRgDIAEoAkgAiAEBEhcKCm1heF90b2tlbnMYBCABKAVIAYgBARIaCg1zeXN0ZW1fcHJvbXB0GAUgASgJSAKIAQESHQoFdG9vbHMYBiADKAsyDi5hZ2VudC52MS5Ub29sEhUKCHByb3ZpZGVyGAcgASgJSAOIAQFCDgoMX3RlbXBlcmF0dXJlQg0KC19tYXhfdG9rZW5zQhAKDl9zeXN0ZW1fcHJvbXB0QgsKCV9wcm92aWRlciLLAQoQQ29tcGxldGVSZXNwb25zZRIKCgJpZBgBIAEoCRINCgVtb2RlbBgCIAEoCRImCgdtZXNzYWdlGAMgASgLMhUuYWdlbnQudjEuQ2hhdE1lc3NhZ2USFQoNcHJvbXB0X3Rva2VucxgEIAEoBRIZChFjb21wbGV0aW9uX3Rva2VucxgFIAEoBRIrCgp0b29sX2NhbGxzGAYgAygLMhcuYWdlbnQudjEuVG9vbENhbGxFbnRyeRIVCg1maW5pc2hfcmVhc29uGAcgASgJIpICChVTdHJlYW1Db21wbGV0ZVJlcXVlc3QSDQoFbW9kZWwYASABKAkSJwoIbWVzc2FnZXMYAiADKAsyFS5hZ2VudC52MS5DaGF0TWVzc2FnZRIYCgt0ZW1wZXJhdHVyZRgDIAEoAkgAiAEBEhcKCm1heF90b2tlbnMYBCABKAVIAYgBARIaCg1zeXN0ZW1fcHJvbXB0GAUgASgJSAKIAQESHQoFdG9vbHMYBiADKAsyDi5hZ2VudC52MS5Ub29sEhUKCHByb3ZpZGVyGAcgASgJSAOIAQFCDgoMX3RlbXBlcmF0dXJlQg0KC19tYXhfdG9rZW5zQhAKDl9zeXN0ZW1fcHJvbXB0QgsKCV9wcm92aWRlciLKAQoWU3RyZWFtQ29tcGxldGVSZXNwb25zZRIKCgJpZBgBIAEoCRINCgVkZWx0YRgCIAEoCRIMCgRkb25lGAMgASgIEhUKDXByb21wdF90b2tlbnMYBCABKAUSGQoRY29tcGxldGlvbl90b2tlbnMYBSABKAUSKwoKdG9vbF9jYWxscxgGIAMoCzIXLmFnZW50LnYxLlRvb2xDYWxsRW50cnkSFQoNZmluaXNoX3JlYXNvbhgHIAEoCRIRCglyZWFzb25pbmcYCCABKAkiWAoWUmVnaXN0ZXJXZWJob29rUmVxdWVzdBIMCgRuYW1lGAEgASgJEhAKCHByb3ZpZGVyGAIgASgJEg4KBnNlY3JldBgDIAEoCRIOCgZldmVudHMYBCADKAkiQwoXUmVnaXN0ZXJXZWJob29rUmVzcG9uc2USEgoKd2ViaG9va19pZBgBIAEoCRIUCgxlbmRwb2ludF91cmwYAiABKAkiLgoYVW5yZWdpc3RlcldlYmhvb2tSZXF1ZXN0EhIKCndlYmhvb2tfaWQYASABKAkiGwoZVW5yZWdpc3RlcldlYmhvb2tSZXNwb25zZSIVChNMaXN0V2ViaG9va3NSZXF1ZXN0ImgKDFdlYmhvb2tFbnRyeRISCgp3ZWJob29rX2lkGAEgASgJEgwKBG5hbWUYAiABKAkSEAoIcHJvdmlkZXIYAyABKAkSFAoMZW5kcG9pbnRfdXJsGAQgASgJEg4KBmV2ZW50cxgFIAMoCSJAChRMaXN0V2ViaG9va3NSZXNwb25zZRIoCgh3ZWJob29rcxgBIAMoCzIWLmFnZW50LnYxLldlYmhvb2tFbnRyeSK/AQoMV2ViaG9va0V2ZW50EhIKCndlYmhvb2tfaWQYASABKAkSEAoIcHJvdmlkZXIYAiABKAkSEgoKZXZlbnRfdHlwZRgDIAEoCRIPCgdwYXlsb2FkGAQgASgJEjQKB2hlYWRlcnMYBSADKAsyIy5hZ2VudC52MS5XZWJob29rRXZlbnQuSGVhZGVyc0VudHJ5Gi4KDEhlYWRlcnNFbnRyeRILCgNrZXkYASABKAkSDQoFdmFsdWUYAiABKAk6AjgBIhwKGlN0cmVhbVdlYmhvb2tFdmVudHNSZXF1ZXN0IkQKG1N0cmVhbVdlYmhvb2tFdmVudHNSZXNwb25zZRIlCgVldmVudBgBIAEoCzIWLmFnZW50LnYxLldlYmhvb2tFdmVudCIUChJIZWFsdGhDaGVja1JlcXVlc3QipwEKE0hlYWx0aENoZWNrUmVzcG9uc2USDwoHaGVhbHRoeRgBIAEoCBIPCgd2ZXJzaW9uGAIgASgJEj0KCHNlcnZpY2VzGAMgAygLMisuYWdlbnQudjEuSGVhbHRoQ2hlY2tSZXNwb25zZS5TZXJ2aWNlc0VudHJ5Gi8KDVNlcnZpY2VzRW50cnkSCwoDa2V5GAEgASgJEg0KBXZhbHVlGAIgASgIOgI4ATLhBAoOR2F0ZXdheVNlcnZpY2USQQoIQ29tcGxldGUSGS5hZ2VudC52MS5Db21wbGV0ZVJlcXVlc3QaGi5hZ2VudC52MS5Db21wbGV0ZVJlc3BvbnNlElUKDlN0cmVhbUNvbXBsZXRlEh8uYWdlbnQudjEuU3RyZWFtQ29tcGxldGVSZXF1ZXN0GiAuYWdlbnQudjEuU3RyZWFtQ29tcGxldGVSZXNwb25zZTABElYKD1JlZ2lzdGVyV2ViaG9vaxIgLmFnZW50LnYxLlJlZ2lzdGVyV2ViaG9va1JlcXVlc3QaIS5hZ2VudC52MS5SZWdpc3RlcldlYmhvb2tSZXNwb25zZRJcChFVbnJlZ2lzdGVyV2ViaG9vaxIiLmFnZW50LnYxLlVucmVnaXN0ZXJXZWJob29rUmVxdWVzdBojLmFnZW50LnYxLlVucmVnaXN0ZXJXZWJob29rUmVzcG9uc2USTQoMTGlzdFdlYmhvb2tzEh0uYWdlbnQudjEuTGlzdFdlYmhvb2tzUmVxdWVzdBoeLmFnZW50LnYxLkxpc3RXZWJob29rc1Jlc3BvbnNlEmQKE1N0cmVhbVdlYmhvb2tFdmVudHMSJC5hZ2VudC52MS5TdHJlYW1XZWJob29rRXZlbnRzUmVxdWVzdBolLmFnZW50LnYxLlN0cmVhbVdlYmhvb2tFdmVudHNSZXNwb25zZTABEkoKC0hlYWx0aENoZWNrEhwuYWdlbnQudjEuSGVhbHRoQ2hlY2tSZXF1ZXN0Gh0uYWdlbnQudjEuSGVhbHRoQ2hlY2tSZXNwb25zZUJ9Cgxjb20uYWdlbnQudjFCDEdhdGV3YXlQcm90b1ABWh5rcmFrZW4vZ2VuL2dvL2FnZW50L3YxO2FnZW50djGiAgNBWFiqAghBZ2VudC5WMcoCCEFnZW50XFYx4gIUQWdlbnRcVjFcR1BCTWV0YWRhdGHqAglBZ2VudDo6VjFiBnByb3RvMw",
+);
 
 /**
  * @generated from message agent.v1.ToolParameter
@@ -36,8 +37,10 @@ export type ToolParameter = Message<"agent.v1.ToolParameter"> & {
  * Describes the message agent.v1.ToolParameter.
  * Use `create(ToolParameterSchema)` to create a new message.
  */
-export const ToolParameterSchema: GenMessage<ToolParameter> = /*@__PURE__*/
-  messageDesc(file_agent_v1_gateway, 0);
+export const ToolParameterSchema: GenMessage<ToolParameter> /*@__PURE__*/ = messageDesc(
+  file_agent_v1_gateway,
+  0,
+);
 
 /**
  * @generated from message agent.v1.ToolFunction
@@ -63,8 +66,10 @@ export type ToolFunction = Message<"agent.v1.ToolFunction"> & {
  * Describes the message agent.v1.ToolFunction.
  * Use `create(ToolFunctionSchema)` to create a new message.
  */
-export const ToolFunctionSchema: GenMessage<ToolFunction> = /*@__PURE__*/
-  messageDesc(file_agent_v1_gateway, 1);
+export const ToolFunctionSchema: GenMessage<ToolFunction> /*@__PURE__*/ = messageDesc(
+  file_agent_v1_gateway,
+  1,
+);
 
 /**
  * @generated from message agent.v1.Tool
@@ -85,8 +90,7 @@ export type Tool = Message<"agent.v1.Tool"> & {
  * Describes the message agent.v1.Tool.
  * Use `create(ToolSchema)` to create a new message.
  */
-export const ToolSchema: GenMessage<Tool> = /*@__PURE__*/
-  messageDesc(file_agent_v1_gateway, 2);
+export const ToolSchema: GenMessage<Tool> /*@__PURE__*/ = messageDesc(file_agent_v1_gateway, 2);
 
 /**
  * @generated from message agent.v1.ToolCallFunction
@@ -107,8 +111,10 @@ export type ToolCallFunction = Message<"agent.v1.ToolCallFunction"> & {
  * Describes the message agent.v1.ToolCallFunction.
  * Use `create(ToolCallFunctionSchema)` to create a new message.
  */
-export const ToolCallFunctionSchema: GenMessage<ToolCallFunction> = /*@__PURE__*/
-  messageDesc(file_agent_v1_gateway, 3);
+export const ToolCallFunctionSchema: GenMessage<ToolCallFunction> /*@__PURE__*/ = messageDesc(
+  file_agent_v1_gateway,
+  3,
+);
 
 /**
  * @generated from message agent.v1.ToolCallEntry
@@ -134,8 +140,10 @@ export type ToolCallEntry = Message<"agent.v1.ToolCallEntry"> & {
  * Describes the message agent.v1.ToolCallEntry.
  * Use `create(ToolCallEntrySchema)` to create a new message.
  */
-export const ToolCallEntrySchema: GenMessage<ToolCallEntry> = /*@__PURE__*/
-  messageDesc(file_agent_v1_gateway, 4);
+export const ToolCallEntrySchema: GenMessage<ToolCallEntry> /*@__PURE__*/ = messageDesc(
+  file_agent_v1_gateway,
+  4,
+);
 
 /**
  * @generated from message agent.v1.ChatMessage
@@ -171,8 +179,10 @@ export type ChatMessage = Message<"agent.v1.ChatMessage"> & {
  * Describes the message agent.v1.ChatMessage.
  * Use `create(ChatMessageSchema)` to create a new message.
  */
-export const ChatMessageSchema: GenMessage<ChatMessage> = /*@__PURE__*/
-  messageDesc(file_agent_v1_gateway, 5);
+export const ChatMessageSchema: GenMessage<ChatMessage> /*@__PURE__*/ = messageDesc(
+  file_agent_v1_gateway,
+  5,
+);
 
 /**
  * @generated from message agent.v1.CompleteRequest
@@ -218,8 +228,10 @@ export type CompleteRequest = Message<"agent.v1.CompleteRequest"> & {
  * Describes the message agent.v1.CompleteRequest.
  * Use `create(CompleteRequestSchema)` to create a new message.
  */
-export const CompleteRequestSchema: GenMessage<CompleteRequest> = /*@__PURE__*/
-  messageDesc(file_agent_v1_gateway, 6);
+export const CompleteRequestSchema: GenMessage<CompleteRequest> /*@__PURE__*/ = messageDesc(
+  file_agent_v1_gateway,
+  6,
+);
 
 /**
  * @generated from message agent.v1.CompleteResponse
@@ -265,8 +277,10 @@ export type CompleteResponse = Message<"agent.v1.CompleteResponse"> & {
  * Describes the message agent.v1.CompleteResponse.
  * Use `create(CompleteResponseSchema)` to create a new message.
  */
-export const CompleteResponseSchema: GenMessage<CompleteResponse> = /*@__PURE__*/
-  messageDesc(file_agent_v1_gateway, 7);
+export const CompleteResponseSchema: GenMessage<CompleteResponse> /*@__PURE__*/ = messageDesc(
+  file_agent_v1_gateway,
+  7,
+);
 
 /**
  * @generated from message agent.v1.StreamCompleteRequest
@@ -312,7 +326,7 @@ export type StreamCompleteRequest = Message<"agent.v1.StreamCompleteRequest"> & 
  * Describes the message agent.v1.StreamCompleteRequest.
  * Use `create(StreamCompleteRequestSchema)` to create a new message.
  */
-export const StreamCompleteRequestSchema: GenMessage<StreamCompleteRequest> = /*@__PURE__*/
+export const StreamCompleteRequestSchema: GenMessage<StreamCompleteRequest> /*@__PURE__*/ =
   messageDesc(file_agent_v1_gateway, 8);
 
 /**
@@ -364,7 +378,7 @@ export type StreamCompleteResponse = Message<"agent.v1.StreamCompleteResponse"> 
  * Describes the message agent.v1.StreamCompleteResponse.
  * Use `create(StreamCompleteResponseSchema)` to create a new message.
  */
-export const StreamCompleteResponseSchema: GenMessage<StreamCompleteResponse> = /*@__PURE__*/
+export const StreamCompleteResponseSchema: GenMessage<StreamCompleteResponse> /*@__PURE__*/ =
   messageDesc(file_agent_v1_gateway, 9);
 
 /**
@@ -396,7 +410,7 @@ export type RegisterWebhookRequest = Message<"agent.v1.RegisterWebhookRequest"> 
  * Describes the message agent.v1.RegisterWebhookRequest.
  * Use `create(RegisterWebhookRequestSchema)` to create a new message.
  */
-export const RegisterWebhookRequestSchema: GenMessage<RegisterWebhookRequest> = /*@__PURE__*/
+export const RegisterWebhookRequestSchema: GenMessage<RegisterWebhookRequest> /*@__PURE__*/ =
   messageDesc(file_agent_v1_gateway, 10);
 
 /**
@@ -418,7 +432,7 @@ export type RegisterWebhookResponse = Message<"agent.v1.RegisterWebhookResponse"
  * Describes the message agent.v1.RegisterWebhookResponse.
  * Use `create(RegisterWebhookResponseSchema)` to create a new message.
  */
-export const RegisterWebhookResponseSchema: GenMessage<RegisterWebhookResponse> = /*@__PURE__*/
+export const RegisterWebhookResponseSchema: GenMessage<RegisterWebhookResponse> /*@__PURE__*/ =
   messageDesc(file_agent_v1_gateway, 11);
 
 /**
@@ -435,34 +449,34 @@ export type UnregisterWebhookRequest = Message<"agent.v1.UnregisterWebhookReques
  * Describes the message agent.v1.UnregisterWebhookRequest.
  * Use `create(UnregisterWebhookRequestSchema)` to create a new message.
  */
-export const UnregisterWebhookRequestSchema: GenMessage<UnregisterWebhookRequest> = /*@__PURE__*/
+export const UnregisterWebhookRequestSchema: GenMessage<UnregisterWebhookRequest> /*@__PURE__*/ =
   messageDesc(file_agent_v1_gateway, 12);
 
 /**
  * @generated from message agent.v1.UnregisterWebhookResponse
  */
-export type UnregisterWebhookResponse = Message<"agent.v1.UnregisterWebhookResponse"> & {
-};
+export type UnregisterWebhookResponse = Message<"agent.v1.UnregisterWebhookResponse"> & {};
 
 /**
  * Describes the message agent.v1.UnregisterWebhookResponse.
  * Use `create(UnregisterWebhookResponseSchema)` to create a new message.
  */
-export const UnregisterWebhookResponseSchema: GenMessage<UnregisterWebhookResponse> = /*@__PURE__*/
+export const UnregisterWebhookResponseSchema: GenMessage<UnregisterWebhookResponse> /*@__PURE__*/ =
   messageDesc(file_agent_v1_gateway, 13);
 
 /**
  * @generated from message agent.v1.ListWebhooksRequest
  */
-export type ListWebhooksRequest = Message<"agent.v1.ListWebhooksRequest"> & {
-};
+export type ListWebhooksRequest = Message<"agent.v1.ListWebhooksRequest"> & {};
 
 /**
  * Describes the message agent.v1.ListWebhooksRequest.
  * Use `create(ListWebhooksRequestSchema)` to create a new message.
  */
-export const ListWebhooksRequestSchema: GenMessage<ListWebhooksRequest> = /*@__PURE__*/
-  messageDesc(file_agent_v1_gateway, 14);
+export const ListWebhooksRequestSchema: GenMessage<ListWebhooksRequest> /*@__PURE__*/ = messageDesc(
+  file_agent_v1_gateway,
+  14,
+);
 
 /**
  * @generated from message agent.v1.WebhookEntry
@@ -498,8 +512,10 @@ export type WebhookEntry = Message<"agent.v1.WebhookEntry"> & {
  * Describes the message agent.v1.WebhookEntry.
  * Use `create(WebhookEntrySchema)` to create a new message.
  */
-export const WebhookEntrySchema: GenMessage<WebhookEntry> = /*@__PURE__*/
-  messageDesc(file_agent_v1_gateway, 15);
+export const WebhookEntrySchema: GenMessage<WebhookEntry> /*@__PURE__*/ = messageDesc(
+  file_agent_v1_gateway,
+  15,
+);
 
 /**
  * @generated from message agent.v1.ListWebhooksResponse
@@ -515,7 +531,7 @@ export type ListWebhooksResponse = Message<"agent.v1.ListWebhooksResponse"> & {
  * Describes the message agent.v1.ListWebhooksResponse.
  * Use `create(ListWebhooksResponseSchema)` to create a new message.
  */
-export const ListWebhooksResponseSchema: GenMessage<ListWebhooksResponse> = /*@__PURE__*/
+export const ListWebhooksResponseSchema: GenMessage<ListWebhooksResponse> /*@__PURE__*/ =
   messageDesc(file_agent_v1_gateway, 16);
 
 /**
@@ -552,20 +568,21 @@ export type WebhookEvent = Message<"agent.v1.WebhookEvent"> & {
  * Describes the message agent.v1.WebhookEvent.
  * Use `create(WebhookEventSchema)` to create a new message.
  */
-export const WebhookEventSchema: GenMessage<WebhookEvent> = /*@__PURE__*/
-  messageDesc(file_agent_v1_gateway, 17);
+export const WebhookEventSchema: GenMessage<WebhookEvent> /*@__PURE__*/ = messageDesc(
+  file_agent_v1_gateway,
+  17,
+);
 
 /**
  * @generated from message agent.v1.StreamWebhookEventsRequest
  */
-export type StreamWebhookEventsRequest = Message<"agent.v1.StreamWebhookEventsRequest"> & {
-};
+export type StreamWebhookEventsRequest = Message<"agent.v1.StreamWebhookEventsRequest"> & {};
 
 /**
  * Describes the message agent.v1.StreamWebhookEventsRequest.
  * Use `create(StreamWebhookEventsRequestSchema)` to create a new message.
  */
-export const StreamWebhookEventsRequestSchema: GenMessage<StreamWebhookEventsRequest> = /*@__PURE__*/
+export const StreamWebhookEventsRequestSchema: GenMessage<StreamWebhookEventsRequest> /*@__PURE__*/ =
   messageDesc(file_agent_v1_gateway, 18);
 
 /**
@@ -582,21 +599,22 @@ export type StreamWebhookEventsResponse = Message<"agent.v1.StreamWebhookEventsR
  * Describes the message agent.v1.StreamWebhookEventsResponse.
  * Use `create(StreamWebhookEventsResponseSchema)` to create a new message.
  */
-export const StreamWebhookEventsResponseSchema: GenMessage<StreamWebhookEventsResponse> = /*@__PURE__*/
+export const StreamWebhookEventsResponseSchema: GenMessage<StreamWebhookEventsResponse> /*@__PURE__*/ =
   messageDesc(file_agent_v1_gateway, 19);
 
 /**
  * @generated from message agent.v1.HealthCheckRequest
  */
-export type HealthCheckRequest = Message<"agent.v1.HealthCheckRequest"> & {
-};
+export type HealthCheckRequest = Message<"agent.v1.HealthCheckRequest"> & {};
 
 /**
  * Describes the message agent.v1.HealthCheckRequest.
  * Use `create(HealthCheckRequestSchema)` to create a new message.
  */
-export const HealthCheckRequestSchema: GenMessage<HealthCheckRequest> = /*@__PURE__*/
-  messageDesc(file_agent_v1_gateway, 20);
+export const HealthCheckRequestSchema: GenMessage<HealthCheckRequest> /*@__PURE__*/ = messageDesc(
+  file_agent_v1_gateway,
+  20,
+);
 
 /**
  * @generated from message agent.v1.HealthCheckResponse
@@ -622,8 +640,10 @@ export type HealthCheckResponse = Message<"agent.v1.HealthCheckResponse"> & {
  * Describes the message agent.v1.HealthCheckResponse.
  * Use `create(HealthCheckResponseSchema)` to create a new message.
  */
-export const HealthCheckResponseSchema: GenMessage<HealthCheckResponse> = /*@__PURE__*/
-  messageDesc(file_agent_v1_gateway, 21);
+export const HealthCheckResponseSchema: GenMessage<HealthCheckResponse> /*@__PURE__*/ = messageDesc(
+  file_agent_v1_gateway,
+  21,
+);
 
 /**
  * @generated from service agent.v1.GatewayService
@@ -636,7 +656,7 @@ export const GatewayService: GenService<{
     methodKind: "unary";
     input: typeof CompleteRequestSchema;
     output: typeof CompleteResponseSchema;
-  },
+  };
   /**
    * @generated from rpc agent.v1.GatewayService.StreamComplete
    */
@@ -644,7 +664,7 @@ export const GatewayService: GenService<{
     methodKind: "server_streaming";
     input: typeof StreamCompleteRequestSchema;
     output: typeof StreamCompleteResponseSchema;
-  },
+  };
   /**
    * @generated from rpc agent.v1.GatewayService.RegisterWebhook
    */
@@ -652,7 +672,7 @@ export const GatewayService: GenService<{
     methodKind: "unary";
     input: typeof RegisterWebhookRequestSchema;
     output: typeof RegisterWebhookResponseSchema;
-  },
+  };
   /**
    * @generated from rpc agent.v1.GatewayService.UnregisterWebhook
    */
@@ -660,7 +680,7 @@ export const GatewayService: GenService<{
     methodKind: "unary";
     input: typeof UnregisterWebhookRequestSchema;
     output: typeof UnregisterWebhookResponseSchema;
-  },
+  };
   /**
    * @generated from rpc agent.v1.GatewayService.ListWebhooks
    */
@@ -668,7 +688,7 @@ export const GatewayService: GenService<{
     methodKind: "unary";
     input: typeof ListWebhooksRequestSchema;
     output: typeof ListWebhooksResponseSchema;
-  },
+  };
   /**
    * @generated from rpc agent.v1.GatewayService.StreamWebhookEvents
    */
@@ -676,7 +696,7 @@ export const GatewayService: GenService<{
     methodKind: "server_streaming";
     input: typeof StreamWebhookEventsRequestSchema;
     output: typeof StreamWebhookEventsResponseSchema;
-  },
+  };
   /**
    * @generated from rpc agent.v1.GatewayService.HealthCheck
    */
@@ -684,7 +704,5 @@ export const GatewayService: GenService<{
     methodKind: "unary";
     input: typeof HealthCheckRequestSchema;
     output: typeof HealthCheckResponseSchema;
-  },
-}> = /*@__PURE__*/
-  serviceDesc(file_agent_v1_gateway, 0);
-
+  };
+}> /*@__PURE__*/ = serviceDesc(file_agent_v1_gateway, 0);

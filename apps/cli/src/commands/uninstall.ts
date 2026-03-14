@@ -100,18 +100,21 @@ export async function execute(_args: string[]): Promise<void> {
       .split(";")
       .filter((p) => p !== krakenBin)
       .join(";");
-    Bun.spawnSync([
-      "reg",
-      "add",
-      "HKCU\\Environment",
-      "/v",
-      "PATH",
-      "/t",
-      "REG_EXPAND_SZ",
-      "/d",
-      filtered,
-      "/f",
-    ], { stdio: ["ignore", "ignore", "ignore"] });
+    Bun.spawnSync(
+      [
+        "reg",
+        "add",
+        "HKCU\\Environment",
+        "/v",
+        "PATH",
+        "/t",
+        "REG_EXPAND_SZ",
+        "/d",
+        filtered,
+        "/f",
+      ],
+      { stdio: ["ignore", "ignore", "ignore"] },
+    );
   }
 
   // On Windows the running process locks files — schedule deletion after exit.

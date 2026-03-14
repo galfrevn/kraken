@@ -24,7 +24,11 @@ import {
   type SlashCommand,
   type CommandResult,
 } from "@/commands.ts";
-import { fetchAllAvailableModels, clearModelCaches, type ProviderModel } from "@core/tools/model.ts";
+import {
+  fetchAllAvailableModels,
+  clearModelCaches,
+  type ProviderModel,
+} from "@core/tools/model.ts";
 import { Avatar, type AvatarState } from "@/avatar.tsx";
 import { loadImagePreview, generatePreviewRows } from "@/images.ts";
 import { SetupPanel } from "@/views/setup.tsx";
