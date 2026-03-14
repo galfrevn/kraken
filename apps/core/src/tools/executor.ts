@@ -1,4 +1,4 @@
-import { $ } from "bun";
+import { spawnShellCommand } from "@/tools/spawn.ts";
 import type { Tool, ToolResult, ToolExecutionContext } from "@/tools/schema.ts";
 import {
   evaluateCommandPolicy,
@@ -9,7 +9,6 @@ import {
 
 const COMMAND_TIMEOUT_MILLISECONDS = 30_000;
 const OUTPUT_MAX_CHARACTERS = 16_000;
-const IS_WINDOWS = process.platform === "win32";
 
 export function createRunCommandTool(policyConfiguration?: CommandPolicyConfiguration): Tool {
   const policy = policyConfiguration ?? DEFAULT_COMMAND_POLICY;
@@ -53,9 +52,7 @@ export function createRunCommandTool(policyConfiguration?: CommandPolicyConfigur
         policyResult.riskLevel === "dangerous" ? `⚠ risk: ${policyResult.reason}\n---\n` : "";
 
       try {
-        const commandPromise = IS_WINDOWS
-          ? $`cmd /c ${command}`.cwd(context.workingDirectory).quiet().nothrow()
-          : $`sh -c ${command}`.cwd(context.workingDirectory).quiet().nothrow();
+        const commandPromise = spawnShellCommand(command, context.workingDirectory);
 
         const timeoutPromise = new Promise<never>((_, reject) =>
           setTimeout(
@@ -66,8 +63,8 @@ export function createRunCommandTool(policyConfiguration?: CommandPolicyConfigur
 
         const result = await Promise.race([commandPromise, timeoutPromise]);
 
-        const stdout = result.stdout.toString().trim();
-        const stderr = result.stderr.toString().trim();
+        const stdout = result.stdout;
+        const stderr = result.stderr;
         let combinedOutput = [stdout, stderr].filter(Boolean).join("\n---stderr---\n");
 
         if (combinedOutput.length > OUTPUT_MAX_CHARACTERS) {

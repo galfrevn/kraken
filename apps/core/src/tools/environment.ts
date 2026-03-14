@@ -1,9 +1,7 @@
-import { $ } from "bun";
+import { spawnShellCommand } from "@/tools/spawn.ts";
 import { cpus, totalmem, freemem, hostname, homedir } from "node:os";
 import { delimiter } from "node:path";
 import type { Tool, ToolResult, ToolExecutionContext } from "@/tools/schema.ts";
-
-const IS_WINDOWS = process.platform === "win32";
 
 export const environmentTool: Tool = {
   definition: {
@@ -41,7 +39,7 @@ export const environmentTool: Tool = {
       { name: "rust", command: "rustc --version" },
       { name: "python", command: "python3 --version" },
       { name: "ruby", command: "ruby --version" },
-      { name: "java", command: IS_WINDOWS ? "java --version 2>&1" : "java --version 2>&1 | head -1" },
+      { name: "java", command: "java --version 2>&1" },
     ];
 
     for (const check of runtimeChecks) {
@@ -77,12 +75,9 @@ export const environmentTool: Tool = {
 
 async function safeCommand(command: string): Promise<string | null> {
   try {
-    const result = IS_WINDOWS
-      ? await $`cmd /c ${command}`.quiet().nothrow()
-      : await $`sh -c ${command}`.quiet().nothrow();
+    const result = await spawnShellCommand(command, process.cwd());
     if (result.exitCode !== 0) return null;
-    const output = result.stdout.toString().trim();
-    return output || null;
+    return result.stdout || null;
   } catch {
     return null;
   }

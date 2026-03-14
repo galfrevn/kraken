@@ -1,8 +1,7 @@
-import { $ } from "bun";
+import { spawnCommand } from "@/tools/spawn.ts";
 import type { Tool, ToolResult, ToolExecutionContext } from "@/tools/schema.ts";
 
 const MAX_RESULT_LINES = 100;
-const IS_WINDOWS = process.platform === "win32";
 
 export const searchFilesTool: Tool = {
   definition: {
@@ -38,37 +37,31 @@ export const searchFilesTool: Tool = {
     const searchPath = (parameters["path"] as string) || ".";
     const glob = parameters["glob"] as string | undefined;
 
-    const commandParts = ["rg", "--line-number", "--no-heading", `--max-count=50`];
+    const args = ["--line-number", "--no-heading", "--max-count=50"];
 
     if (glob) {
-      commandParts.push(`--glob=${glob}`);
+      args.push(`--glob=${glob}`);
     }
 
-    commandParts.push(pattern, searchPath);
-    const fullCommand = commandParts.join(" ");
+    args.push(pattern, searchPath);
 
     try {
-      const result = IS_WINDOWS
-        ? await $`cmd /c ${fullCommand}`.cwd(context.workingDirectory).quiet().nothrow()
-        : await $`sh -c ${fullCommand}`.cwd(context.workingDirectory).quiet().nothrow();
-
-      const output = result.stdout.toString().trim();
+      const result = await spawnCommand("rg", args, context.workingDirectory);
 
       if (result.exitCode === 1) {
         return { success: true, output: "no matches found" };
       }
 
       if (result.exitCode !== 0) {
-        const stderr = result.stderr.toString().trim();
-        return { success: false, output: "", error: `search failed: ${stderr}` };
+        return { success: false, output: "", error: `search failed: ${result.stderr}` };
       }
 
-      const lines = output.split(/\r?\n/);
+      const lines = result.stdout.split(/\r?\n/);
       const truncatedOutput =
         lines.length > MAX_RESULT_LINES
           ? lines.slice(0, MAX_RESULT_LINES).join("\n") +
             `\n... (${lines.length - MAX_RESULT_LINES} more matches)`
-          : output;
+          : result.stdout;
 
       return { success: true, output: truncatedOutput || "no matches found" };
     } catch (executionError) {
