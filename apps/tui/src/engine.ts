@@ -1003,6 +1003,14 @@ export class ChatEngine {
       let completionResult = await this.getResponse(llmInput);
       this.log("info", "engine", `initial response: finishReason=${completionResult.finishReason}, toolCalls=${completionResult.toolCalls.length}, contentLength=${completionResult.content.length}`);
 
+      // Normalize: if LLM says "tool_calls" but no tool calls were parsed, treat as "stop".
+      // This happens when the provider returns finish_reason=tool_calls natively but kraken
+      // uses XML-based tool calling, so no native tool calls are present.
+      if (completionResult.finishReason === "tool_calls" && completionResult.toolCalls.length === 0) {
+        this.log("warn", "engine", `finishReason was tool_calls but no tool calls found — normalizing to stop`);
+        completionResult.finishReason = "stop";
+      }
+
       let iterations = 0;
 
       while (iterations < MAX_ITERATIONS_PER_MESSAGE) {
@@ -1106,6 +1114,10 @@ export class ChatEngine {
 
         try {
           completionResult = await this.getResponseContinuation();
+          if (completionResult.finishReason === "tool_calls" && completionResult.toolCalls.length === 0) {
+            this.log("warn", "engine", `continuation finishReason was tool_calls but no tool calls found — normalizing to stop`);
+            completionResult.finishReason = "stop";
+          }
           this.log("info", "engine", `continuation response: finishReason=${completionResult.finishReason}, toolCalls=${completionResult.toolCalls.length}, contentLength=${completionResult.content.length}`);
         } catch (followUpError) {
           if (followUpError instanceof CancelledError) throw followUpError;
