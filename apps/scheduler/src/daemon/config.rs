@@ -3,6 +3,11 @@ use std::path::{Path, PathBuf};
 use serde::Deserialize;
 use tracing::{info, warn};
 
+use crate::triggers::types::{
+    CronTriggerConfig, TriggerFilter, WatcherTriggerConfig, WebhookEventConfig,
+    WebhookTriggerConfig,
+};
+
 /// Top-level daemon configuration, loaded from kraken.yml.
 /// Field names use serde rename attributes to match the camelCase YAML keys
 /// used throughout the Kraken configuration ecosystem.
@@ -27,6 +32,10 @@ pub struct DaemonConfig {
     /// Git-related configuration (branch naming, etc.).
     #[serde(default)]
     pub git: GitConfig,
+
+    /// Trigger definitions: crons, webhooks, and file watchers.
+    #[serde(default)]
+    pub triggers: TriggersYamlConfig,
 }
 
 /// Controls how the orchestrator schedules and monitors worker tasks.
@@ -59,6 +68,166 @@ pub struct GitConfig {
     /// Prefix applied to branches created by the daemon (e.g. "kraken/fix-123").
     #[serde(rename = "branchPrefix", default = "default_branch_prefix")]
     pub branch_prefix: String,
+}
+
+// ---------------------------------------------------------------------------
+// Trigger YAML config types
+// ---------------------------------------------------------------------------
+
+#[derive(Debug, Clone, Default, Deserialize)]
+pub struct TriggersYamlConfig {
+    #[serde(default)]
+    pub crons: Vec<CronTriggerYamlConfig>,
+    #[serde(default)]
+    pub webhooks: Vec<WebhookTriggerYamlConfig>,
+    #[serde(default)]
+    pub watchers: Vec<WatcherTriggerYamlConfig>,
+}
+
+#[derive(Debug, Clone, Deserialize)]
+pub struct CronTriggerYamlConfig {
+    pub name: String,
+    pub expression: String,
+    pub task: String,
+    #[serde(default, rename = "branchPrefix")]
+    pub branch_prefix: Option<String>,
+}
+
+#[derive(Debug, Clone, Deserialize)]
+pub struct WebhookTriggerYamlConfig {
+    pub name: String,
+    pub provider: String,
+    pub secret: String,
+    pub events: Vec<WebhookEventYamlConfig>,
+}
+
+#[derive(Debug, Clone, Deserialize)]
+pub struct WebhookEventYamlConfig {
+    #[serde(rename = "type")]
+    pub event_type: String,
+    #[serde(default)]
+    pub filter: Vec<String>,
+    pub task: String,
+}
+
+#[derive(Debug, Clone, Deserialize)]
+pub struct WatcherTriggerYamlConfig {
+    pub name: String,
+    pub paths: Vec<String>,
+    #[serde(default)]
+    pub ignore: Vec<String>,
+    #[serde(default = "default_debounce_ms", rename = "debounceMs")]
+    pub debounce_ms: u32,
+    pub task: String,
+}
+
+fn default_debounce_ms() -> u32 {
+    500
+}
+
+// ---------------------------------------------------------------------------
+// Environment variable substitution for secrets
+// ---------------------------------------------------------------------------
+
+fn substitute_environment_variables(input: &str) -> String {
+    let mut result = input.to_string();
+    while let Some(start_position) = result.find("${") {
+        if let Some(end_position) = result[start_position..].find('}') {
+            let variable_name = &result[start_position + 2..start_position + end_position];
+            let replacement_value = std::env::var(variable_name).unwrap_or_default();
+            result = format!(
+                "{}{}{}",
+                &result[..start_position],
+                replacement_value,
+                &result[start_position + end_position + 1..]
+            );
+        } else {
+            break;
+        }
+    }
+    result
+}
+
+// ---------------------------------------------------------------------------
+// Conversion from YAML config to trigger engine config types
+// ---------------------------------------------------------------------------
+
+impl TriggersYamlConfig {
+    pub fn into_parsed_webhook_trigger_configs(&self) -> Vec<WebhookTriggerConfig> {
+        let mut parsed_webhook_configs = Vec::new();
+
+        for yaml_webhook in &self.webhooks {
+            let resolved_secret = substitute_environment_variables(&yaml_webhook.secret);
+
+            let mut parsed_event_configs = Vec::new();
+
+            for yaml_event in &yaml_webhook.events {
+                let mut parsed_filters = Vec::new();
+                let mut event_has_errors = false;
+
+                for filter_string in &yaml_event.filter {
+                    match TriggerFilter::parse(filter_string) {
+                        Ok(parsed_filter) => parsed_filters.push(parsed_filter),
+                        Err(filter_parse_error) => {
+                            warn!(
+                                webhook_name = %yaml_webhook.name,
+                                event_type = %yaml_event.event_type,
+                                filter = %filter_string,
+                                error = %filter_parse_error,
+                                "skipping webhook event with invalid filter"
+                            );
+                            event_has_errors = true;
+                            break;
+                        }
+                    }
+                }
+
+                if event_has_errors {
+                    continue;
+                }
+
+                parsed_event_configs.push(WebhookEventConfig {
+                    event_type: yaml_event.event_type.clone(),
+                    filters: parsed_filters,
+                    task_template: yaml_event.task.clone(),
+                });
+            }
+
+            parsed_webhook_configs.push(WebhookTriggerConfig {
+                name: yaml_webhook.name.clone(),
+                provider: yaml_webhook.provider.clone(),
+                secret: resolved_secret,
+                events: parsed_event_configs,
+            });
+        }
+
+        parsed_webhook_configs
+    }
+
+    pub fn into_parsed_cron_trigger_configs(&self) -> Vec<CronTriggerConfig> {
+        self.crons
+            .iter()
+            .map(|yaml_cron| CronTriggerConfig {
+                name: yaml_cron.name.clone(),
+                expression: yaml_cron.expression.clone(),
+                task_template: yaml_cron.task.clone(),
+                branch_prefix: yaml_cron.branch_prefix.clone(),
+            })
+            .collect()
+    }
+
+    pub fn into_parsed_watcher_trigger_configs(&self) -> Vec<WatcherTriggerConfig> {
+        self.watchers
+            .iter()
+            .map(|yaml_watcher| WatcherTriggerConfig {
+                name: yaml_watcher.name.clone(),
+                paths: yaml_watcher.paths.clone(),
+                ignore_patterns: yaml_watcher.ignore.clone(),
+                debounce_ms: yaml_watcher.debounce_ms,
+                task_template: yaml_watcher.task.clone(),
+            })
+            .collect()
+    }
 }
 
 // ---------------------------------------------------------------------------
@@ -110,6 +279,7 @@ impl Default for DaemonConfig {
             orchestrator: OrchestratorConfig::default(),
             services: ServicesConfig::default(),
             git: GitConfig::default(),
+            triggers: TriggersYamlConfig::default(),
         }
     }
 }
@@ -288,5 +458,189 @@ repo: "/custom/repo"
         assert_eq!(config.git.branch_prefix, "kraken/");
 
         let _ = std::fs::remove_file(&config_file_path);
+    }
+
+    #[test]
+    fn test_load_config_with_triggers_section() {
+        let temporary_directory = std::env::temp_dir();
+        let config_file_path = temporary_directory.join("kraken_test_triggers_config.yml");
+
+        let yaml_content = r#"
+repo: "/home/user/project"
+triggers:
+  crons:
+    - name: daily-review
+      expression: "0 0 9 * * *"
+      task: "Review open PRs and summarize status"
+  webhooks:
+    - name: github-issues
+      provider: github
+      secret: "test-secret"
+      events:
+        - type: issues.opened
+          filter:
+            - "labels contains 'kraken'"
+          task: "Fix: {{event.issue.title}}"
+  watchers:
+    - name: src-watcher
+      paths:
+        - "src/"
+      ignore:
+        - "*.tmp"
+      debounceMs: 1000
+      task: "File changed: {{event.path}}"
+"#;
+
+        let mut config_file = std::fs::File::create(&config_file_path)
+            .expect("should create test config file");
+        config_file
+            .write_all(yaml_content.as_bytes())
+            .expect("should write test config");
+
+        let config = DaemonConfig::load(Some(&config_file_path))
+            .expect("should parse config with triggers");
+
+        assert_eq!(config.triggers.crons.len(), 1);
+        assert_eq!(config.triggers.crons[0].name, "daily-review");
+        assert_eq!(config.triggers.crons[0].expression, "0 0 9 * * *");
+
+        assert_eq!(config.triggers.webhooks.len(), 1);
+        assert_eq!(config.triggers.webhooks[0].name, "github-issues");
+        assert_eq!(config.triggers.webhooks[0].events.len(), 1);
+        assert_eq!(config.triggers.webhooks[0].events[0].filter.len(), 1);
+
+        assert_eq!(config.triggers.watchers.len(), 1);
+        assert_eq!(config.triggers.watchers[0].name, "src-watcher");
+        assert_eq!(config.triggers.watchers[0].debounce_ms, 1000);
+
+        let _ = std::fs::remove_file(&config_file_path);
+    }
+
+    #[test]
+    fn test_triggers_yaml_config_defaults_to_empty() {
+        let config = DaemonConfig::default();
+        assert!(config.triggers.crons.is_empty());
+        assert!(config.triggers.webhooks.is_empty());
+        assert!(config.triggers.watchers.is_empty());
+    }
+
+    #[test]
+    fn test_into_parsed_cron_trigger_configs() {
+        let triggers_config = TriggersYamlConfig {
+            crons: vec![CronTriggerYamlConfig {
+                name: "daily-review".to_string(),
+                expression: "0 0 9 * * *".to_string(),
+                task: "Review PRs".to_string(),
+                branch_prefix: Some("review/".to_string()),
+            }],
+            webhooks: vec![],
+            watchers: vec![],
+        };
+
+        let parsed_crons = triggers_config.into_parsed_cron_trigger_configs();
+        assert_eq!(parsed_crons.len(), 1);
+        assert_eq!(parsed_crons[0].name, "daily-review");
+        assert_eq!(parsed_crons[0].expression, "0 0 9 * * *");
+        assert_eq!(parsed_crons[0].task_template, "Review PRs");
+        assert_eq!(parsed_crons[0].branch_prefix.as_deref(), Some("review/"));
+    }
+
+    #[test]
+    fn test_into_parsed_webhook_trigger_configs_with_valid_filters() {
+        let triggers_config = TriggersYamlConfig {
+            crons: vec![],
+            webhooks: vec![WebhookTriggerYamlConfig {
+                name: "github-issues".to_string(),
+                provider: "github".to_string(),
+                secret: "my-secret".to_string(),
+                events: vec![WebhookEventYamlConfig {
+                    event_type: "issues.opened".to_string(),
+                    filter: vec!["labels contains 'kraken'".to_string()],
+                    task: "Fix: {{event.issue.title}}".to_string(),
+                }],
+            }],
+            watchers: vec![],
+        };
+
+        let parsed_webhooks = triggers_config.into_parsed_webhook_trigger_configs();
+        assert_eq!(parsed_webhooks.len(), 1);
+        assert_eq!(parsed_webhooks[0].events.len(), 1);
+        assert_eq!(parsed_webhooks[0].events[0].filters.len(), 1);
+        assert_eq!(parsed_webhooks[0].events[0].filters[0].field, "labels");
+    }
+
+    #[test]
+    fn test_into_parsed_webhook_trigger_configs_skips_invalid_filters() {
+        let triggers_config = TriggersYamlConfig {
+            crons: vec![],
+            webhooks: vec![WebhookTriggerYamlConfig {
+                name: "test-webhook".to_string(),
+                provider: "github".to_string(),
+                secret: "secret".to_string(),
+                events: vec![WebhookEventYamlConfig {
+                    event_type: "push".to_string(),
+                    filter: vec!["this has no valid operator".to_string()],
+                    task: "Deploy".to_string(),
+                }],
+            }],
+            watchers: vec![],
+        };
+
+        let parsed_webhooks = triggers_config.into_parsed_webhook_trigger_configs();
+        assert_eq!(parsed_webhooks.len(), 1);
+        assert_eq!(parsed_webhooks[0].events.len(), 0);
+    }
+
+    #[test]
+    fn test_into_parsed_watcher_trigger_configs() {
+        let triggers_config = TriggersYamlConfig {
+            crons: vec![],
+            webhooks: vec![],
+            watchers: vec![WatcherTriggerYamlConfig {
+                name: "config-watcher".to_string(),
+                paths: vec!["config/".to_string()],
+                ignore: vec!["*.bak".to_string()],
+                debounce_ms: 2000,
+                task: "Config changed".to_string(),
+            }],
+        };
+
+        let parsed_watchers = triggers_config.into_parsed_watcher_trigger_configs();
+        assert_eq!(parsed_watchers.len(), 1);
+        assert_eq!(parsed_watchers[0].name, "config-watcher");
+        assert_eq!(parsed_watchers[0].paths, vec!["config/"]);
+        assert_eq!(parsed_watchers[0].ignore_patterns, vec!["*.bak"]);
+        assert_eq!(parsed_watchers[0].debounce_ms, 2000);
+        assert_eq!(parsed_watchers[0].task_template, "Config changed");
+    }
+
+    #[test]
+    fn test_substitute_environment_variables_in_secret() {
+        unsafe {
+            std::env::set_var("KRAKEN_TEST_WEBHOOK_SECRET", "real-secret-value");
+        }
+
+        let result = super::substitute_environment_variables("${KRAKEN_TEST_WEBHOOK_SECRET}");
+        assert_eq!(result, "real-secret-value");
+
+        unsafe {
+            std::env::remove_var("KRAKEN_TEST_WEBHOOK_SECRET");
+        }
+    }
+
+    #[test]
+    fn test_substitute_environment_variables_with_missing_var() {
+        unsafe {
+            std::env::remove_var("KRAKEN_NONEXISTENT_VAR_12345");
+        }
+
+        let result = super::substitute_environment_variables("${KRAKEN_NONEXISTENT_VAR_12345}");
+        assert_eq!(result, "");
+    }
+
+    #[test]
+    fn test_substitute_environment_variables_with_no_placeholders() {
+        let result = super::substitute_environment_variables("plain-secret");
+        assert_eq!(result, "plain-secret");
     }
 }

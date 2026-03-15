@@ -117,6 +117,106 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     );
 
     // -----------------------------------------------------------------------
+    // 9b. Parse trigger configs and create TriggerEngine
+    // -----------------------------------------------------------------------
+    let parsed_webhook_trigger_configs = daemon_config
+        .triggers
+        .into_parsed_webhook_trigger_configs();
+    let parsed_cron_trigger_configs = daemon_config
+        .triggers
+        .into_parsed_cron_trigger_configs();
+    let parsed_watcher_trigger_configs = daemon_config
+        .triggers
+        .into_parsed_watcher_trigger_configs();
+
+    info!(
+        cron_triggers = parsed_cron_trigger_configs.len(),
+        webhook_triggers = parsed_webhook_trigger_configs.len(),
+        watcher_triggers = parsed_watcher_trigger_configs.len(),
+        "trigger configs parsed from configuration"
+    );
+
+    let trigger_engine = Arc::new(triggers::engine::TriggerEngine::new(
+        Arc::clone(&shared_task_store),
+        parsed_webhook_trigger_configs.clone(),
+        parsed_cron_trigger_configs.clone(),
+        parsed_watcher_trigger_configs.clone(),
+    ));
+
+    // Register cron jobs from config into CronEngine
+    for cron_trigger_config in &parsed_cron_trigger_configs {
+        match cron_engine.register(
+            cron_trigger_config.name.clone(),
+            &cron_trigger_config.expression,
+            cron_trigger_config.task_template.clone(),
+            std::collections::HashMap::new(),
+        ) {
+            Ok((registered_cron_id, next_run_time)) => {
+                info!(
+                    cron_name = %cron_trigger_config.name,
+                    cron_id = %registered_cron_id,
+                    next_run = %next_run_time,
+                    "registered cron trigger from config"
+                );
+            }
+            Err(registration_error) => {
+                warn!(
+                    cron_name = %cron_trigger_config.name,
+                    expression = %cron_trigger_config.expression,
+                    error = %registration_error,
+                    "failed to register cron trigger from config, skipping"
+                );
+            }
+        }
+    }
+
+    // Start CronTriggerListener to bridge scheduler events to TriggerEngine
+    let cron_trigger_listener = triggers::cron_trigger::CronTriggerListener::new(
+        Arc::clone(&trigger_engine),
+        scheduler_event_sender.subscribe(),
+    );
+    let cron_trigger_shutdown_receiver = daemon_state.shutdown_receiver.clone();
+    let cron_trigger_listener_handle = tokio::spawn(async move {
+        cron_trigger_listener.run(cron_trigger_shutdown_receiver).await;
+    });
+
+    // Start FileWatcherTriggerListener to bridge scheduler events to TriggerEngine
+    let file_watcher_trigger_listener = triggers::watcher_trigger::FileWatcherTriggerListener::new(
+        Arc::clone(&trigger_engine),
+        scheduler_event_sender.subscribe(),
+    );
+    let watcher_trigger_shutdown_receiver = daemon_state.shutdown_receiver.clone();
+    let watcher_trigger_listener_handle = tokio::spawn(async move {
+        file_watcher_trigger_listener.run(watcher_trigger_shutdown_receiver).await;
+    });
+
+    // Start WebhookServer if any webhook triggers are configured
+    let webhook_server_handle = if !parsed_webhook_trigger_configs.is_empty() {
+        let webhook_port = daemon_config.services.webhook_port;
+        let webhook_shutdown_receiver = daemon_state.shutdown_receiver.clone();
+        let webhook_server = triggers::webhook::WebhookServer::new(
+            Arc::clone(&trigger_engine),
+            parsed_webhook_trigger_configs,
+        );
+
+        info!(
+            webhook_port = webhook_port,
+            "starting webhook server for trigger configs"
+        );
+
+        Some(tokio::spawn(async move {
+            if let Err(webhook_error) = webhook_server.start(webhook_port, webhook_shutdown_receiver).await {
+                error!(
+                    error = %webhook_error,
+                    "webhook server failed"
+                );
+            }
+        }))
+    } else {
+        None
+    };
+
+    // -----------------------------------------------------------------------
     // 10. Find the worker script path
     // -----------------------------------------------------------------------
     let worker_script_candidates = vec![
@@ -271,6 +371,30 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             error = %orchestrator_join_error,
             "orchestrator task panicked during shutdown"
         );
+    }
+
+    // Wait for trigger listeners to finish
+    if let Err(cron_listener_join_error) = cron_trigger_listener_handle.await {
+        error!(
+            error = %cron_listener_join_error,
+            "cron trigger listener task panicked during shutdown"
+        );
+    }
+
+    if let Err(watcher_listener_join_error) = watcher_trigger_listener_handle.await {
+        error!(
+            error = %watcher_listener_join_error,
+            "file watcher trigger listener task panicked during shutdown"
+        );
+    }
+
+    if let Some(webhook_handle) = webhook_server_handle {
+        if let Err(webhook_join_error) = webhook_handle.await {
+            error!(
+                error = %webhook_join_error,
+                "webhook server task panicked during shutdown"
+            );
+        }
     }
 
     // Shutdown cron engine
