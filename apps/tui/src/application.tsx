@@ -214,7 +214,7 @@ export function Application({
                   <DashboardView store={store} daemonStore={daemonStore} pluginRegistry={pluginRegistry} />
                 )}
                 {activeView === "tasks" && (
-                  <TasksView store={store} focused={activeView === "tasks"} />
+                  <TasksView store={store} daemonStore={daemonStore} focused={activeView === "tasks"} />
                 )}
                 {activeView === "reviews" && (
                   <ReviewsView store={store} focused={activeView === "reviews"} />
