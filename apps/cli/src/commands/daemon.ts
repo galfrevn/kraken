@@ -118,7 +118,7 @@ async function startDaemon(args: string[]): Promise<void> {
     if (existsSync(debugBinaryPath)) {
       daemonCommand = [debugBinaryPath];
     } else {
-      daemonCommand = ["cargo", "run", "--quiet"];
+      daemonCommand = ["cargo", "run", "--bin", "kraken-daemon", "--quiet"];
     }
   } else {
     if (existsSync(releaseBinaryPath)) {
@@ -126,7 +126,7 @@ async function startDaemon(args: string[]): Promise<void> {
     } else if (existsSync(debugBinaryPath)) {
       daemonCommand = [debugBinaryPath];
     } else {
-      daemonCommand = ["cargo", "run", "--quiet", "--release"];
+      daemonCommand = ["cargo", "run", "--bin", "kraken-daemon", "--quiet", "--release"];
     }
   }
 
