@@ -198,7 +198,18 @@ async function startDaemon(args: string[]): Promise<void> {
     ];
     writeFileSync(launcherScriptPath, launcherScriptLines.join("\r\n"));
 
-    Bun.spawnSync(["cmd", "/c", "start", "/b", "", launcherScriptPath], {
+    const scheduledTaskName = "KrakenDaemonStart";
+    Bun.spawnSync(["schtasks", "/delete", "/tn", scheduledTaskName, "/f"], {
+      stdio: ["ignore", "ignore", "ignore"],
+    });
+    Bun.spawnSync(
+      ["schtasks", "/create", "/tn", scheduledTaskName, "/tr", launcherScriptPath, "/sc", "ONCE", "/st", "00:00", "/f", "/rl", "LIMITED"],
+      { stdio: ["ignore", "ignore", "ignore"] },
+    );
+    Bun.spawnSync(["schtasks", "/run", "/tn", scheduledTaskName], {
+      stdio: ["ignore", "ignore", "ignore"],
+    });
+    Bun.spawnSync(["schtasks", "/delete", "/tn", scheduledTaskName, "/f"], {
       stdio: ["ignore", "ignore", "ignore"],
     });
   } else {
