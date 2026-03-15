@@ -1,5 +1,6 @@
 pub mod heartbeat;
 pub mod worker;
+pub mod worktree;
 
 use std::sync::Arc;
 
