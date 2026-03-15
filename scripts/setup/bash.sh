@@ -48,11 +48,6 @@ fi
 CARGO_VERSION=$(cargo --version | awk '{print $2}')
 success "cargo $CARGO_VERSION"
 
-if command -v go &>/dev/null; then
-  GO_VERSION=$(go version | awk '{print $3}' | sed 's/go//')
-  success "go $GO_VERSION (optional)"
-fi
-
 # -------------------------------------------------------------------
 # 2. Install TypeScript dependencies
 # -------------------------------------------------------------------
@@ -69,7 +64,7 @@ if command -v buf &>/dev/null; then
   buf generate
   success "protobuf code generated"
 else
-  if [ -d gen/go/agent ] && [ -d gen/ts/agent ]; then
+  if [ -d gen/ts/agent ]; then
     warn "buf not installed, using existing generated code"
     warn "install buf for fresh generation: https://buf.build/docs/installation"
   else

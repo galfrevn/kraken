@@ -141,7 +141,7 @@ Pop-Location
 Success "dependencies installed"
 
 # -------------------------------------------------------------------
-# 6. Get scheduler & gateway binaries (pre-built or build from source)
+# 6. Build daemon binary (Rust)
 # -------------------------------------------------------------------
 Step "setting up native binaries"
 
@@ -184,13 +184,7 @@ if (-not $PrebuiltOk) {
     if ($HasCargo) {
         Success "cargo found: $((cargo --version) -replace 'cargo ','')"
     } else {
-        Warn "cargo not found -- scheduler won't be available (https://rustup.rs)"
-    }
-
-    if ($HasGo) {
-        Success "go found: $((go version) -replace 'go version go' -replace ' .*','')"
-    } else {
-        Warn "go not found -- gateway won't be available (https://go.dev/dl)"
+        Warn "cargo not found -- daemon won't be available (https://rustup.rs)"
     }
 
     # Check / setup protoc for Rust build
@@ -198,7 +192,7 @@ if (-not $PrebuiltOk) {
     $ProtocExe = Join-Path $ProtocDir "bin\protoc.exe"
 
     if ($HasCargo) {
-        Step "checking protoc (required for scheduler)"
+        Step "checking protoc (required for daemon)"
 
         if (Test-Path $ProtocExe) {
             $env:PROTOC = $ProtocExe
@@ -216,31 +210,20 @@ if (-not $PrebuiltOk) {
                 $env:PROTOC_INCLUDE = Join-Path $ProtocDir "include"
                 Success "protoc installed to $ProtocDir"
             } else {
-                Warn "protoc not found -- scheduler build may fail"
+                Warn "protoc not found -- daemon build may fail"
                 Warn "install it: winget install Google.Protobuf"
             }
         }
 
-        Step "building scheduler (rust)"
-        Push-Location (Join-Path $KrakenSrc "apps\scheduler")
+        Step "building daemon (rust)"
+        Push-Location (Join-Path $KrakenSrc "apps\daemon")
         cargo build --release
-        $SchedulerExe = Join-Path $KrakenSrc "apps\scheduler\target\release\scheduler.exe"
-        if (Test-Path $SchedulerExe) {
-            Copy-Item $SchedulerExe (Join-Path $KrakenLib "scheduler.exe") -Force
+        $DaemonExe = Join-Path $KrakenSrc "apps\daemon\target\release\kraken-daemon.exe"
+        if (Test-Path $DaemonExe) {
+            Copy-Item $DaemonExe (Join-Path $KrakenLib "kraken-daemon.exe") -Force
         }
         Pop-Location
-        Success "scheduler built"
-    }
-
-    if ($HasGo) {
-        Step "building gateway (go)"
-        Push-Location (Join-Path $KrakenSrc "apps\gateway")
-        go build -o gateway.exe ./cmd/gateway
-        if (Test-Path "gateway.exe") {
-            Copy-Item "gateway.exe" (Join-Path $KrakenLib "gateway.exe") -Force
-        }
-        Pop-Location
-        Success "gateway built"
+        Success "daemon built"
     }
 }
 

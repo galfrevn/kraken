@@ -3,16 +3,6 @@ version: v2
 clean: false
 
 plugins:
-  - remote: buf.build/protocolbuffers/go
-    out: gen/go
-    opt:
-      - paths=source_relative
-
-  - remote: buf.build/connectrpc/go
-    out: gen/go
-    opt:
-      - paths=source_relative
-
   - remote: buf.build/bufbuild/es
     out: gen/ts
     opt:
@@ -20,6 +10,3 @@ plugins:
 
 managed:
   enabled: true
-  override:
-    - file_option: go_package_prefix
-      value: kraken/gen/go
