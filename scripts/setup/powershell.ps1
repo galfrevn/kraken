@@ -95,9 +95,6 @@ if (Get-Command buf -ErrorAction SilentlyContinue) {
     buf generate
     if ($LASTEXITCODE -ne 0) { Fail "buf generate failed" }
     Success "protobuf code generated"
-
-    Push-Location gen/go; go mod tidy; Pop-Location
-    Success "go modules synced"
 } else {
     if ((Test-Path "gen/go/agent") -and (Test-Path "gen/ts/agent")) {
         Warn "buf not installed, using existing generated code"

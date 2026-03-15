@@ -68,9 +68,6 @@ step "generating protobuf code"
 if command -v buf &>/dev/null; then
   buf generate
   success "protobuf code generated"
-
-  cd gen/go && go mod tidy && cd "$PROJECT_ROOT"
-  success "go modules synced"
 else
   if [ -d gen/go/agent ] && [ -d gen/ts/agent ]; then
     warn "buf not installed, using existing generated code"
