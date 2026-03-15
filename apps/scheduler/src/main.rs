@@ -5,6 +5,7 @@ mod grpc;
 mod db;
 mod daemon;
 mod orchestrator;
+mod services;
 
 use std::sync::Arc;
 use tokio::sync::broadcast;
