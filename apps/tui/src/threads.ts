@@ -140,7 +140,7 @@ export class ThreadManager {
       platform: process.platform,
       shell: process.env.SHELL || (process.platform === "win32" ? "powershell" : "bash"),
       date: new Date().toISOString().split("T")[0]!,
-      modelName: this.languageModelClient.getModel(),
+      modelName: this.languageModelClient?.getModel() ?? "daemon",
       projectName: this.workingDirectory.split(/[/\\]/).pop() || "unknown",
     };
   }
@@ -278,6 +278,7 @@ export class ThreadManager {
         : substantiveMessage.content;
 
     try {
+      if (!this.languageModelClient) return truncatedFallback;
       const generatedTitle = await this.languageModelClient.singlePrompt(
         titleInput,
         TITLE_GENERATION_SYSTEM_PROMPT,
@@ -321,6 +322,7 @@ export class ThreadManager {
     const transcript = this.buildCondensedTranscript(messages);
 
     try {
+      if (!this.languageModelClient) return;
       const generatedSummary = await this.languageModelClient.singlePrompt(
         transcript,
         SUMMARY_GENERATION_SYSTEM_PROMPT,
