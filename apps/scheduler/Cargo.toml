@@ -1,7 +1,11 @@
 [package]
-name = "scheduler"
+name = "kraken-daemon"
 version = "0.1.0"
 edition = "2024"
+
+[[bin]]
+name = "kraken-daemon"
+path = "src/main.rs"
 
 [dependencies]
 tonic = "0.13"
