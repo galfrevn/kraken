@@ -207,6 +207,24 @@ async function taskCancel(taskId: string | undefined): Promise<void> {
   console.log();
 }
 
+async function retryTask(taskIdToRetry: string | undefined): Promise<void> {
+  if (!taskIdToRetry) {
+    fail("Missing task ID. Usage: kraken task retry <task-id>");
+    process.exit(1);
+  }
+
+  const daemonServiceClient = await verifyDaemonIsRunning();
+
+  const retryTaskResponse = await daemonServiceClient.retryTask({ taskId: taskIdToRetry });
+
+  if (retryTaskResponse.success) {
+    success(`Task ${colorize(taskIdToRetry, "cyan")} queued for retry. New task ID: ${colorize(retryTaskResponse.newTaskId, "cyan")}`);
+  } else {
+    fail(`Failed to retry task ${taskIdToRetry}: ${retryTaskResponse.message}`);
+  }
+  console.log();
+}
+
 async function taskCleanup(args: string[]): Promise<void> {
   let olderThanDays = DEFAULT_OLDER_THAN_DAYS;
 
@@ -335,6 +353,7 @@ function printTaskUsage(): void {
   console.log(`    ${colorize("list", "cyan")}                        List all tasks from the daemon`);
   console.log(`    ${colorize("submit", "cyan")} ${colorize('"prompt"', "dim")}               Submit a new task`);
   console.log(`    ${colorize("cancel", "cyan")} ${colorize("<id>", "dim")}                   Cancel a running task`);
+  console.log(`    ${colorize("retry", "cyan")} ${colorize("<id>", "dim")}                   Retry a failed task`);
   console.log(`    ${colorize("cleanup", "cyan")}                      Remove old worktrees`);
   console.log(`\n  ${bold("Submit options:")}\n`);
   console.log(`    ${colorize("--priority=N", "cyan")}                 Task priority 1-10 (default: 5)`);
@@ -356,6 +375,11 @@ export async function execute(args: string[]): Promise<void> {
     case "cancel": {
       const taskIdArgument = remainingArgs.find((argument) => !argument.startsWith("-"));
       await taskCancel(taskIdArgument);
+      break;
+    }
+    case "retry": {
+      const taskIdToRetryArgument = remainingArgs.find((argument) => !argument.startsWith("-"));
+      await retryTask(taskIdToRetryArgument);
       break;
     }
     case "cleanup":

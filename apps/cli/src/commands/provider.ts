@@ -10,6 +10,24 @@ function findConfigurationFilePath(): string | null {
   return null;
 }
 
+function readApiKeysFromEnvFile(): Record<string, string> {
+  const environmentFilePath = join(KRAKEN_HOME, ".env");
+  const parsedKeyValuePairs: Record<string, string> = {};
+  if (!existsSync(environmentFilePath)) return parsedKeyValuePairs;
+  const environmentFileContents = readFileSync(environmentFilePath, "utf-8");
+  for (const currentLine of environmentFileContents.split("\n")) {
+    const trimmedLine = currentLine.trim();
+    if (!trimmedLine || trimmedLine.startsWith("#")) continue;
+    const equalsPosition = trimmedLine.indexOf("=");
+    if (equalsPosition > 0) {
+      const variableName = trimmedLine.slice(0, equalsPosition).trim();
+      const variableValue = trimmedLine.slice(equalsPosition + 1).trim();
+      if (variableValue) parsedKeyValuePairs[variableName] = variableValue;
+    }
+  }
+  return parsedKeyValuePairs;
+}
+
 function parseSimpleYaml(fileContents: string): Record<string, unknown> {
   const parsedResult: Record<string, unknown> = {};
   const fileLines = fileContents.split("\n");
@@ -101,8 +119,10 @@ function listProviderConfiguration(): void {
 
   console.log(`\n  ${bold("API Keys:")}\n`);
 
+  const apiKeysFromEnvFile = readApiKeysFromEnvFile();
+
   for (const [providerName, environmentVariableName] of Object.entries(API_KEY_ENV_VAR_BY_PROVIDER)) {
-    const environmentVariableValue = Bun.env[environmentVariableName];
+    const environmentVariableValue = Bun.env[environmentVariableName] || apiKeysFromEnvFile[environmentVariableName];
     const providerDisplayLabel = LLM_PROVIDERS.find((providerOption) => providerOption.value === providerName)?.label ?? providerName;
     const isCurrentProvider = providerName === currentProvider;
     const statusIndicator = environmentVariableValue
@@ -153,7 +173,8 @@ async function switchProviderInteractively(): Promise<void> {
   }
 
   const environmentVariableName = API_KEY_ENV_VAR_BY_PROVIDER[selectedProvider] ?? "OPENROUTER_API_KEY";
-  const existingApiKeyValue = Bun.env[environmentVariableName];
+  const apiKeysFromEnvFileForSwitch = readApiKeysFromEnvFile();
+  const existingApiKeyValue = Bun.env[environmentVariableName] || apiKeysFromEnvFileForSwitch[environmentVariableName];
   let finalApiKeyValue = "";
 
   if (existingApiKeyValue) {

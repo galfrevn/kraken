@@ -8,6 +8,9 @@ import {
   appendYamlArrayItem,
   removeYamlArrayItemByName,
 } from "@/yaml-writer.ts";
+import { createClient } from "@connectrpc/connect";
+import { createGrpcTransport } from "@connectrpc/connect-node";
+import { DaemonService } from "@gen/agent/v1/daemon_pb.ts";
 
 // ---------------------------------------------------------------------------
 // YAML config types (mirrors the Rust TriggersYamlConfig)
@@ -367,6 +370,8 @@ function listTriggers(): void {
       }
       console.log();
     }
+    const defaultWebhookPort = process.env.GATEWAY_PORT || "50052";
+    console.log(`  ${colorize("Webhook endpoint:", "dim")} http://localhost:${defaultWebhookPort}/webhooks/{provider}\n`);
   }
 
   if (triggersConfig.watchers && triggersConfig.watchers.length > 0) {
@@ -918,6 +923,77 @@ function removeTrigger(triggerNameToRemove: string): void {
 }
 
 // ---------------------------------------------------------------------------
+// Status subcommand (live daemon gRPC)
+// ---------------------------------------------------------------------------
+
+async function showTriggerStatus(): Promise<void> {
+  const daemonGrpcUrl = process.env.KRAKEN_SCHEDULER_URL || "http://localhost:50051";
+  const grpcTransport = createGrpcTransport({ baseUrl: daemonGrpcUrl });
+  const daemonServiceClient = createClient(DaemonService, grpcTransport);
+
+  try {
+    const triggerStatusResponse = await daemonServiceClient.getTriggerStatus({});
+
+    console.log(`\n  ${bold("Trigger Status")} ${colorize("(live from daemon)", "dim")}\n`);
+
+    if (triggerStatusResponse.webhookEndpointUrl) {
+      console.log(`  ${bold("Webhook endpoint:")} ${colorize(triggerStatusResponse.webhookEndpointUrl, "green")}\n`);
+    } else {
+      console.log(`  ${bold("Webhook endpoint:")} ${colorize("http://localhost:50052/webhooks/{provider}", "green")}\n`);
+    }
+
+    if (triggerStatusResponse.triggers.length === 0) {
+      console.log(`  ${colorize("No triggers registered in daemon.", "dim")}\n`);
+      return;
+    }
+
+    const nameColumnHeader = "Name";
+    const typeColumnHeader = "Type";
+    const nextRunColumnHeader = "Next Run";
+    const lastFiredColumnHeader = "Last Fired";
+    const eventsColumnHeader = "Events";
+
+    const maximumNameLength = Math.max(
+      nameColumnHeader.length,
+      ...triggerStatusResponse.triggers.map((triggerEntry) => triggerEntry.name.length),
+    );
+    const maximumTypeLength = Math.max(
+      typeColumnHeader.length,
+      ...triggerStatusResponse.triggers.map((triggerEntry) => triggerEntry.triggerType.length),
+    );
+    const maximumNextRunLength = Math.max(
+      nextRunColumnHeader.length,
+      ...triggerStatusResponse.triggers.map((triggerEntry) => (triggerEntry.nextRunAt || "-").length),
+    );
+    const maximumLastFiredLength = Math.max(
+      lastFiredColumnHeader.length,
+      ...triggerStatusResponse.triggers.map((triggerEntry) => (triggerEntry.lastFiredAt || "-").length),
+    );
+
+    const headerLine = `  ${nameColumnHeader.padEnd(maximumNameLength)}  ${typeColumnHeader.padEnd(maximumTypeLength)}  ${nextRunColumnHeader.padEnd(maximumNextRunLength)}  ${lastFiredColumnHeader.padEnd(maximumLastFiredLength)}  ${eventsColumnHeader}`;
+    const separatorLine = `  ${"─".repeat(maximumNameLength)}  ${"─".repeat(maximumTypeLength)}  ${"─".repeat(maximumNextRunLength)}  ${"─".repeat(maximumLastFiredLength)}  ${"─".repeat(eventsColumnHeader.length)}`;
+
+    console.log(colorize(headerLine, "dim"));
+    console.log(colorize(separatorLine, "dim"));
+
+    for (const triggerEntry of triggerStatusResponse.triggers) {
+      const formattedName = colorize(triggerEntry.name.padEnd(maximumNameLength), "cyan");
+      const formattedType = triggerEntry.triggerType.padEnd(maximumTypeLength);
+      const formattedNextRun = (triggerEntry.nextRunAt || "-").padEnd(maximumNextRunLength);
+      const formattedLastFired = (triggerEntry.lastFiredAt || "-").padEnd(maximumLastFiredLength);
+      const formattedEventCount = String(triggerEntry.totalEventsFired);
+
+      console.log(`  ${formattedName}  ${formattedType}  ${formattedNextRun}  ${formattedLastFired}  ${formattedEventCount}`);
+    }
+
+    console.log();
+  } catch (_connectionError) {
+    fail("Cannot connect to daemon. Is it running? Start it with 'kraken daemon start'");
+    process.exit(1);
+  }
+}
+
+// ---------------------------------------------------------------------------
 // Entry point
 // ---------------------------------------------------------------------------
 
@@ -928,7 +1004,8 @@ function printTriggerUsage(): void {
   console.log(`    ${colorize("list", "cyan")}              List all configured triggers`);
   console.log(`    ${colorize("add", "cyan")}               Interactive wizard to add a trigger`);
   console.log(`    ${colorize("remove", "cyan")} ${colorize("<name>", "dim")}     Remove a trigger from configuration`);
-  console.log(`    ${colorize("test", "cyan")} ${colorize("<name>", "dim")}       Dry-run a trigger with a sample payload\n`);
+  console.log(`    ${colorize("test", "cyan")} ${colorize("<name>", "dim")}       Dry-run a trigger with a sample payload
+    ${colorize("status", "cyan")}            Show live trigger status from daemon\n`);
 }
 
 export async function execute(args: string[]): Promise<void> {
@@ -938,6 +1015,9 @@ export async function execute(args: string[]): Promise<void> {
   switch (subcommand) {
     case "list":
       listTriggers();
+      break;
+    case "status":
+      await showTriggerStatus();
       break;
     case "add":
       await addTriggerInteractively();

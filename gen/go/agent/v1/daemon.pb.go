@@ -1054,6 +1054,506 @@ func (x *ReloadConfigResponse) GetNotificationChannelsLoaded() int32 {
 	return 0
 }
 
+type TestNotificationRequest struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	ChannelName   string                 `protobuf:"bytes,1,opt,name=channel_name,json=channelName,proto3" json:"channel_name,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *TestNotificationRequest) Reset() {
+	*x = TestNotificationRequest{}
+	mi := &file_agent_v1_daemon_proto_msgTypes[18]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *TestNotificationRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*TestNotificationRequest) ProtoMessage() {}
+
+func (x *TestNotificationRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_agent_v1_daemon_proto_msgTypes[18]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use TestNotificationRequest.ProtoReflect.Descriptor instead.
+func (*TestNotificationRequest) Descriptor() ([]byte, []int) {
+	return file_agent_v1_daemon_proto_rawDescGZIP(), []int{18}
+}
+
+func (x *TestNotificationRequest) GetChannelName() string {
+	if x != nil {
+		return x.ChannelName
+	}
+	return ""
+}
+
+type TestNotificationResponse struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Success       bool                   `protobuf:"varint,1,opt,name=success,proto3" json:"success,omitempty"`
+	Message       string                 `protobuf:"bytes,2,opt,name=message,proto3" json:"message,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *TestNotificationResponse) Reset() {
+	*x = TestNotificationResponse{}
+	mi := &file_agent_v1_daemon_proto_msgTypes[19]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *TestNotificationResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*TestNotificationResponse) ProtoMessage() {}
+
+func (x *TestNotificationResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_agent_v1_daemon_proto_msgTypes[19]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use TestNotificationResponse.ProtoReflect.Descriptor instead.
+func (*TestNotificationResponse) Descriptor() ([]byte, []int) {
+	return file_agent_v1_daemon_proto_rawDescGZIP(), []int{19}
+}
+
+func (x *TestNotificationResponse) GetSuccess() bool {
+	if x != nil {
+		return x.Success
+	}
+	return false
+}
+
+func (x *TestNotificationResponse) GetMessage() string {
+	if x != nil {
+		return x.Message
+	}
+	return ""
+}
+
+type RetryTaskRequest struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	TaskId        string                 `protobuf:"bytes,1,opt,name=task_id,json=taskId,proto3" json:"task_id,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *RetryTaskRequest) Reset() {
+	*x = RetryTaskRequest{}
+	mi := &file_agent_v1_daemon_proto_msgTypes[20]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *RetryTaskRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*RetryTaskRequest) ProtoMessage() {}
+
+func (x *RetryTaskRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_agent_v1_daemon_proto_msgTypes[20]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use RetryTaskRequest.ProtoReflect.Descriptor instead.
+func (*RetryTaskRequest) Descriptor() ([]byte, []int) {
+	return file_agent_v1_daemon_proto_rawDescGZIP(), []int{20}
+}
+
+func (x *RetryTaskRequest) GetTaskId() string {
+	if x != nil {
+		return x.TaskId
+	}
+	return ""
+}
+
+type RetryTaskResponse struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	NewTaskId     string                 `protobuf:"bytes,1,opt,name=new_task_id,json=newTaskId,proto3" json:"new_task_id,omitempty"`
+	Success       bool                   `protobuf:"varint,2,opt,name=success,proto3" json:"success,omitempty"`
+	Message       string                 `protobuf:"bytes,3,opt,name=message,proto3" json:"message,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *RetryTaskResponse) Reset() {
+	*x = RetryTaskResponse{}
+	mi := &file_agent_v1_daemon_proto_msgTypes[21]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *RetryTaskResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*RetryTaskResponse) ProtoMessage() {}
+
+func (x *RetryTaskResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_agent_v1_daemon_proto_msgTypes[21]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use RetryTaskResponse.ProtoReflect.Descriptor instead.
+func (*RetryTaskResponse) Descriptor() ([]byte, []int) {
+	return file_agent_v1_daemon_proto_rawDescGZIP(), []int{21}
+}
+
+func (x *RetryTaskResponse) GetNewTaskId() string {
+	if x != nil {
+		return x.NewTaskId
+	}
+	return ""
+}
+
+func (x *RetryTaskResponse) GetSuccess() bool {
+	if x != nil {
+		return x.Success
+	}
+	return false
+}
+
+func (x *RetryTaskResponse) GetMessage() string {
+	if x != nil {
+		return x.Message
+	}
+	return ""
+}
+
+type GetCostSummaryRequest struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *GetCostSummaryRequest) Reset() {
+	*x = GetCostSummaryRequest{}
+	mi := &file_agent_v1_daemon_proto_msgTypes[22]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *GetCostSummaryRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*GetCostSummaryRequest) ProtoMessage() {}
+
+func (x *GetCostSummaryRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_agent_v1_daemon_proto_msgTypes[22]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use GetCostSummaryRequest.ProtoReflect.Descriptor instead.
+func (*GetCostSummaryRequest) Descriptor() ([]byte, []int) {
+	return file_agent_v1_daemon_proto_rawDescGZIP(), []int{22}
+}
+
+type GetCostSummaryResponse struct {
+	state                      protoimpl.MessageState `protogen:"open.v1"`
+	TotalCostTodayUsd          float64                `protobuf:"fixed64,1,opt,name=total_cost_today_usd,json=totalCostTodayUsd,proto3" json:"total_cost_today_usd,omitempty"`
+	TotalCostWeekUsd           float64                `protobuf:"fixed64,2,opt,name=total_cost_week_usd,json=totalCostWeekUsd,proto3" json:"total_cost_week_usd,omitempty"`
+	TotalCostMonthUsd          float64                `protobuf:"fixed64,3,opt,name=total_cost_month_usd,json=totalCostMonthUsd,proto3" json:"total_cost_month_usd,omitempty"`
+	TotalPromptTokensToday     int64                  `protobuf:"varint,4,opt,name=total_prompt_tokens_today,json=totalPromptTokensToday,proto3" json:"total_prompt_tokens_today,omitempty"`
+	TotalCompletionTokensToday int64                  `protobuf:"varint,5,opt,name=total_completion_tokens_today,json=totalCompletionTokensToday,proto3" json:"total_completion_tokens_today,omitempty"`
+	TotalTasksToday            int32                  `protobuf:"varint,6,opt,name=total_tasks_today,json=totalTasksToday,proto3" json:"total_tasks_today,omitempty"`
+	CostWarningThresholdUsd    float64                `protobuf:"fixed64,7,opt,name=cost_warning_threshold_usd,json=costWarningThresholdUsd,proto3" json:"cost_warning_threshold_usd,omitempty"`
+	unknownFields              protoimpl.UnknownFields
+	sizeCache                  protoimpl.SizeCache
+}
+
+func (x *GetCostSummaryResponse) Reset() {
+	*x = GetCostSummaryResponse{}
+	mi := &file_agent_v1_daemon_proto_msgTypes[23]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *GetCostSummaryResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*GetCostSummaryResponse) ProtoMessage() {}
+
+func (x *GetCostSummaryResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_agent_v1_daemon_proto_msgTypes[23]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use GetCostSummaryResponse.ProtoReflect.Descriptor instead.
+func (*GetCostSummaryResponse) Descriptor() ([]byte, []int) {
+	return file_agent_v1_daemon_proto_rawDescGZIP(), []int{23}
+}
+
+func (x *GetCostSummaryResponse) GetTotalCostTodayUsd() float64 {
+	if x != nil {
+		return x.TotalCostTodayUsd
+	}
+	return 0
+}
+
+func (x *GetCostSummaryResponse) GetTotalCostWeekUsd() float64 {
+	if x != nil {
+		return x.TotalCostWeekUsd
+	}
+	return 0
+}
+
+func (x *GetCostSummaryResponse) GetTotalCostMonthUsd() float64 {
+	if x != nil {
+		return x.TotalCostMonthUsd
+	}
+	return 0
+}
+
+func (x *GetCostSummaryResponse) GetTotalPromptTokensToday() int64 {
+	if x != nil {
+		return x.TotalPromptTokensToday
+	}
+	return 0
+}
+
+func (x *GetCostSummaryResponse) GetTotalCompletionTokensToday() int64 {
+	if x != nil {
+		return x.TotalCompletionTokensToday
+	}
+	return 0
+}
+
+func (x *GetCostSummaryResponse) GetTotalTasksToday() int32 {
+	if x != nil {
+		return x.TotalTasksToday
+	}
+	return 0
+}
+
+func (x *GetCostSummaryResponse) GetCostWarningThresholdUsd() float64 {
+	if x != nil {
+		return x.CostWarningThresholdUsd
+	}
+	return 0
+}
+
+type GetTriggerStatusRequest struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *GetTriggerStatusRequest) Reset() {
+	*x = GetTriggerStatusRequest{}
+	mi := &file_agent_v1_daemon_proto_msgTypes[24]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *GetTriggerStatusRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*GetTriggerStatusRequest) ProtoMessage() {}
+
+func (x *GetTriggerStatusRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_agent_v1_daemon_proto_msgTypes[24]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use GetTriggerStatusRequest.ProtoReflect.Descriptor instead.
+func (*GetTriggerStatusRequest) Descriptor() ([]byte, []int) {
+	return file_agent_v1_daemon_proto_rawDescGZIP(), []int{24}
+}
+
+type TriggerStatusEntry struct {
+	state            protoimpl.MessageState `protogen:"open.v1"`
+	Name             string                 `protobuf:"bytes,1,opt,name=name,proto3" json:"name,omitempty"`
+	TriggerType      string                 `protobuf:"bytes,2,opt,name=trigger_type,json=triggerType,proto3" json:"trigger_type,omitempty"`
+	LastFiredAt      string                 `protobuf:"bytes,3,opt,name=last_fired_at,json=lastFiredAt,proto3" json:"last_fired_at,omitempty"`
+	NextRunAt        string                 `protobuf:"bytes,4,opt,name=next_run_at,json=nextRunAt,proto3" json:"next_run_at,omitempty"`
+	TotalEventsFired int32                  `protobuf:"varint,5,opt,name=total_events_fired,json=totalEventsFired,proto3" json:"total_events_fired,omitempty"`
+	TasksCreated     int32                  `protobuf:"varint,6,opt,name=tasks_created,json=tasksCreated,proto3" json:"tasks_created,omitempty"`
+	unknownFields    protoimpl.UnknownFields
+	sizeCache        protoimpl.SizeCache
+}
+
+func (x *TriggerStatusEntry) Reset() {
+	*x = TriggerStatusEntry{}
+	mi := &file_agent_v1_daemon_proto_msgTypes[25]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *TriggerStatusEntry) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*TriggerStatusEntry) ProtoMessage() {}
+
+func (x *TriggerStatusEntry) ProtoReflect() protoreflect.Message {
+	mi := &file_agent_v1_daemon_proto_msgTypes[25]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use TriggerStatusEntry.ProtoReflect.Descriptor instead.
+func (*TriggerStatusEntry) Descriptor() ([]byte, []int) {
+	return file_agent_v1_daemon_proto_rawDescGZIP(), []int{25}
+}
+
+func (x *TriggerStatusEntry) GetName() string {
+	if x != nil {
+		return x.Name
+	}
+	return ""
+}
+
+func (x *TriggerStatusEntry) GetTriggerType() string {
+	if x != nil {
+		return x.TriggerType
+	}
+	return ""
+}
+
+func (x *TriggerStatusEntry) GetLastFiredAt() string {
+	if x != nil {
+		return x.LastFiredAt
+	}
+	return ""
+}
+
+func (x *TriggerStatusEntry) GetNextRunAt() string {
+	if x != nil {
+		return x.NextRunAt
+	}
+	return ""
+}
+
+func (x *TriggerStatusEntry) GetTotalEventsFired() int32 {
+	if x != nil {
+		return x.TotalEventsFired
+	}
+	return 0
+}
+
+func (x *TriggerStatusEntry) GetTasksCreated() int32 {
+	if x != nil {
+		return x.TasksCreated
+	}
+	return 0
+}
+
+type GetTriggerStatusResponse struct {
+	state              protoimpl.MessageState `protogen:"open.v1"`
+	Triggers           []*TriggerStatusEntry  `protobuf:"bytes,1,rep,name=triggers,proto3" json:"triggers,omitempty"`
+	WebhookEndpointUrl string                 `protobuf:"bytes,2,opt,name=webhook_endpoint_url,json=webhookEndpointUrl,proto3" json:"webhook_endpoint_url,omitempty"`
+	unknownFields      protoimpl.UnknownFields
+	sizeCache          protoimpl.SizeCache
+}
+
+func (x *GetTriggerStatusResponse) Reset() {
+	*x = GetTriggerStatusResponse{}
+	mi := &file_agent_v1_daemon_proto_msgTypes[26]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *GetTriggerStatusResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*GetTriggerStatusResponse) ProtoMessage() {}
+
+func (x *GetTriggerStatusResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_agent_v1_daemon_proto_msgTypes[26]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use GetTriggerStatusResponse.ProtoReflect.Descriptor instead.
+func (*GetTriggerStatusResponse) Descriptor() ([]byte, []int) {
+	return file_agent_v1_daemon_proto_rawDescGZIP(), []int{26}
+}
+
+func (x *GetTriggerStatusResponse) GetTriggers() []*TriggerStatusEntry {
+	if x != nil {
+		return x.Triggers
+	}
+	return nil
+}
+
+func (x *GetTriggerStatusResponse) GetWebhookEndpointUrl() string {
+	if x != nil {
+		return x.WebhookEndpointUrl
+	}
+	return ""
+}
+
 type ChatInput struct {
 	state protoimpl.MessageState `protogen:"open.v1"`
 	// Types that are valid to be assigned to Input:
@@ -1068,7 +1568,7 @@ type ChatInput struct {
 
 func (x *ChatInput) Reset() {
 	*x = ChatInput{}
-	mi := &file_agent_v1_daemon_proto_msgTypes[18]
+	mi := &file_agent_v1_daemon_proto_msgTypes[27]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1080,7 +1580,7 @@ func (x *ChatInput) String() string {
 func (*ChatInput) ProtoMessage() {}
 
 func (x *ChatInput) ProtoReflect() protoreflect.Message {
-	mi := &file_agent_v1_daemon_proto_msgTypes[18]
+	mi := &file_agent_v1_daemon_proto_msgTypes[27]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1093,7 +1593,7 @@ func (x *ChatInput) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ChatInput.ProtoReflect.Descriptor instead.
 func (*ChatInput) Descriptor() ([]byte, []int) {
-	return file_agent_v1_daemon_proto_rawDescGZIP(), []int{18}
+	return file_agent_v1_daemon_proto_rawDescGZIP(), []int{27}
 }
 
 func (x *ChatInput) GetInput() isChatInput_Input {
@@ -1170,7 +1670,7 @@ type ChatOutput struct {
 
 func (x *ChatOutput) Reset() {
 	*x = ChatOutput{}
-	mi := &file_agent_v1_daemon_proto_msgTypes[19]
+	mi := &file_agent_v1_daemon_proto_msgTypes[28]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1182,7 +1682,7 @@ func (x *ChatOutput) String() string {
 func (*ChatOutput) ProtoMessage() {}
 
 func (x *ChatOutput) ProtoReflect() protoreflect.Message {
-	mi := &file_agent_v1_daemon_proto_msgTypes[19]
+	mi := &file_agent_v1_daemon_proto_msgTypes[28]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1195,7 +1695,7 @@ func (x *ChatOutput) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ChatOutput.ProtoReflect.Descriptor instead.
 func (*ChatOutput) Descriptor() ([]byte, []int) {
-	return file_agent_v1_daemon_proto_rawDescGZIP(), []int{19}
+	return file_agent_v1_daemon_proto_rawDescGZIP(), []int{28}
 }
 
 func (x *ChatOutput) GetOutput() isChatOutput_Output {
@@ -1391,7 +1891,38 @@ const file_agent_v1_daemon_proto_rawDesc = "" +
 	"\x14cron_triggers_loaded\x18\x03 \x01(\x05R\x12cronTriggersLoaded\x126\n" +
 	"\x17webhook_triggers_loaded\x18\x04 \x01(\x05R\x15webhookTriggersLoaded\x126\n" +
 	"\x17watcher_triggers_loaded\x18\x05 \x01(\x05R\x15watcherTriggersLoaded\x12@\n" +
-	"\x1cnotification_channels_loaded\x18\x06 \x01(\x05R\x1anotificationChannelsLoaded\"\x8a\x01\n" +
+	"\x1cnotification_channels_loaded\x18\x06 \x01(\x05R\x1anotificationChannelsLoaded\"<\n" +
+	"\x17TestNotificationRequest\x12!\n" +
+	"\fchannel_name\x18\x01 \x01(\tR\vchannelName\"N\n" +
+	"\x18TestNotificationResponse\x12\x18\n" +
+	"\asuccess\x18\x01 \x01(\bR\asuccess\x12\x18\n" +
+	"\amessage\x18\x02 \x01(\tR\amessage\"+\n" +
+	"\x10RetryTaskRequest\x12\x17\n" +
+	"\atask_id\x18\x01 \x01(\tR\x06taskId\"g\n" +
+	"\x11RetryTaskResponse\x12\x1e\n" +
+	"\vnew_task_id\x18\x01 \x01(\tR\tnewTaskId\x12\x18\n" +
+	"\asuccess\x18\x02 \x01(\bR\asuccess\x12\x18\n" +
+	"\amessage\x18\x03 \x01(\tR\amessage\"\x17\n" +
+	"\x15GetCostSummaryRequest\"\x90\x03\n" +
+	"\x16GetCostSummaryResponse\x12/\n" +
+	"\x14total_cost_today_usd\x18\x01 \x01(\x01R\x11totalCostTodayUsd\x12-\n" +
+	"\x13total_cost_week_usd\x18\x02 \x01(\x01R\x10totalCostWeekUsd\x12/\n" +
+	"\x14total_cost_month_usd\x18\x03 \x01(\x01R\x11totalCostMonthUsd\x129\n" +
+	"\x19total_prompt_tokens_today\x18\x04 \x01(\x03R\x16totalPromptTokensToday\x12A\n" +
+	"\x1dtotal_completion_tokens_today\x18\x05 \x01(\x03R\x1atotalCompletionTokensToday\x12*\n" +
+	"\x11total_tasks_today\x18\x06 \x01(\x05R\x0ftotalTasksToday\x12;\n" +
+	"\x1acost_warning_threshold_usd\x18\a \x01(\x01R\x17costWarningThresholdUsd\"\x19\n" +
+	"\x17GetTriggerStatusRequest\"\xe2\x01\n" +
+	"\x12TriggerStatusEntry\x12\x12\n" +
+	"\x04name\x18\x01 \x01(\tR\x04name\x12!\n" +
+	"\ftrigger_type\x18\x02 \x01(\tR\vtriggerType\x12\"\n" +
+	"\rlast_fired_at\x18\x03 \x01(\tR\vlastFiredAt\x12\x1e\n" +
+	"\vnext_run_at\x18\x04 \x01(\tR\tnextRunAt\x12,\n" +
+	"\x12total_events_fired\x18\x05 \x01(\x05R\x10totalEventsFired\x12#\n" +
+	"\rtasks_created\x18\x06 \x01(\x05R\ftasksCreated\"\x86\x01\n" +
+	"\x18GetTriggerStatusResponse\x128\n" +
+	"\btriggers\x18\x01 \x03(\v2\x1c.agent.v1.TriggerStatusEntryR\btriggers\x120\n" +
+	"\x14webhook_endpoint_url\x18\x02 \x01(\tR\x12webhookEndpointUrl\"\x8a\x01\n" +
 	"\tChatInput\x12#\n" +
 	"\fuser_message\x18\x01 \x01(\tH\x00R\vuserMessage\x125\n" +
 	"\x15confirmation_response\x18\x02 \x01(\tH\x00R\x14confirmationResponse\x12\x18\n" +
@@ -1407,7 +1938,7 @@ const file_agent_v1_daemon_proto_rawDesc = "" +
 	"\x11waiting_for_input\x18\x05 \x01(\bH\x00R\x0fwaitingForInput\x12\x16\n" +
 	"\x05error\x18\x06 \x01(\tH\x00R\x05error\x12\x14\n" +
 	"\x04done\x18\a \x01(\bH\x00R\x04doneB\b\n" +
-	"\x06output2\xbe\x05\n" +
+	"\x06output2\x8f\b\n" +
 	"\rDaemonService\x12D\n" +
 	"\tGetStatus\x12\x1a.agent.v1.GetStatusRequest\x1a\x1b.agent.v1.GetStatusResponse\x12a\n" +
 	"\n" +
@@ -1419,7 +1950,11 @@ const file_agent_v1_daemon_proto_rawDesc = "" +
 	"\n" +
 	"WatchTasks\x12\x1b.agent.v1.WatchTasksRequest\x1a\x1c.agent.v1.WatchTasksResponse0\x01\x12U\n" +
 	"\x0eStreamTaskLogs\x12\x1f.agent.v1.StreamTaskLogsRequest\x1a .agent.v1.StreamTaskLogsResponse0\x01\x12M\n" +
-	"\fReloadConfig\x12\x1d.agent.v1.ReloadConfigRequest\x1a\x1e.agent.v1.ReloadConfigResponse2I\n" +
+	"\fReloadConfig\x12\x1d.agent.v1.ReloadConfigRequest\x1a\x1e.agent.v1.ReloadConfigResponse\x12Y\n" +
+	"\x10TestNotification\x12!.agent.v1.TestNotificationRequest\x1a\".agent.v1.TestNotificationResponse\x12D\n" +
+	"\tRetryTask\x12\x1a.agent.v1.RetryTaskRequest\x1a\x1b.agent.v1.RetryTaskResponse\x12S\n" +
+	"\x0eGetCostSummary\x12\x1f.agent.v1.GetCostSummaryRequest\x1a .agent.v1.GetCostSummaryResponse\x12Y\n" +
+	"\x10GetTriggerStatus\x12!.agent.v1.GetTriggerStatusRequest\x1a\".agent.v1.GetTriggerStatusResponse2I\n" +
 	"\x10AgentChatService\x125\n" +
 	"\x04Chat\x12\x13.agent.v1.ChatInput\x1a\x14.agent.v1.ChatOutput(\x010\x01B|\n" +
 	"\fcom.agent.v1B\vDaemonProtoP\x01Z\x1ekraken/gen/go/agent/v1;agentv1\xa2\x02\x03AXX\xaa\x02\bAgent.V1\xca\x02\bAgent\\V1\xe2\x02\x14Agent\\V1\\GPBMetadata\xea\x02\tAgent::V1b\x06proto3"
@@ -1436,7 +1971,7 @@ func file_agent_v1_daemon_proto_rawDescGZIP() []byte {
 	return file_agent_v1_daemon_proto_rawDescData
 }
 
-var file_agent_v1_daemon_proto_msgTypes = make([]protoimpl.MessageInfo, 20)
+var file_agent_v1_daemon_proto_msgTypes = make([]protoimpl.MessageInfo, 29)
 var file_agent_v1_daemon_proto_goTypes = []any{
 	(*GetStatusRequest)(nil),                // 0: agent.v1.GetStatusRequest
 	(*GetStatusResponse)(nil),               // 1: agent.v1.GetStatusResponse
@@ -1456,45 +1991,63 @@ var file_agent_v1_daemon_proto_goTypes = []any{
 	(*TaskLogEntry)(nil),                    // 15: agent.v1.TaskLogEntry
 	(*ReloadConfigRequest)(nil),             // 16: agent.v1.ReloadConfigRequest
 	(*ReloadConfigResponse)(nil),            // 17: agent.v1.ReloadConfigResponse
-	(*ChatInput)(nil),                       // 18: agent.v1.ChatInput
-	(*ChatOutput)(nil),                      // 19: agent.v1.ChatOutput
-	(*timestamppb.Timestamp)(nil),           // 20: google.protobuf.Timestamp
-	(*Artifact)(nil),                        // 21: agent.v1.Artifact
+	(*TestNotificationRequest)(nil),         // 18: agent.v1.TestNotificationRequest
+	(*TestNotificationResponse)(nil),        // 19: agent.v1.TestNotificationResponse
+	(*RetryTaskRequest)(nil),                // 20: agent.v1.RetryTaskRequest
+	(*RetryTaskResponse)(nil),               // 21: agent.v1.RetryTaskResponse
+	(*GetCostSummaryRequest)(nil),           // 22: agent.v1.GetCostSummaryRequest
+	(*GetCostSummaryResponse)(nil),          // 23: agent.v1.GetCostSummaryResponse
+	(*GetTriggerStatusRequest)(nil),         // 24: agent.v1.GetTriggerStatusRequest
+	(*TriggerStatusEntry)(nil),              // 25: agent.v1.TriggerStatusEntry
+	(*GetTriggerStatusResponse)(nil),        // 26: agent.v1.GetTriggerStatusResponse
+	(*ChatInput)(nil),                       // 27: agent.v1.ChatInput
+	(*ChatOutput)(nil),                      // 28: agent.v1.ChatOutput
+	(*timestamppb.Timestamp)(nil),           // 29: google.protobuf.Timestamp
+	(*Artifact)(nil),                        // 30: agent.v1.Artifact
 }
 var file_agent_v1_daemon_proto_depIdxs = []int32{
 	6,  // 0: agent.v1.DaemonServiceListTasksResponse.tasks:type_name -> agent.v1.DaemonTask
-	20, // 1: agent.v1.DaemonTask.created_at:type_name -> google.protobuf.Timestamp
-	20, // 2: agent.v1.DaemonTask.started_at:type_name -> google.protobuf.Timestamp
-	20, // 3: agent.v1.DaemonTask.completed_at:type_name -> google.protobuf.Timestamp
+	29, // 1: agent.v1.DaemonTask.created_at:type_name -> google.protobuf.Timestamp
+	29, // 2: agent.v1.DaemonTask.started_at:type_name -> google.protobuf.Timestamp
+	29, // 3: agent.v1.DaemonTask.completed_at:type_name -> google.protobuf.Timestamp
 	6,  // 4: agent.v1.GetTaskDetailResponse.task:type_name -> agent.v1.DaemonTask
 	15, // 5: agent.v1.GetTaskDetailResponse.logs:type_name -> agent.v1.TaskLogEntry
-	21, // 6: agent.v1.GetTaskDetailResponse.artifacts:type_name -> agent.v1.Artifact
+	30, // 6: agent.v1.GetTaskDetailResponse.artifacts:type_name -> agent.v1.Artifact
 	6,  // 7: agent.v1.WatchTasksResponse.task:type_name -> agent.v1.DaemonTask
 	15, // 8: agent.v1.StreamTaskLogsResponse.log:type_name -> agent.v1.TaskLogEntry
-	20, // 9: agent.v1.TaskLogEntry.timestamp:type_name -> google.protobuf.Timestamp
-	0,  // 10: agent.v1.DaemonService.GetStatus:input_type -> agent.v1.GetStatusRequest
-	2,  // 11: agent.v1.DaemonService.SubmitTask:input_type -> agent.v1.DaemonServiceSubmitTaskRequest
-	4,  // 12: agent.v1.DaemonService.ListTasks:input_type -> agent.v1.DaemonServiceListTasksRequest
-	7,  // 13: agent.v1.DaemonService.GetTaskDetail:input_type -> agent.v1.GetTaskDetailRequest
-	9,  // 14: agent.v1.DaemonService.CancelTask:input_type -> agent.v1.DaemonServiceCancelTaskRequest
-	11, // 15: agent.v1.DaemonService.WatchTasks:input_type -> agent.v1.WatchTasksRequest
-	13, // 16: agent.v1.DaemonService.StreamTaskLogs:input_type -> agent.v1.StreamTaskLogsRequest
-	16, // 17: agent.v1.DaemonService.ReloadConfig:input_type -> agent.v1.ReloadConfigRequest
-	18, // 18: agent.v1.AgentChatService.Chat:input_type -> agent.v1.ChatInput
-	1,  // 19: agent.v1.DaemonService.GetStatus:output_type -> agent.v1.GetStatusResponse
-	3,  // 20: agent.v1.DaemonService.SubmitTask:output_type -> agent.v1.DaemonServiceSubmitTaskResponse
-	5,  // 21: agent.v1.DaemonService.ListTasks:output_type -> agent.v1.DaemonServiceListTasksResponse
-	8,  // 22: agent.v1.DaemonService.GetTaskDetail:output_type -> agent.v1.GetTaskDetailResponse
-	10, // 23: agent.v1.DaemonService.CancelTask:output_type -> agent.v1.DaemonServiceCancelTaskResponse
-	12, // 24: agent.v1.DaemonService.WatchTasks:output_type -> agent.v1.WatchTasksResponse
-	14, // 25: agent.v1.DaemonService.StreamTaskLogs:output_type -> agent.v1.StreamTaskLogsResponse
-	17, // 26: agent.v1.DaemonService.ReloadConfig:output_type -> agent.v1.ReloadConfigResponse
-	19, // 27: agent.v1.AgentChatService.Chat:output_type -> agent.v1.ChatOutput
-	19, // [19:28] is the sub-list for method output_type
-	10, // [10:19] is the sub-list for method input_type
-	10, // [10:10] is the sub-list for extension type_name
-	10, // [10:10] is the sub-list for extension extendee
-	0,  // [0:10] is the sub-list for field type_name
+	29, // 9: agent.v1.TaskLogEntry.timestamp:type_name -> google.protobuf.Timestamp
+	25, // 10: agent.v1.GetTriggerStatusResponse.triggers:type_name -> agent.v1.TriggerStatusEntry
+	0,  // 11: agent.v1.DaemonService.GetStatus:input_type -> agent.v1.GetStatusRequest
+	2,  // 12: agent.v1.DaemonService.SubmitTask:input_type -> agent.v1.DaemonServiceSubmitTaskRequest
+	4,  // 13: agent.v1.DaemonService.ListTasks:input_type -> agent.v1.DaemonServiceListTasksRequest
+	7,  // 14: agent.v1.DaemonService.GetTaskDetail:input_type -> agent.v1.GetTaskDetailRequest
+	9,  // 15: agent.v1.DaemonService.CancelTask:input_type -> agent.v1.DaemonServiceCancelTaskRequest
+	11, // 16: agent.v1.DaemonService.WatchTasks:input_type -> agent.v1.WatchTasksRequest
+	13, // 17: agent.v1.DaemonService.StreamTaskLogs:input_type -> agent.v1.StreamTaskLogsRequest
+	16, // 18: agent.v1.DaemonService.ReloadConfig:input_type -> agent.v1.ReloadConfigRequest
+	18, // 19: agent.v1.DaemonService.TestNotification:input_type -> agent.v1.TestNotificationRequest
+	20, // 20: agent.v1.DaemonService.RetryTask:input_type -> agent.v1.RetryTaskRequest
+	22, // 21: agent.v1.DaemonService.GetCostSummary:input_type -> agent.v1.GetCostSummaryRequest
+	24, // 22: agent.v1.DaemonService.GetTriggerStatus:input_type -> agent.v1.GetTriggerStatusRequest
+	27, // 23: agent.v1.AgentChatService.Chat:input_type -> agent.v1.ChatInput
+	1,  // 24: agent.v1.DaemonService.GetStatus:output_type -> agent.v1.GetStatusResponse
+	3,  // 25: agent.v1.DaemonService.SubmitTask:output_type -> agent.v1.DaemonServiceSubmitTaskResponse
+	5,  // 26: agent.v1.DaemonService.ListTasks:output_type -> agent.v1.DaemonServiceListTasksResponse
+	8,  // 27: agent.v1.DaemonService.GetTaskDetail:output_type -> agent.v1.GetTaskDetailResponse
+	10, // 28: agent.v1.DaemonService.CancelTask:output_type -> agent.v1.DaemonServiceCancelTaskResponse
+	12, // 29: agent.v1.DaemonService.WatchTasks:output_type -> agent.v1.WatchTasksResponse
+	14, // 30: agent.v1.DaemonService.StreamTaskLogs:output_type -> agent.v1.StreamTaskLogsResponse
+	17, // 31: agent.v1.DaemonService.ReloadConfig:output_type -> agent.v1.ReloadConfigResponse
+	19, // 32: agent.v1.DaemonService.TestNotification:output_type -> agent.v1.TestNotificationResponse
+	21, // 33: agent.v1.DaemonService.RetryTask:output_type -> agent.v1.RetryTaskResponse
+	23, // 34: agent.v1.DaemonService.GetCostSummary:output_type -> agent.v1.GetCostSummaryResponse
+	26, // 35: agent.v1.DaemonService.GetTriggerStatus:output_type -> agent.v1.GetTriggerStatusResponse
+	28, // 36: agent.v1.AgentChatService.Chat:output_type -> agent.v1.ChatOutput
+	24, // [24:37] is the sub-list for method output_type
+	11, // [11:24] is the sub-list for method input_type
+	11, // [11:11] is the sub-list for extension type_name
+	11, // [11:11] is the sub-list for extension extendee
+	0,  // [0:11] is the sub-list for field type_name
 }
 
 func init() { file_agent_v1_daemon_proto_init() }
@@ -1503,12 +2056,12 @@ func file_agent_v1_daemon_proto_init() {
 		return
 	}
 	file_agent_v1_worker_proto_init()
-	file_agent_v1_daemon_proto_msgTypes[18].OneofWrappers = []any{
+	file_agent_v1_daemon_proto_msgTypes[27].OneofWrappers = []any{
 		(*ChatInput_UserMessage)(nil),
 		(*ChatInput_ConfirmationResponse)(nil),
 		(*ChatInput_Cancel)(nil),
 	}
-	file_agent_v1_daemon_proto_msgTypes[19].OneofWrappers = []any{
+	file_agent_v1_daemon_proto_msgTypes[28].OneofWrappers = []any{
 		(*ChatOutput_TextDelta)(nil),
 		(*ChatOutput_Activity)(nil),
 		(*ChatOutput_ToolCallDescription)(nil),
@@ -1523,7 +2076,7 @@ func file_agent_v1_daemon_proto_init() {
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_agent_v1_daemon_proto_rawDesc), len(file_agent_v1_daemon_proto_rawDesc)),
 			NumEnums:      0,
-			NumMessages:   20,
+			NumMessages:   29,
 			NumExtensions: 0,
 			NumServices:   2,
 		},

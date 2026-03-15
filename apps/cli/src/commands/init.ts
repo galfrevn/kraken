@@ -50,8 +50,9 @@ function generateKrakenYml(options: {
     "services:",
     "  schedulerUrl: http://localhost:50051",
     "",
-    "scheduler:",
+    "triggers:",
     "  crons: []",
+    "  webhooks: []",
     "  watchers: []",
   ];
 

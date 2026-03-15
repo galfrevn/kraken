@@ -104,6 +104,53 @@ message ReloadConfigResponse {
   int32 notification_channels_loaded = 6;
 }
 
+message TestNotificationRequest {
+  string channel_name = 1;
+}
+
+message TestNotificationResponse {
+  bool success = 1;
+  string message = 2;
+}
+
+message RetryTaskRequest {
+  string task_id = 1;
+}
+
+message RetryTaskResponse {
+  string new_task_id = 1;
+  bool success = 2;
+  string message = 3;
+}
+
+message GetCostSummaryRequest {}
+
+message GetCostSummaryResponse {
+  double total_cost_today_usd = 1;
+  double total_cost_week_usd = 2;
+  double total_cost_month_usd = 3;
+  int64 total_prompt_tokens_today = 4;
+  int64 total_completion_tokens_today = 5;
+  int32 total_tasks_today = 6;
+  double cost_warning_threshold_usd = 7;
+}
+
+message GetTriggerStatusRequest {}
+
+message TriggerStatusEntry {
+  string name = 1;
+  string trigger_type = 2;
+  string last_fired_at = 3;
+  string next_run_at = 4;
+  int32 total_events_fired = 5;
+  int32 tasks_created = 6;
+}
+
+message GetTriggerStatusResponse {
+  repeated TriggerStatusEntry triggers = 1;
+  string webhook_endpoint_url = 2;
+}
+
 service DaemonService {
   rpc GetStatus(GetStatusRequest) returns (GetStatusResponse);
   rpc SubmitTask(DaemonServiceSubmitTaskRequest) returns (DaemonServiceSubmitTaskResponse);
@@ -113,6 +160,10 @@ service DaemonService {
   rpc WatchTasks(WatchTasksRequest) returns (stream WatchTasksResponse);
   rpc StreamTaskLogs(StreamTaskLogsRequest) returns (stream StreamTaskLogsResponse);
   rpc ReloadConfig(ReloadConfigRequest) returns (ReloadConfigResponse);
+  rpc TestNotification(TestNotificationRequest) returns (TestNotificationResponse);
+  rpc RetryTask(RetryTaskRequest) returns (RetryTaskResponse);
+  rpc GetCostSummary(GetCostSummaryRequest) returns (GetCostSummaryResponse);
+  rpc GetTriggerStatus(GetTriggerStatusRequest) returns (GetTriggerStatusResponse);
 }
 
 service AgentChatService {

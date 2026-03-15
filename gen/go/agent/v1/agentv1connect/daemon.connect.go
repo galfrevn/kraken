@@ -57,6 +57,17 @@ const (
 	// DaemonServiceReloadConfigProcedure is the fully-qualified name of the DaemonService's
 	// ReloadConfig RPC.
 	DaemonServiceReloadConfigProcedure = "/agent.v1.DaemonService/ReloadConfig"
+	// DaemonServiceTestNotificationProcedure is the fully-qualified name of the DaemonService's
+	// TestNotification RPC.
+	DaemonServiceTestNotificationProcedure = "/agent.v1.DaemonService/TestNotification"
+	// DaemonServiceRetryTaskProcedure is the fully-qualified name of the DaemonService's RetryTask RPC.
+	DaemonServiceRetryTaskProcedure = "/agent.v1.DaemonService/RetryTask"
+	// DaemonServiceGetCostSummaryProcedure is the fully-qualified name of the DaemonService's
+	// GetCostSummary RPC.
+	DaemonServiceGetCostSummaryProcedure = "/agent.v1.DaemonService/GetCostSummary"
+	// DaemonServiceGetTriggerStatusProcedure is the fully-qualified name of the DaemonService's
+	// GetTriggerStatus RPC.
+	DaemonServiceGetTriggerStatusProcedure = "/agent.v1.DaemonService/GetTriggerStatus"
 	// AgentChatServiceChatProcedure is the fully-qualified name of the AgentChatService's Chat RPC.
 	AgentChatServiceChatProcedure = "/agent.v1.AgentChatService/Chat"
 )
@@ -71,6 +82,10 @@ type DaemonServiceClient interface {
 	WatchTasks(context.Context, *connect.Request[v1.WatchTasksRequest]) (*connect.ServerStreamForClient[v1.WatchTasksResponse], error)
 	StreamTaskLogs(context.Context, *connect.Request[v1.StreamTaskLogsRequest]) (*connect.ServerStreamForClient[v1.StreamTaskLogsResponse], error)
 	ReloadConfig(context.Context, *connect.Request[v1.ReloadConfigRequest]) (*connect.Response[v1.ReloadConfigResponse], error)
+	TestNotification(context.Context, *connect.Request[v1.TestNotificationRequest]) (*connect.Response[v1.TestNotificationResponse], error)
+	RetryTask(context.Context, *connect.Request[v1.RetryTaskRequest]) (*connect.Response[v1.RetryTaskResponse], error)
+	GetCostSummary(context.Context, *connect.Request[v1.GetCostSummaryRequest]) (*connect.Response[v1.GetCostSummaryResponse], error)
+	GetTriggerStatus(context.Context, *connect.Request[v1.GetTriggerStatusRequest]) (*connect.Response[v1.GetTriggerStatusResponse], error)
 }
 
 // NewDaemonServiceClient constructs a client for the agent.v1.DaemonService service. By default, it
@@ -132,19 +147,47 @@ func NewDaemonServiceClient(httpClient connect.HTTPClient, baseURL string, opts 
 			connect.WithSchema(daemonServiceMethods.ByName("ReloadConfig")),
 			connect.WithClientOptions(opts...),
 		),
+		testNotification: connect.NewClient[v1.TestNotificationRequest, v1.TestNotificationResponse](
+			httpClient,
+			baseURL+DaemonServiceTestNotificationProcedure,
+			connect.WithSchema(daemonServiceMethods.ByName("TestNotification")),
+			connect.WithClientOptions(opts...),
+		),
+		retryTask: connect.NewClient[v1.RetryTaskRequest, v1.RetryTaskResponse](
+			httpClient,
+			baseURL+DaemonServiceRetryTaskProcedure,
+			connect.WithSchema(daemonServiceMethods.ByName("RetryTask")),
+			connect.WithClientOptions(opts...),
+		),
+		getCostSummary: connect.NewClient[v1.GetCostSummaryRequest, v1.GetCostSummaryResponse](
+			httpClient,
+			baseURL+DaemonServiceGetCostSummaryProcedure,
+			connect.WithSchema(daemonServiceMethods.ByName("GetCostSummary")),
+			connect.WithClientOptions(opts...),
+		),
+		getTriggerStatus: connect.NewClient[v1.GetTriggerStatusRequest, v1.GetTriggerStatusResponse](
+			httpClient,
+			baseURL+DaemonServiceGetTriggerStatusProcedure,
+			connect.WithSchema(daemonServiceMethods.ByName("GetTriggerStatus")),
+			connect.WithClientOptions(opts...),
+		),
 	}
 }
 
 // daemonServiceClient implements DaemonServiceClient.
 type daemonServiceClient struct {
-	getStatus      *connect.Client[v1.GetStatusRequest, v1.GetStatusResponse]
-	submitTask     *connect.Client[v1.DaemonServiceSubmitTaskRequest, v1.DaemonServiceSubmitTaskResponse]
-	listTasks      *connect.Client[v1.DaemonServiceListTasksRequest, v1.DaemonServiceListTasksResponse]
-	getTaskDetail  *connect.Client[v1.GetTaskDetailRequest, v1.GetTaskDetailResponse]
-	cancelTask     *connect.Client[v1.DaemonServiceCancelTaskRequest, v1.DaemonServiceCancelTaskResponse]
-	watchTasks     *connect.Client[v1.WatchTasksRequest, v1.WatchTasksResponse]
-	streamTaskLogs *connect.Client[v1.StreamTaskLogsRequest, v1.StreamTaskLogsResponse]
-	reloadConfig   *connect.Client[v1.ReloadConfigRequest, v1.ReloadConfigResponse]
+	getStatus        *connect.Client[v1.GetStatusRequest, v1.GetStatusResponse]
+	submitTask       *connect.Client[v1.DaemonServiceSubmitTaskRequest, v1.DaemonServiceSubmitTaskResponse]
+	listTasks        *connect.Client[v1.DaemonServiceListTasksRequest, v1.DaemonServiceListTasksResponse]
+	getTaskDetail    *connect.Client[v1.GetTaskDetailRequest, v1.GetTaskDetailResponse]
+	cancelTask       *connect.Client[v1.DaemonServiceCancelTaskRequest, v1.DaemonServiceCancelTaskResponse]
+	watchTasks       *connect.Client[v1.WatchTasksRequest, v1.WatchTasksResponse]
+	streamTaskLogs   *connect.Client[v1.StreamTaskLogsRequest, v1.StreamTaskLogsResponse]
+	reloadConfig     *connect.Client[v1.ReloadConfigRequest, v1.ReloadConfigResponse]
+	testNotification *connect.Client[v1.TestNotificationRequest, v1.TestNotificationResponse]
+	retryTask        *connect.Client[v1.RetryTaskRequest, v1.RetryTaskResponse]
+	getCostSummary   *connect.Client[v1.GetCostSummaryRequest, v1.GetCostSummaryResponse]
+	getTriggerStatus *connect.Client[v1.GetTriggerStatusRequest, v1.GetTriggerStatusResponse]
 }
 
 // GetStatus calls agent.v1.DaemonService.GetStatus.
@@ -187,6 +230,26 @@ func (c *daemonServiceClient) ReloadConfig(ctx context.Context, req *connect.Req
 	return c.reloadConfig.CallUnary(ctx, req)
 }
 
+// TestNotification calls agent.v1.DaemonService.TestNotification.
+func (c *daemonServiceClient) TestNotification(ctx context.Context, req *connect.Request[v1.TestNotificationRequest]) (*connect.Response[v1.TestNotificationResponse], error) {
+	return c.testNotification.CallUnary(ctx, req)
+}
+
+// RetryTask calls agent.v1.DaemonService.RetryTask.
+func (c *daemonServiceClient) RetryTask(ctx context.Context, req *connect.Request[v1.RetryTaskRequest]) (*connect.Response[v1.RetryTaskResponse], error) {
+	return c.retryTask.CallUnary(ctx, req)
+}
+
+// GetCostSummary calls agent.v1.DaemonService.GetCostSummary.
+func (c *daemonServiceClient) GetCostSummary(ctx context.Context, req *connect.Request[v1.GetCostSummaryRequest]) (*connect.Response[v1.GetCostSummaryResponse], error) {
+	return c.getCostSummary.CallUnary(ctx, req)
+}
+
+// GetTriggerStatus calls agent.v1.DaemonService.GetTriggerStatus.
+func (c *daemonServiceClient) GetTriggerStatus(ctx context.Context, req *connect.Request[v1.GetTriggerStatusRequest]) (*connect.Response[v1.GetTriggerStatusResponse], error) {
+	return c.getTriggerStatus.CallUnary(ctx, req)
+}
+
 // DaemonServiceHandler is an implementation of the agent.v1.DaemonService service.
 type DaemonServiceHandler interface {
 	GetStatus(context.Context, *connect.Request[v1.GetStatusRequest]) (*connect.Response[v1.GetStatusResponse], error)
@@ -197,6 +260,10 @@ type DaemonServiceHandler interface {
 	WatchTasks(context.Context, *connect.Request[v1.WatchTasksRequest], *connect.ServerStream[v1.WatchTasksResponse]) error
 	StreamTaskLogs(context.Context, *connect.Request[v1.StreamTaskLogsRequest], *connect.ServerStream[v1.StreamTaskLogsResponse]) error
 	ReloadConfig(context.Context, *connect.Request[v1.ReloadConfigRequest]) (*connect.Response[v1.ReloadConfigResponse], error)
+	TestNotification(context.Context, *connect.Request[v1.TestNotificationRequest]) (*connect.Response[v1.TestNotificationResponse], error)
+	RetryTask(context.Context, *connect.Request[v1.RetryTaskRequest]) (*connect.Response[v1.RetryTaskResponse], error)
+	GetCostSummary(context.Context, *connect.Request[v1.GetCostSummaryRequest]) (*connect.Response[v1.GetCostSummaryResponse], error)
+	GetTriggerStatus(context.Context, *connect.Request[v1.GetTriggerStatusRequest]) (*connect.Response[v1.GetTriggerStatusResponse], error)
 }
 
 // NewDaemonServiceHandler builds an HTTP handler from the service implementation. It returns the
@@ -254,6 +321,30 @@ func NewDaemonServiceHandler(svc DaemonServiceHandler, opts ...connect.HandlerOp
 		connect.WithSchema(daemonServiceMethods.ByName("ReloadConfig")),
 		connect.WithHandlerOptions(opts...),
 	)
+	daemonServiceTestNotificationHandler := connect.NewUnaryHandler(
+		DaemonServiceTestNotificationProcedure,
+		svc.TestNotification,
+		connect.WithSchema(daemonServiceMethods.ByName("TestNotification")),
+		connect.WithHandlerOptions(opts...),
+	)
+	daemonServiceRetryTaskHandler := connect.NewUnaryHandler(
+		DaemonServiceRetryTaskProcedure,
+		svc.RetryTask,
+		connect.WithSchema(daemonServiceMethods.ByName("RetryTask")),
+		connect.WithHandlerOptions(opts...),
+	)
+	daemonServiceGetCostSummaryHandler := connect.NewUnaryHandler(
+		DaemonServiceGetCostSummaryProcedure,
+		svc.GetCostSummary,
+		connect.WithSchema(daemonServiceMethods.ByName("GetCostSummary")),
+		connect.WithHandlerOptions(opts...),
+	)
+	daemonServiceGetTriggerStatusHandler := connect.NewUnaryHandler(
+		DaemonServiceGetTriggerStatusProcedure,
+		svc.GetTriggerStatus,
+		connect.WithSchema(daemonServiceMethods.ByName("GetTriggerStatus")),
+		connect.WithHandlerOptions(opts...),
+	)
 	return "/agent.v1.DaemonService/", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		switch r.URL.Path {
 		case DaemonServiceGetStatusProcedure:
@@ -272,6 +363,14 @@ func NewDaemonServiceHandler(svc DaemonServiceHandler, opts ...connect.HandlerOp
 			daemonServiceStreamTaskLogsHandler.ServeHTTP(w, r)
 		case DaemonServiceReloadConfigProcedure:
 			daemonServiceReloadConfigHandler.ServeHTTP(w, r)
+		case DaemonServiceTestNotificationProcedure:
+			daemonServiceTestNotificationHandler.ServeHTTP(w, r)
+		case DaemonServiceRetryTaskProcedure:
+			daemonServiceRetryTaskHandler.ServeHTTP(w, r)
+		case DaemonServiceGetCostSummaryProcedure:
+			daemonServiceGetCostSummaryHandler.ServeHTTP(w, r)
+		case DaemonServiceGetTriggerStatusProcedure:
+			daemonServiceGetTriggerStatusHandler.ServeHTTP(w, r)
 		default:
 			http.NotFound(w, r)
 		}
@@ -311,6 +410,22 @@ func (UnimplementedDaemonServiceHandler) StreamTaskLogs(context.Context, *connec
 
 func (UnimplementedDaemonServiceHandler) ReloadConfig(context.Context, *connect.Request[v1.ReloadConfigRequest]) (*connect.Response[v1.ReloadConfigResponse], error) {
 	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("agent.v1.DaemonService.ReloadConfig is not implemented"))
+}
+
+func (UnimplementedDaemonServiceHandler) TestNotification(context.Context, *connect.Request[v1.TestNotificationRequest]) (*connect.Response[v1.TestNotificationResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("agent.v1.DaemonService.TestNotification is not implemented"))
+}
+
+func (UnimplementedDaemonServiceHandler) RetryTask(context.Context, *connect.Request[v1.RetryTaskRequest]) (*connect.Response[v1.RetryTaskResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("agent.v1.DaemonService.RetryTask is not implemented"))
+}
+
+func (UnimplementedDaemonServiceHandler) GetCostSummary(context.Context, *connect.Request[v1.GetCostSummaryRequest]) (*connect.Response[v1.GetCostSummaryResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("agent.v1.DaemonService.GetCostSummary is not implemented"))
+}
+
+func (UnimplementedDaemonServiceHandler) GetTriggerStatus(context.Context, *connect.Request[v1.GetTriggerStatusRequest]) (*connect.Response[v1.GetTriggerStatusResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("agent.v1.DaemonService.GetTriggerStatus is not implemented"))
 }
 
 // AgentChatServiceClient is a client for the agent.v1.AgentChatService service.

@@ -466,6 +466,8 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             Arc::clone(&trigger_engine),
             Arc::clone(&reloadable_notification_dispatcher),
             command_line_config_path.clone(),
+            daemon_config.services.webhook_port,
+            daemon_config.costs.cost_warning_threshold_usd.unwrap_or(50.0),
         );
 
     // -----------------------------------------------------------------------

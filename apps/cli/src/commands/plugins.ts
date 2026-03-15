@@ -41,6 +41,123 @@ async function fetchRemoteRegistry(): Promise<RegistryManifest> {
   return (await response.json()) as RegistryManifest;
 }
 
+async function searchPluginRegistry(searchQuery: string | undefined): Promise<void> {
+  step("searching plugin registry");
+
+  try {
+    const registryManifest = await fetchRemoteRegistry();
+    const pluginsDirectory = getPluginsDirectory();
+    const installedPlugins = existsSync(pluginsDirectory) ? listPlugins(pluginsDirectory) : [];
+    const installedPluginNames = new Set(installedPlugins.map((plugin) => plugin.name));
+
+    let filteredRegistryEntries = registryManifest.plugins;
+
+    if (searchQuery) {
+      const lowercaseSearchQuery = searchQuery.toLowerCase();
+      filteredRegistryEntries = registryManifest.plugins.filter(
+        (registryEntry) =>
+          registryEntry.name.toLowerCase().includes(lowercaseSearchQuery) ||
+          registryEntry.description.toLowerCase().includes(lowercaseSearchQuery),
+      );
+    }
+
+    if (filteredRegistryEntries.length === 0) {
+      warn(`no plugins found matching '${searchQuery}'`);
+      return;
+    }
+
+    console.log();
+    for (const registryEntry of filteredRegistryEntries) {
+      const isAlreadyInstalled = installedPluginNames.has(registryEntry.name);
+      const installationStatusIcon = isAlreadyInstalled
+        ? colorize("installed", "green")
+        : colorize("not installed", "dim");
+
+      console.log(
+        `  ${bold(colorize(registryEntry.name, "cyan"))} ${colorize(`v${registryEntry.version}`, "dim")} [${installationStatusIcon}]`,
+      );
+      console.log(`    ${registryEntry.description}`);
+      if (registryEntry.tools.length > 0) {
+        console.log(
+          `    ${colorize("tools:", "dim")} ${registryEntry.tools.join(", ")}`,
+        );
+      }
+      if (registryEntry.requires.length > 0) {
+        console.log(
+          `    ${colorize("requires:", "dim")} ${registryEntry.requires.join(", ")}`,
+        );
+      }
+      console.log();
+    }
+  } catch (error) {
+    const errorMessage = error instanceof Error ? error.message : String(error);
+    fail(`failed to search registry: ${errorMessage}`);
+    process.exit(1);
+  }
+}
+
+async function showPluginInfo(pluginName: string | undefined): Promise<void> {
+  if (!pluginName) {
+    fail("plugin name is required");
+    console.log(`\n  Run ${colorize("kraken plugins search", "cyan")} to browse available plugins.\n`);
+    process.exit(1);
+  }
+
+  step(`plugin info: ${pluginName}`);
+
+  try {
+    const registryManifest = await fetchRemoteRegistry();
+    const matchingRegistryEntry = registryManifest.plugins.find(
+      (registryEntry) => registryEntry.name === pluginName,
+    );
+
+    if (!matchingRegistryEntry) {
+      fail(`plugin "${pluginName}" not found in registry`);
+      console.log(`\n  Run ${colorize("kraken plugins search", "cyan")} to browse available plugins.\n`);
+      process.exit(1);
+    }
+
+    const pluginsDirectory = getPluginsDirectory();
+    const installedPlugins = existsSync(pluginsDirectory) ? listPlugins(pluginsDirectory) : [];
+    const isAlreadyInstalled = installedPlugins.some((plugin) => plugin.name === pluginName);
+
+    console.log();
+    console.log(
+      `  ${bold(colorize(matchingRegistryEntry.name, "cyan"))} ${colorize(`v${matchingRegistryEntry.version}`, "dim")}`,
+    );
+    console.log(`  ${colorize("author:", "dim")} ${matchingRegistryEntry.author}`);
+    console.log(`  ${colorize("description:", "dim")} ${matchingRegistryEntry.description}`);
+
+    if (matchingRegistryEntry.tools.length > 0) {
+      console.log(`  ${colorize("tools:", "dim")}`);
+      for (const toolName of matchingRegistryEntry.tools) {
+        console.log(`    - ${toolName}`);
+      }
+    }
+
+    if (matchingRegistryEntry.requires.length > 0) {
+      console.log(`  ${colorize("requires:", "dim")}`);
+      for (const requiredDependency of matchingRegistryEntry.requires) {
+        console.log(`    - ${requiredDependency}`);
+      }
+    }
+
+    console.log();
+    if (isAlreadyInstalled) {
+      console.log(`  ${colorize("status:", "dim")} ${colorize("installed", "green")}`);
+    } else {
+      console.log(
+        `  ${colorize("install:", "dim")} ${colorize(`kraken plugins install ${matchingRegistryEntry.name}`, "cyan")}`,
+      );
+    }
+    console.log();
+  } catch (error) {
+    const errorMessage = error instanceof Error ? error.message : String(error);
+    fail(`failed to fetch plugin info: ${errorMessage}`);
+    process.exit(1);
+  }
+}
+
 function checkCommandAvailable(command: string): boolean {
   try {
     const result = Bun.spawnSync({ cmd: ["which", command], stdout: "pipe", stderr: "pipe" });
@@ -274,43 +391,28 @@ export default plugin;
   }
 
   if (subcommand === "search" || subcommand === "store") {
-    step("available plugins");
+    const searchQueryFromArguments = args.slice(1).join(" ") || undefined;
+    await searchPluginRegistry(searchQueryFromArguments);
+    return;
+  }
 
-    try {
-      const registry = await fetchRemoteRegistry();
-      const installed = existsSync(pluginsDirectory) ? listPlugins(pluginsDirectory) : [];
-      const installedNames = new Set(installed.map((p) => p.name));
-
-      console.log();
-      for (const entry of registry.plugins) {
-        const isInstalled = installedNames.has(entry.name);
-        const statusIcon = isInstalled ? colorize("✓", "green") : colorize("○", "dim");
-        const statusLabel = isInstalled ? colorize(" installed", "green") : "";
-        console.log(
-          `  ${statusIcon} ${colorize(entry.name, "cyan")} ${colorize(`v${entry.version}`, "dim")}${statusLabel}`,
-        );
-        console.log(`    ${entry.description}`);
-        console.log(
-          `    ${colorize(`${entry.tools.length} tools`, "dim")}${entry.requires.length > 0 ? colorize(` | requires: ${entry.requires.join(", ")}`, "dim") : ""}`,
-        );
-        console.log();
-      }
-    } catch (error) {
-      const message = error instanceof Error ? error.message : String(error);
-      fail(`failed to fetch registry: ${message}`);
-      process.exit(1);
-    }
+  if (subcommand === "info") {
+    const pluginNameFromArguments = args[1];
+    await showPluginInfo(pluginNameFromArguments);
     return;
   }
 
   console.log(`\n  ${bold("Usage:")}`);
-  console.log(`    ${colorize("kraken plugins", "cyan")}                 list installed plugins`);
+  console.log(`    ${colorize("kraken plugins", "cyan")}                        list installed plugins`);
   console.log(
-    `    ${colorize("kraken plugins search", "cyan")}           browse available plugins`,
+    `    ${colorize("kraken plugins search", "cyan")} [query]      browse and filter available plugins`,
   );
   console.log(
-    `    ${colorize("kraken plugins install", "cyan")} <name>   install a plugin from the registry`,
+    `    ${colorize("kraken plugins info", "cyan")} <name>          show detailed plugin information`,
   );
-  console.log(`    ${colorize("kraken plugins inspect", "cyan")} <name>   show plugin details`);
-  console.log(`    ${colorize("kraken plugins create", "cyan")} <name>    scaffold a new plugin\n`);
+  console.log(
+    `    ${colorize("kraken plugins install", "cyan")} <name>       install a plugin from the registry`,
+  );
+  console.log(`    ${colorize("kraken plugins inspect", "cyan")} <name>       show installed plugin details`);
+  console.log(`    ${colorize("kraken plugins create", "cyan")} <name>        scaffold a new plugin\n`);
 }

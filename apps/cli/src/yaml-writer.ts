@@ -15,85 +15,83 @@ export function writeConfigFile(fileContents: string): void {
   writeFileSync(configurationFilePath, fileContents);
 }
 
-export function serializeYamlValue(
-  value: unknown,
-  indentationLevel: number,
-): string {
-  const indentationSpaces = " ".repeat(indentationLevel * 2);
+function quoteYamlStringIfNeeded(value: string): string {
+  const requiresQuoting =
+    value.includes(":") ||
+    value.includes("#") ||
+    value.includes("{") ||
+    value.includes("}") ||
+    value.includes("[") ||
+    value.includes("]") ||
+    value.includes(",") ||
+    value.includes("&") ||
+    value.includes("*") ||
+    value.includes("!") ||
+    value.includes("|") ||
+    value.includes(">") ||
+    value.includes("'") ||
+    value.includes('"') ||
+    value.includes("%") ||
+    value.includes("@") ||
+    value.includes("`") ||
+    value.startsWith(" ") ||
+    value.endsWith(" ") ||
+    value === "";
 
+  if (requiresQuoting) return `"${value.replace(/\\/g, "\\\\").replace(/"/g, '\\"')}"`;
+  return value;
+}
+
+function serializeScalarValue(value: unknown): string {
   if (value === null || value === undefined) return "null";
   if (typeof value === "boolean") return value ? "true" : "false";
   if (typeof value === "number") return String(value);
+  if (typeof value === "string") return quoteYamlStringIfNeeded(value);
+  return String(value);
+}
 
-  if (typeof value === "string") {
-    const requiresQuoting =
-      value.includes(":") ||
-      value.includes("#") ||
-      value.includes("{") ||
-      value.includes("}") ||
-      value.includes("[") ||
-      value.includes("]") ||
-      value.includes(",") ||
-      value.includes("&") ||
-      value.includes("*") ||
-      value.includes("!") ||
-      value.includes("|") ||
-      value.includes(">") ||
-      value.includes("'") ||
-      value.includes('"') ||
-      value.includes("%") ||
-      value.includes("@") ||
-      value.includes("`") ||
-      value.startsWith(" ") ||
-      value.endsWith(" ") ||
-      value === "";
+function serializeItemToFlatYamlLines(
+  itemToSerialize: Record<string, unknown>,
+  baseIndentationSpaces: number,
+): string[] {
+  const resultLines: string[] = [];
+  const baseIndentation = " ".repeat(baseIndentationSpaces);
+  const objectEntries = Object.entries(itemToSerialize);
 
-    if (requiresQuoting) return `"${value.replace(/\\/g, "\\\\").replace(/"/g, '\\"')}"`;
-    return value;
-  }
+  for (let entryIndex = 0; entryIndex < objectEntries.length; entryIndex++) {
+    const [entryKey, entryValue] = objectEntries[entryIndex]!;
+    const linePrefix = entryIndex === 0 ? `${baseIndentation}- ` : `${baseIndentation}  `;
 
-  if (Array.isArray(value)) {
-    if (value.length === 0) return "[]";
-    const serializedArrayItems: string[] = [];
-    for (const arrayElement of value) {
-      if (typeof arrayElement === "object" && arrayElement !== null && !Array.isArray(arrayElement)) {
-        const objectEntries = Object.entries(arrayElement as Record<string, unknown>);
-        const firstEntryLines: string[] = [];
-        for (let entryIndex = 0; entryIndex < objectEntries.length; entryIndex++) {
-          const [entryKey, entryValue] = objectEntries[entryIndex]!;
-          const serializedEntryValue = serializeYamlValue(entryValue, indentationLevel + 2);
-          if (entryIndex === 0) {
-            firstEntryLines.push(`${indentationSpaces}- ${entryKey}: ${serializedEntryValue}`);
+    if (Array.isArray(entryValue)) {
+      if (entryValue.length === 0) {
+        resultLines.push(`${linePrefix}${entryKey}: []`);
+      } else {
+        resultLines.push(`${linePrefix}${entryKey}:`);
+        const arrayItemIndentation = " ".repeat(baseIndentationSpaces + 4);
+        for (const arrayElement of entryValue) {
+          if (typeof arrayElement === "object" && arrayElement !== null && !Array.isArray(arrayElement)) {
+            const nestedObjectLines = serializeItemToFlatYamlLines(
+              arrayElement as Record<string, unknown>,
+              baseIndentationSpaces + 4,
+            );
+            resultLines.push(...nestedObjectLines);
           } else {
-            firstEntryLines.push(`${indentationSpaces}  ${entryKey}: ${serializedEntryValue}`);
+            resultLines.push(`${arrayItemIndentation}- ${serializeScalarValue(arrayElement)}`);
           }
         }
-        serializedArrayItems.push(firstEntryLines.join("\n"));
-      } else {
-        const serializedElementValue = serializeYamlValue(arrayElement, indentationLevel + 1);
-        serializedArrayItems.push(`${indentationSpaces}- ${serializedElementValue}`);
       }
+    } else if (typeof entryValue === "object" && entryValue !== null) {
+      resultLines.push(`${linePrefix}${entryKey}:`);
+      const nestedObjectIndentation = " ".repeat(baseIndentationSpaces + 4);
+      for (const [nestedKey, nestedValue] of Object.entries(entryValue as Record<string, unknown>)) {
+        resultLines.push(`${nestedObjectIndentation}${nestedKey}: ${serializeScalarValue(nestedValue)}`);
+      }
+    } else {
+      resultLines.push(`${linePrefix}${entryKey}: ${serializeScalarValue(entryValue)}`);
     }
-    return "\n" + serializedArrayItems.join("\n");
   }
 
-  if (typeof value === "object") {
-    const objectLines: string[] = [];
-    for (const [objectKey, objectValue] of Object.entries(value as Record<string, unknown>)) {
-      const serializedObjectValue = serializeYamlValue(objectValue, indentationLevel + 1);
-      if (typeof objectValue === "object" && objectValue !== null && !Array.isArray(objectValue)) {
-        objectLines.push(`${indentationSpaces}${objectKey}:`);
-        objectLines.push(serializedObjectValue);
-      } else if (Array.isArray(objectValue) && objectValue.length > 0) {
-        objectLines.push(`${indentationSpaces}${objectKey}:${serializedObjectValue}`);
-      } else {
-        objectLines.push(`${indentationSpaces}${objectKey}: ${serializedObjectValue}`);
-      }
-    }
-    return objectLines.join("\n");
-  }
-
-  return String(value);
+  return resultLines;
 }
 
 export function appendYamlArrayItem(
@@ -102,7 +100,6 @@ export function appendYamlArrayItem(
   itemToAppend: Record<string, unknown>,
 ): string {
   const fileLines = fileContents.split("\n");
-
   const sectionSearchResult = findSectionInYaml(fileLines, sectionPath);
 
   if (!sectionSearchResult.found) {
@@ -111,8 +108,7 @@ export function appendYamlArrayItem(
     return trimmedFileContents + "\n\n" + newSectionLines.join("\n") + "\n";
   }
 
-  const targetIndentationLevel = sectionPath.length;
-  const targetIndentation = " ".repeat(targetIndentationLevel * 2);
+  const targetIndentationSpaces = sectionPath.length * 2;
   const insertionLineIndex = sectionSearchResult.sectionEndLineIndex;
 
   const currentLineAtInsertion = fileLines[insertionLineIndex - 1] ?? "";
@@ -124,13 +120,10 @@ export function appendYamlArrayItem(
     const lastSectionKey = sectionPath[sectionPath.length - 1]!;
     const parentIndentation = " ".repeat((sectionPath.length - 1) * 2);
     fileLines[insertionLineIndex - 1] = `${parentIndentation}${lastSectionKey}:`;
-    const serializedItemLines = serializeArrayItemLines(itemToAppend, targetIndentationLevel);
-    fileLines.splice(insertionLineIndex, 0, ...serializedItemLines.map((line) => targetIndentation + line));
-    return fileLines.join("\n");
   }
 
-  const serializedItemLines = serializeArrayItemLines(itemToAppend, targetIndentationLevel);
-  fileLines.splice(insertionLineIndex, 0, ...serializedItemLines.map((line) => targetIndentation + line));
+  const serializedItemLines = serializeItemToFlatYamlLines(itemToAppend, targetIndentationSpaces);
+  fileLines.splice(insertionLineIndex, 0, ...serializedItemLines);
   return fileLines.join("\n");
 }
 
@@ -252,52 +245,12 @@ function buildNewSection(
 
   for (let pathIndex = 0; pathIndex < sectionPath.length; pathIndex++) {
     const indentation = " ".repeat(pathIndex * 2);
-    if (pathIndex < sectionPath.length - 1) {
-      generatedLines.push(`${indentation}${sectionPath[pathIndex]}:`);
-    } else {
-      generatedLines.push(`${indentation}${sectionPath[pathIndex]}:`);
-      const targetIndentation = " ".repeat((pathIndex + 1) * 2);
-      const serializedItemLines = serializeArrayItemLines(itemToAppend, pathIndex + 1);
-      for (const serializedLine of serializedItemLines) {
-        generatedLines.push(targetIndentation + serializedLine);
-      }
-    }
+    generatedLines.push(`${indentation}${sectionPath[pathIndex]}:`);
   }
+
+  const targetIndentationSpaces = sectionPath.length * 2;
+  const serializedItemLines = serializeItemToFlatYamlLines(itemToAppend, targetIndentationSpaces);
+  generatedLines.push(...serializedItemLines);
 
   return generatedLines;
-}
-
-function serializeArrayItemLines(
-  itemToSerialize: Record<string, unknown>,
-  indentationLevel: number,
-): string[] {
-  const resultLines: string[] = [];
-  const objectEntries = Object.entries(itemToSerialize);
-
-  for (let entryIndex = 0; entryIndex < objectEntries.length; entryIndex++) {
-    const [entryKey, entryValue] = objectEntries[entryIndex]!;
-    const serializedValue = serializeYamlValue(entryValue, indentationLevel + 1);
-
-    if (entryIndex === 0) {
-      if (Array.isArray(entryValue) && entryValue.length > 0) {
-        resultLines.push(`- ${entryKey}:${serializedValue}`);
-      } else if (typeof entryValue === "object" && entryValue !== null && !Array.isArray(entryValue)) {
-        resultLines.push(`- ${entryKey}:`);
-        resultLines.push(serializedValue);
-      } else {
-        resultLines.push(`- ${entryKey}: ${serializedValue}`);
-      }
-    } else {
-      if (Array.isArray(entryValue) && entryValue.length > 0) {
-        resultLines.push(`  ${entryKey}:${serializedValue}`);
-      } else if (typeof entryValue === "object" && entryValue !== null && !Array.isArray(entryValue)) {
-        resultLines.push(`  ${entryKey}:`);
-        resultLines.push(serializedValue);
-      } else {
-        resultLines.push(`  ${entryKey}: ${serializedValue}`);
-      }
-    }
-  }
-
-  return resultLines;
 }

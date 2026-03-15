@@ -8,6 +8,9 @@ import {
   appendYamlArrayItem,
   removeYamlArrayItemByName,
 } from "@/yaml-writer.ts";
+import { createClient } from "@connectrpc/connect";
+import { createGrpcTransport } from "@connectrpc/connect-node";
+import { DaemonService } from "@gen/agent/v1/daemon_pb.ts";
 
 const NOTIFICATION_PROVIDER_OPTIONS = [
   { value: "slack", label: "Slack", hint: "webhook URL" },
@@ -301,9 +304,23 @@ function removeNotificationChannel(channelNameToRemove: string): void {
   success(`Removed notification channel "${channelNameToRemove}"`);
 }
 
-function testNotificationChannel(_channelName: string): void {
-  console.log(`\n  Testing notification channels requires daemon support (not yet implemented).`);
-  console.log(`  This will send a test message to the specified channel once the daemon supports it.\n`);
+async function testNotificationChannel(channelNameToTest: string): Promise<void> {
+  try {
+    const grpcTransport = createGrpcTransport({
+      baseUrl: process.env.KRAKEN_SCHEDULER_URL || "http://localhost:50051",
+    });
+    const daemonServiceClient = createClient(DaemonService, grpcTransport);
+    const testNotificationResponse = await daemonServiceClient.testNotification({
+      channelName: channelNameToTest,
+    });
+    if (testNotificationResponse.success) {
+      success(testNotificationResponse.message);
+    } else {
+      fail(testNotificationResponse.message);
+    }
+  } catch {
+    fail("Failed to connect to daemon. Is it running?");
+  }
 }
 
 function printNotificationUsage(): void {
@@ -342,7 +359,7 @@ export async function execute(args: string[]): Promise<void> {
         fail("missing channel name. Usage: kraken notification test <name>");
         process.exit(1);
       }
-      testNotificationChannel(testChannelName);
+      await testNotificationChannel(testChannelName);
       break;
     }
     default:

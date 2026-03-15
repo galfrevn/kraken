@@ -1,9 +1,10 @@
+use std::collections::HashMap;
 use std::path::PathBuf;
 use std::pin::Pin;
 use std::sync::Arc;
 use std::time::Instant;
 
-use chrono::NaiveDateTime;
+use chrono::{Datelike, NaiveDate, NaiveDateTime, Utc};
 use prost_types::Timestamp;
 use tokio::sync::broadcast;
 use tokio_stream::wrappers::BroadcastStream;
@@ -15,6 +16,7 @@ use tracing::{info, warn};
 use crate::cron::CronEngine;
 use crate::daemon::reload::{ReloadableNotificationDispatcher, reload_configuration_from_disk};
 use crate::db::tasks::{DaemonTask, TaskStore};
+use crate::notifications::types::{NotificationEvent, NotificationEventType};
 use crate::orchestrator::Orchestrator;
 use crate::proto::agent::v1::{
     daemon_service_server::DaemonService,
@@ -22,11 +24,15 @@ use crate::proto::agent::v1::{
     DaemonServiceListTasksRequest, DaemonServiceListTasksResponse,
     DaemonServiceSubmitTaskRequest, DaemonServiceSubmitTaskResponse,
     DaemonTask as DaemonTaskProto,
+    GetCostSummaryRequest, GetCostSummaryResponse,
     GetStatusRequest, GetStatusResponse,
     GetTaskDetailRequest, GetTaskDetailResponse,
+    GetTriggerStatusRequest, GetTriggerStatusResponse, TriggerStatusEntry,
     ReloadConfigRequest, ReloadConfigResponse,
+    RetryTaskRequest, RetryTaskResponse,
     StreamTaskLogsRequest, StreamTaskLogsResponse,
     TaskLogEntry,
+    TestNotificationRequest, TestNotificationResponse,
     WatchTasksRequest, WatchTasksResponse,
 };
 use crate::triggers::engine::TriggerEngine;
@@ -54,6 +60,8 @@ pub struct DaemonServiceImplementation {
     trigger_engine: Arc<TriggerEngine>,
     reloadable_notification_dispatcher: Arc<ReloadableNotificationDispatcher>,
     configuration_file_path: Option<PathBuf>,
+    webhook_port: u16,
+    cost_warning_threshold_usd: f64,
 }
 
 impl DaemonServiceImplementation {
@@ -69,6 +77,8 @@ impl DaemonServiceImplementation {
         trigger_engine: Arc<TriggerEngine>,
         reloadable_notification_dispatcher: Arc<ReloadableNotificationDispatcher>,
         configuration_file_path: Option<PathBuf>,
+        webhook_port: u16,
+        cost_warning_threshold_usd: f64,
     ) -> Self {
         Self {
             task_store,
@@ -82,6 +92,8 @@ impl DaemonServiceImplementation {
             trigger_engine,
             reloadable_notification_dispatcher,
             configuration_file_path,
+            webhook_port,
+            cost_warning_threshold_usd,
         }
     }
 }
@@ -463,6 +475,192 @@ impl DaemonService for DaemonServiceImplementation {
                 notification_channels_loaded: 0,
             })),
         }
+    }
+
+    async fn test_notification(
+        &self,
+        request: Request<TestNotificationRequest>,
+    ) -> Result<Response<TestNotificationResponse>, Status> {
+        let test_notification_request = request.into_inner();
+        let requested_channel_name = &test_notification_request.channel_name;
+
+        info!(channel_name = %requested_channel_name, "test_notification RPC called");
+
+        let current_notification_dispatcher = self
+            .reloadable_notification_dispatcher
+            .current_dispatcher()
+            .await;
+
+        let test_notification_event = NotificationEvent {
+            event_type: NotificationEventType::TaskCompleted,
+            task_name: "test-notification".to_string(),
+            task_id: "test-000".to_string(),
+            summary: format!(
+                "Test notification from Kraken daemon (channel: {})",
+                requested_channel_name
+            ),
+            details: HashMap::new(),
+            timestamp: Utc::now(),
+        };
+
+        current_notification_dispatcher
+            .dispatch(test_notification_event)
+            .await;
+
+        Ok(Response::new(TestNotificationResponse {
+            success: true,
+            message: format!(
+                "test notification dispatched to all subscribed channels (requested: {})",
+                requested_channel_name
+            ),
+        }))
+    }
+
+    async fn retry_task(
+        &self,
+        request: Request<RetryTaskRequest>,
+    ) -> Result<Response<RetryTaskResponse>, Status> {
+        let retry_task_request = request.into_inner();
+        let original_task_id = &retry_task_request.task_id;
+
+        info!(task_id = %original_task_id, "retry_task RPC called");
+
+        let original_task = match self.task_store.get_task(original_task_id).await {
+            Some(found_task) => found_task,
+            None => {
+                return Ok(Response::new(RetryTaskResponse {
+                    new_task_id: String::new(),
+                    success: false,
+                    message: "task not found".to_string(),
+                }));
+            }
+        };
+
+        let retried_task_name = format!("[retry] {}", original_task.name);
+
+        let newly_created_task = self
+            .task_store
+            .create_task(
+                &retried_task_name,
+                &original_task.description,
+                original_task.priority,
+            )
+            .await
+            .map_err(|creation_error| {
+                Status::internal(format!("failed to create retry task: {creation_error}"))
+            })?;
+
+        info!(
+            original_task_id = %original_task_id,
+            new_task_id = %newly_created_task.id,
+            "retry task created"
+        );
+
+        Ok(Response::new(RetryTaskResponse {
+            new_task_id: newly_created_task.id,
+            success: true,
+            message: "retry task created successfully".to_string(),
+        }))
+    }
+
+    async fn get_cost_summary(
+        &self,
+        _request: Request<GetCostSummaryRequest>,
+    ) -> Result<Response<GetCostSummaryResponse>, Status> {
+        info!("get_cost_summary RPC called");
+
+        let all_tasks = self.task_store.list_tasks(None, 1000).await;
+        let completed_tasks_today_count = self.task_store.count_completed_today().await;
+
+        let today_utc = Utc::now().date_naive();
+        let start_of_current_week = today_utc
+            - chrono::Duration::days(today_utc.weekday().num_days_from_monday() as i64);
+        let start_of_current_month =
+            NaiveDate::from_ymd_opt(today_utc.year(), today_utc.month(), 1)
+                .unwrap_or(today_utc);
+
+        let mut total_cost_today_usd: f64 = 0.0;
+        let mut total_cost_this_week_usd: f64 = 0.0;
+        let mut total_cost_this_month_usd: f64 = 0.0;
+        let mut total_prompt_tokens_today: i64 = 0;
+        let mut total_completion_tokens_today: i64 = 0;
+
+        for task in &all_tasks {
+            let parsed_task_date = NaiveDateTime::parse_from_str(
+                &task.created_at,
+                "%Y-%m-%d %H:%M:%S",
+            )
+            .ok()
+            .map(|naive_datetime| naive_datetime.date());
+
+            if let Some(task_date) = parsed_task_date {
+                if task_date == today_utc {
+                    total_cost_today_usd += task.estimated_cost_usd;
+                    total_prompt_tokens_today += task.prompt_tokens;
+                    total_completion_tokens_today += task.completion_tokens;
+                }
+
+                if task_date >= start_of_current_week {
+                    total_cost_this_week_usd += task.estimated_cost_usd;
+                }
+
+                if task_date >= start_of_current_month {
+                    total_cost_this_month_usd += task.estimated_cost_usd;
+                }
+            }
+        }
+
+        Ok(Response::new(GetCostSummaryResponse {
+            total_cost_today_usd,
+            total_cost_week_usd: total_cost_this_week_usd,
+            total_cost_month_usd: total_cost_this_month_usd,
+            total_prompt_tokens_today,
+            total_completion_tokens_today,
+            total_tasks_today: completed_tasks_today_count,
+            cost_warning_threshold_usd: self.cost_warning_threshold_usd,
+        }))
+    }
+
+    async fn get_trigger_status(
+        &self,
+        _request: Request<GetTriggerStatusRequest>,
+    ) -> Result<Response<GetTriggerStatusResponse>, Status> {
+        info!("get_trigger_status RPC called");
+
+        let all_cron_entries = self.cron_engine.list();
+        let all_watcher_entries = self.file_watcher_engine.list();
+
+        let mut trigger_status_entries: Vec<TriggerStatusEntry> = Vec::new();
+
+        for cron_entry in &all_cron_entries {
+            trigger_status_entries.push(TriggerStatusEntry {
+                name: cron_entry.name.clone(),
+                trigger_type: "cron".to_string(),
+                last_fired_at: String::new(),
+                next_run_at: cron_entry.next_run.clone(),
+                total_events_fired: 0,
+                tasks_created: 0,
+            });
+        }
+
+        for watcher_entry in &all_watcher_entries {
+            trigger_status_entries.push(TriggerStatusEntry {
+                name: watcher_entry.name.clone(),
+                trigger_type: "watcher".to_string(),
+                last_fired_at: String::new(),
+                next_run_at: String::new(),
+                total_events_fired: 0,
+                tasks_created: 0,
+            });
+        }
+
+        let webhook_endpoint_url =
+            format!("http://localhost:{}/webhooks/{{provider}}", self.webhook_port);
+
+        Ok(Response::new(GetTriggerStatusResponse {
+            triggers: trigger_status_entries,
+            webhook_endpoint_url,
+        }))
     }
 }
 
