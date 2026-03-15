@@ -914,7 +914,7 @@ export function ChatView({
       return;
     }
 
-    if (daemonStore) {
+    if (daemonStore && !threadManager) {
       const daemonChatSubmissionTimestamp = new Date();
       const daemonUserMessage: ChatMessage = {
         role: "user",
