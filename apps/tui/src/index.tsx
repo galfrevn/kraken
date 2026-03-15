@@ -183,6 +183,7 @@ export async function main(): Promise<void> {
         profile: "chat",
       });
 
+  const hookDispatcher = pluginRegistry.getHookDispatcher();
   let localTaskRunnerDaemon: TaskRunnerDaemon | null = null;
 
   if (!daemonStore && languageModelClient) {
@@ -194,7 +195,6 @@ export async function main(): Promise<void> {
       { workingDirectory: configuration.repo },
     );
 
-    const hookDispatcher = pluginRegistry.getHookDispatcher();
     executionLoop.setHookDispatcher(hookDispatcher);
 
     localTaskRunnerDaemon = new TaskRunnerDaemon(executionLoop, taskQueueManager, { silent: true });
