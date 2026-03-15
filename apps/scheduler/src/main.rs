@@ -4,6 +4,7 @@ mod watcher;
 mod grpc;
 mod db;
 mod daemon;
+mod orchestrator;
 
 use std::sync::Arc;
 use tokio::sync::broadcast;
