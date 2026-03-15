@@ -7,6 +7,7 @@ mod daemon;
 mod llm;
 mod orchestrator;
 mod services;
+mod triggers;
 
 use std::path::PathBuf;
 use std::sync::Arc;
