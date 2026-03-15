@@ -5,11 +5,15 @@ pub mod worktree;
 use std::path::PathBuf;
 use std::sync::Arc;
 
+use std::collections::HashMap;
+
 use dashmap::DashMap;
 use tokio::sync::watch;
 use tracing::{error, info, warn};
 
 use crate::db::tasks::TaskStore;
+use crate::notifications::dispatcher::NotificationDispatcher;
+use crate::notifications::types::{NotificationEvent, NotificationEventType};
 use heartbeat::HeartbeatTracker;
 use worker::WorkerProcess;
 use worktree::WorktreeManager;
@@ -38,6 +42,7 @@ pub struct Orchestrator {
     worktree_manager: Arc<WorktreeManager>,
     shutdown_receiver: watch::Receiver<bool>,
     ticks_since_last_stale_worktree_cleanup: u64,
+    notification_dispatcher: Arc<NotificationDispatcher>,
 }
 
 impl Orchestrator {
@@ -53,6 +58,7 @@ impl Orchestrator {
         repository_directory: String,
         branch_prefix: String,
         shutdown_receiver: watch::Receiver<bool>,
+        notification_dispatcher: Arc<NotificationDispatcher>,
     ) -> Self {
         let heartbeat_tracker = Arc::new(HeartbeatTracker::new(heartbeat_timeout_seconds));
         let worktree_manager = Arc::new(WorktreeManager::new(
@@ -83,11 +89,86 @@ impl Orchestrator {
             worktree_manager,
             shutdown_receiver,
             ticks_since_last_stale_worktree_cleanup: 0,
+            notification_dispatcher,
         }
     }
 
     pub fn get_heartbeat_tracker(&self) -> Arc<HeartbeatTracker> {
         Arc::clone(&self.heartbeat_tracker)
+    }
+
+    fn fire_notification(&self, notification_event: NotificationEvent) {
+        let dispatcher_for_background_send = Arc::clone(&self.notification_dispatcher);
+        tokio::spawn(async move {
+            dispatcher_for_background_send
+                .dispatch(notification_event)
+                .await;
+        });
+    }
+
+    async fn fire_notification_for_completed_worker(&self, task_id: &str, exit_code: i32) {
+        let task_from_store = match self.task_store.get_task(task_id).await {
+            Some(task) => task,
+            None => return,
+        };
+
+        if exit_code == 0 {
+            let mut completed_task_details = HashMap::new();
+
+            if let Some(started_at_timestamp) = &task_from_store.started_at {
+                if let Some(completed_at_timestamp) = &task_from_store.completed_at {
+                    completed_task_details.insert(
+                        "duration".to_string(),
+                        format!("{} to {}", started_at_timestamp, completed_at_timestamp),
+                    );
+                }
+            }
+
+            if task_from_store.estimated_cost_usd > 0.0 {
+                completed_task_details.insert(
+                    "cost".to_string(),
+                    format!("${:.4}", task_from_store.estimated_cost_usd),
+                );
+            }
+
+            if let Some(artifacts_json) = &task_from_store.artifacts {
+                if let Ok(parsed_artifacts) =
+                    serde_json::from_str::<serde_json::Value>(artifacts_json)
+                {
+                    if let Some(pull_request_url) = parsed_artifacts
+                        .get("pr_url")
+                        .and_then(|value| value.as_str())
+                    {
+                        completed_task_details
+                            .insert("pr_url".to_string(), pull_request_url.to_string());
+                    }
+                }
+            }
+
+            self.fire_notification(NotificationEvent {
+                event_type: NotificationEventType::TaskCompleted,
+                task_name: task_from_store.name.clone(),
+                task_id: task_id.to_string(),
+                summary: format!("Task '{}' completed successfully", task_from_store.name),
+                details: completed_task_details,
+                timestamp: chrono::Utc::now(),
+            });
+        } else {
+            let mut failed_task_details = HashMap::new();
+
+            if let Some(error_message) = &task_from_store.error_message {
+                failed_task_details.insert("error".to_string(), error_message.clone());
+            }
+
+            self.fire_notification(NotificationEvent {
+                event_type: NotificationEventType::TaskFailed,
+                task_name: task_from_store.name.clone(),
+                task_id: task_id.to_string(),
+                summary: format!("Task '{}' failed with exit code {}", task_from_store.name, exit_code),
+                details: failed_task_details,
+                timestamp: chrono::Utc::now(),
+            });
+        }
     }
 
     pub fn active_worker_count(&self) -> usize {
@@ -319,6 +400,12 @@ impl Orchestrator {
                     );
                 }
 
+                self.fire_notification_for_completed_worker(
+                    stale_task_id,
+                    HEARTBEAT_TIMEOUT_EXIT_CODE,
+                )
+                .await;
+
                 self.schedule_retry_for_failed_task(
                     stale_task_id,
                     HEARTBEAT_TIMEOUT_EXIT_CODE,
@@ -383,6 +470,9 @@ impl Orchestrator {
                 }
 
                 let worker_working_directory = removed_worker.working_directory().to_string();
+
+                self.fire_notification_for_completed_worker(task_id, exit_code)
+                    .await;
 
                 if exit_code != 0 {
                     self.schedule_retry_for_failed_task(
@@ -512,6 +602,15 @@ impl Orchestrator {
                     active_count = self.active_workers.len(),
                     "worker spawned and tracking started"
                 );
+
+                self.fire_notification(NotificationEvent {
+                    event_type: NotificationEventType::TaskStarted,
+                    task_name: task_name.to_string(),
+                    task_id: task_id.to_string(),
+                    summary: format!("Task '{}' has started", task_name),
+                    details: HashMap::new(),
+                    timestamp: chrono::Utc::now(),
+                });
             }
             Err(spawn_error) => {
                 error!(
@@ -607,6 +706,10 @@ mod tests {
         (task_store, database_path)
     }
 
+    fn create_empty_notification_dispatcher() -> Arc<NotificationDispatcher> {
+        Arc::new(NotificationDispatcher::new())
+    }
+
     #[tokio::test]
     async fn test_orchestrator_creation() {
         let (task_store, database_path) = create_test_task_store().await;
@@ -623,6 +726,7 @@ mod tests {
             "/tmp/test-repo".to_string(),
             "kraken/".to_string(),
             shutdown_receiver,
+            create_empty_notification_dispatcher(),
         );
 
         assert_eq!(orchestrator.active_worker_count(), 0);
@@ -647,6 +751,7 @@ mod tests {
             "/tmp/test-repo".to_string(),
             "kraken/".to_string(),
             shutdown_receiver,
+            create_empty_notification_dispatcher(),
         );
 
         let heartbeat_tracker = orchestrator.get_heartbeat_tracker();
@@ -672,6 +777,7 @@ mod tests {
             "/tmp/test-repo".to_string(),
             "kraken/".to_string(),
             shutdown_receiver,
+            create_empty_notification_dispatcher(),
         );
 
         shutdown_sender.send(true).unwrap();
@@ -699,6 +805,7 @@ mod tests {
             "/tmp/test-repo".to_string(),
             "kraken/".to_string(),
             shutdown_receiver,
+            create_empty_notification_dispatcher(),
         );
 
         task_store
@@ -728,6 +835,7 @@ mod tests {
             "/nonexistent/impossible/path".to_string(),
             "kraken/".to_string(),
             shutdown_receiver,
+            create_empty_notification_dispatcher(),
         );
 
         let created_task = task_store
@@ -768,6 +876,7 @@ mod tests {
             ".".to_string(),
             "kraken/".to_string(),
             shutdown_receiver,
+            create_empty_notification_dispatcher(),
         );
 
         let created_task = task_store
@@ -833,6 +942,7 @@ mod tests {
             ".".to_string(),
             "kraken/".to_string(),
             shutdown_receiver,
+            create_empty_notification_dispatcher(),
         );
 
         let created_task = task_store
@@ -911,6 +1021,7 @@ mod tests {
             "/tmp/test-repo".to_string(),
             "kraken/".to_string(),
             shutdown_receiver,
+            create_empty_notification_dispatcher(),
         );
 
         // When worker_working_directory matches repository_directory, no cleanup should happen
@@ -939,6 +1050,7 @@ mod tests {
             "/tmp/test-repo".to_string(),
             "kraken/".to_string(),
             shutdown_receiver,
+            create_empty_notification_dispatcher(),
         );
 
         let created_task = task_store
@@ -998,6 +1110,7 @@ mod tests {
             "/tmp/test-repo".to_string(),
             "kraken/".to_string(),
             shutdown_receiver,
+            create_empty_notification_dispatcher(),
         );
 
         let created_task = task_store
@@ -1044,6 +1157,7 @@ mod tests {
             "/tmp/test-repo".to_string(),
             "kraken/".to_string(),
             shutdown_receiver,
+            create_empty_notification_dispatcher(),
         );
 
         let created_task = task_store
@@ -1124,6 +1238,7 @@ mod tests {
             "/tmp/test-repo".to_string(),
             "kraken/".to_string(),
             shutdown_receiver,
+            create_empty_notification_dispatcher(),
         );
 
         let created_task = task_store
@@ -1192,6 +1307,7 @@ mod tests {
             "/tmp/test-repo".to_string(),
             "kraken/".to_string(),
             shutdown_receiver,
+            create_empty_notification_dispatcher(),
         );
 
         let created_task = task_store

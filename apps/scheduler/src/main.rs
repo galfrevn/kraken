@@ -218,6 +218,16 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     };
 
     // -----------------------------------------------------------------------
+    // 9c. Build notification dispatcher from config
+    // -----------------------------------------------------------------------
+    let notification_dispatcher = daemon_config.notifications.build_dispatcher();
+    info!(
+        notification_channel_count = notification_dispatcher.channel_count(),
+        "notification dispatcher built from configuration"
+    );
+    let shared_notification_dispatcher = Arc::new(notification_dispatcher);
+
+    // -----------------------------------------------------------------------
     // 10. Find the worker script path
     // -----------------------------------------------------------------------
     let worker_script_candidates = vec![
@@ -255,6 +265,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         daemon_config.repo.clone(),
         daemon_config.git.branch_prefix.clone(),
         shutdown_receiver_for_orchestrator,
+        Arc::clone(&shared_notification_dispatcher),
     );
 
     let orchestrator_heartbeat_tracker = orchestrator_instance.get_heartbeat_tracker();
@@ -323,6 +334,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         daemon_config.repo.clone(),
         daemon_config.git.branch_prefix.clone(),
         daemon_state.shutdown_receiver.clone(),
+        Arc::clone(&shared_notification_dispatcher),
     ));
 
     let llm_providers_are_configured = llm_provider_router.has_any_providers();

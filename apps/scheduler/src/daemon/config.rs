@@ -3,6 +3,12 @@ use std::path::{Path, PathBuf};
 use serde::Deserialize;
 use tracing::{info, warn};
 
+use crate::notifications::dispatcher::NotificationDispatcher;
+use crate::notifications::discord::DiscordNotificationChannel;
+use crate::notifications::email::EmailNotificationChannel;
+use crate::notifications::slack::SlackNotificationChannel;
+use crate::notifications::system::SystemNotificationChannel;
+use crate::notifications::types::NotificationEventType;
 use crate::triggers::types::{
     CronTriggerConfig, TriggerFilter, WatcherTriggerConfig, WebhookEventConfig,
     WebhookTriggerConfig,
@@ -36,6 +42,10 @@ pub struct DaemonConfig {
     /// Trigger definitions: crons, webhooks, and file watchers.
     #[serde(default)]
     pub triggers: TriggersYamlConfig,
+
+    /// Notification channel definitions.
+    #[serde(default)]
+    pub notifications: NotificationsYamlConfig,
 }
 
 /// Controls how the orchestrator schedules and monitors worker tasks.
@@ -131,6 +141,157 @@ pub struct WatcherTriggerYamlConfig {
     #[serde(default = "default_debounce_ms", rename = "debounceMs")]
     pub debounce_ms: u32,
     pub task: String,
+}
+
+// ---------------------------------------------------------------------------
+// Notification YAML config types
+// ---------------------------------------------------------------------------
+
+#[derive(Debug, Clone, Default, Deserialize)]
+pub struct NotificationsYamlConfig {
+    #[serde(default)]
+    pub channels: Vec<NotificationChannelYamlConfig>,
+}
+
+#[derive(Debug, Clone, Deserialize)]
+pub struct NotificationChannelYamlConfig {
+    pub name: String,
+    pub provider: String,
+    #[serde(default, rename = "webhookUrl")]
+    pub webhook_url: Option<String>,
+    #[serde(default, rename = "apiKey")]
+    pub api_key: Option<String>,
+    #[serde(default)]
+    pub from: Option<String>,
+    #[serde(default)]
+    pub to: Option<String>,
+    #[serde(default)]
+    pub events: Vec<String>,
+}
+
+fn parse_notification_event_type_from_string(
+    event_type_string: &str,
+) -> Option<NotificationEventType> {
+    match event_type_string {
+        "task.started" => Some(NotificationEventType::TaskStarted),
+        "task.completed" => Some(NotificationEventType::TaskCompleted),
+        "task.failed" => Some(NotificationEventType::TaskFailed),
+        "pr.created" => Some(NotificationEventType::PullRequestCreated),
+        "trigger.fired" => Some(NotificationEventType::TriggerFired),
+        "daily_digest" => Some(NotificationEventType::DailyDigest),
+        _ => None,
+    }
+}
+
+impl NotificationsYamlConfig {
+    pub fn build_dispatcher(&self) -> NotificationDispatcher {
+        let mut notification_dispatcher = NotificationDispatcher::new();
+
+        for channel_yaml_config in &self.channels {
+            let parsed_subscribed_event_types: Vec<NotificationEventType> = channel_yaml_config
+                .events
+                .iter()
+                .filter_map(|event_string| {
+                    let parsed_event_type =
+                        parse_notification_event_type_from_string(event_string);
+                    if parsed_event_type.is_none() {
+                        warn!(
+                            channel_name = %channel_yaml_config.name,
+                            event_string = %event_string,
+                            "unknown notification event type, skipping"
+                        );
+                    }
+                    parsed_event_type
+                })
+                .collect();
+
+            match channel_yaml_config.provider.as_str() {
+                "slack" => {
+                    let Some(raw_webhook_url) = &channel_yaml_config.webhook_url else {
+                        warn!(
+                            channel_name = %channel_yaml_config.name,
+                            "slack channel missing webhookUrl, skipping"
+                        );
+                        continue;
+                    };
+                    let resolved_webhook_url =
+                        substitute_environment_variables(raw_webhook_url);
+                    let slack_channel = SlackNotificationChannel::new(
+                        channel_yaml_config.name.clone(),
+                        resolved_webhook_url,
+                        parsed_subscribed_event_types,
+                    );
+                    notification_dispatcher.add_channel(Box::new(slack_channel));
+                }
+                "discord" => {
+                    let Some(raw_webhook_url) = &channel_yaml_config.webhook_url else {
+                        warn!(
+                            channel_name = %channel_yaml_config.name,
+                            "discord channel missing webhookUrl, skipping"
+                        );
+                        continue;
+                    };
+                    let resolved_webhook_url =
+                        substitute_environment_variables(raw_webhook_url);
+                    let discord_channel = DiscordNotificationChannel::new(
+                        channel_yaml_config.name.clone(),
+                        resolved_webhook_url,
+                        parsed_subscribed_event_types,
+                    );
+                    notification_dispatcher.add_channel(Box::new(discord_channel));
+                }
+                "email" => {
+                    let Some(raw_api_key) = &channel_yaml_config.api_key else {
+                        warn!(
+                            channel_name = %channel_yaml_config.name,
+                            "email channel missing apiKey, skipping"
+                        );
+                        continue;
+                    };
+                    let Some(from_address) = &channel_yaml_config.from else {
+                        warn!(
+                            channel_name = %channel_yaml_config.name,
+                            "email channel missing from address, skipping"
+                        );
+                        continue;
+                    };
+                    let Some(to_address) = &channel_yaml_config.to else {
+                        warn!(
+                            channel_name = %channel_yaml_config.name,
+                            "email channel missing to address, skipping"
+                        );
+                        continue;
+                    };
+                    let resolved_api_key =
+                        substitute_environment_variables(raw_api_key);
+                    let email_channel = EmailNotificationChannel::new(
+                        channel_yaml_config.name.clone(),
+                        resolved_api_key,
+                        from_address.clone(),
+                        to_address.clone(),
+                        parsed_subscribed_event_types,
+                    );
+                    notification_dispatcher.add_channel(Box::new(email_channel));
+                }
+                "system" => {
+                    let system_channel = SystemNotificationChannel::new(
+                        channel_yaml_config.name.clone(),
+                        parsed_subscribed_event_types,
+                    );
+                    notification_dispatcher.add_channel(Box::new(system_channel));
+                }
+                unknown_provider => {
+                    warn!(
+                        channel_name = %channel_yaml_config.name,
+                        provider = %unknown_provider,
+                        "unknown notification provider, skipping"
+                    );
+                }
+            }
+        }
+
+        notification_dispatcher
+    }
 }
 
 fn default_max_retries() -> u32 {
@@ -300,6 +461,7 @@ impl Default for DaemonConfig {
             services: ServicesConfig::default(),
             git: GitConfig::default(),
             triggers: TriggersYamlConfig::default(),
+            notifications: NotificationsYamlConfig::default(),
         }
     }
 }
@@ -672,5 +834,361 @@ triggers:
     fn test_substitute_environment_variables_with_no_placeholders() {
         let result = super::substitute_environment_variables("plain-secret");
         assert_eq!(result, "plain-secret");
+    }
+
+    #[test]
+    fn test_parse_notification_event_type_from_string_valid_types() {
+        use super::parse_notification_event_type_from_string;
+        use crate::notifications::types::NotificationEventType;
+
+        assert_eq!(
+            parse_notification_event_type_from_string("task.started"),
+            Some(NotificationEventType::TaskStarted)
+        );
+        assert_eq!(
+            parse_notification_event_type_from_string("task.completed"),
+            Some(NotificationEventType::TaskCompleted)
+        );
+        assert_eq!(
+            parse_notification_event_type_from_string("task.failed"),
+            Some(NotificationEventType::TaskFailed)
+        );
+        assert_eq!(
+            parse_notification_event_type_from_string("pr.created"),
+            Some(NotificationEventType::PullRequestCreated)
+        );
+        assert_eq!(
+            parse_notification_event_type_from_string("trigger.fired"),
+            Some(NotificationEventType::TriggerFired)
+        );
+        assert_eq!(
+            parse_notification_event_type_from_string("daily_digest"),
+            Some(NotificationEventType::DailyDigest)
+        );
+    }
+
+    #[test]
+    fn test_parse_notification_event_type_from_string_unknown_returns_none() {
+        use super::parse_notification_event_type_from_string;
+
+        assert_eq!(
+            parse_notification_event_type_from_string("unknown.event"),
+            None
+        );
+        assert_eq!(parse_notification_event_type_from_string(""), None);
+        assert_eq!(
+            parse_notification_event_type_from_string("task_completed"),
+            None
+        );
+    }
+
+    #[test]
+    fn test_notifications_yaml_config_defaults_to_empty() {
+        let config = DaemonConfig::default();
+        assert!(config.notifications.channels.is_empty());
+    }
+
+    #[test]
+    fn test_build_dispatcher_creates_slack_channel() {
+        let notifications_config = NotificationsYamlConfig {
+            channels: vec![NotificationChannelYamlConfig {
+                name: "team-slack".to_string(),
+                provider: "slack".to_string(),
+                webhook_url: Some("https://hooks.slack.com/services/T00/B00/xxx".to_string()),
+                api_key: None,
+                from: None,
+                to: None,
+                events: vec![
+                    "task.completed".to_string(),
+                    "task.failed".to_string(),
+                ],
+            }],
+        };
+
+        let dispatcher = notifications_config.build_dispatcher();
+        assert_eq!(dispatcher.channel_count(), 1);
+    }
+
+    #[test]
+    fn test_build_dispatcher_creates_discord_channel() {
+        let notifications_config = NotificationsYamlConfig {
+            channels: vec![NotificationChannelYamlConfig {
+                name: "dev-discord".to_string(),
+                provider: "discord".to_string(),
+                webhook_url: Some("https://discord.com/api/webhooks/123/abc".to_string()),
+                api_key: None,
+                from: None,
+                to: None,
+                events: vec!["task.completed".to_string()],
+            }],
+        };
+
+        let dispatcher = notifications_config.build_dispatcher();
+        assert_eq!(dispatcher.channel_count(), 1);
+    }
+
+    #[test]
+    fn test_build_dispatcher_creates_email_channel() {
+        let notifications_config = NotificationsYamlConfig {
+            channels: vec![NotificationChannelYamlConfig {
+                name: "email-alerts".to_string(),
+                provider: "email".to_string(),
+                webhook_url: None,
+                api_key: Some("re_test_key".to_string()),
+                from: Some("Kraken <noreply@kraken.dev>".to_string()),
+                to: Some("dev@company.com".to_string()),
+                events: vec!["task.failed".to_string(), "daily_digest".to_string()],
+            }],
+        };
+
+        let dispatcher = notifications_config.build_dispatcher();
+        assert_eq!(dispatcher.channel_count(), 1);
+    }
+
+    #[test]
+    fn test_build_dispatcher_creates_system_channel() {
+        let notifications_config = NotificationsYamlConfig {
+            channels: vec![NotificationChannelYamlConfig {
+                name: "desktop".to_string(),
+                provider: "system".to_string(),
+                webhook_url: None,
+                api_key: None,
+                from: None,
+                to: None,
+                events: vec!["task.completed".to_string(), "task.failed".to_string()],
+            }],
+        };
+
+        let dispatcher = notifications_config.build_dispatcher();
+        assert_eq!(dispatcher.channel_count(), 1);
+    }
+
+    #[test]
+    fn test_build_dispatcher_skips_slack_channel_without_webhook_url() {
+        let notifications_config = NotificationsYamlConfig {
+            channels: vec![NotificationChannelYamlConfig {
+                name: "broken-slack".to_string(),
+                provider: "slack".to_string(),
+                webhook_url: None,
+                api_key: None,
+                from: None,
+                to: None,
+                events: vec!["task.completed".to_string()],
+            }],
+        };
+
+        let dispatcher = notifications_config.build_dispatcher();
+        assert_eq!(dispatcher.channel_count(), 0);
+    }
+
+    #[test]
+    fn test_build_dispatcher_skips_discord_channel_without_webhook_url() {
+        let notifications_config = NotificationsYamlConfig {
+            channels: vec![NotificationChannelYamlConfig {
+                name: "broken-discord".to_string(),
+                provider: "discord".to_string(),
+                webhook_url: None,
+                api_key: None,
+                from: None,
+                to: None,
+                events: vec!["task.completed".to_string()],
+            }],
+        };
+
+        let dispatcher = notifications_config.build_dispatcher();
+        assert_eq!(dispatcher.channel_count(), 0);
+    }
+
+    #[test]
+    fn test_build_dispatcher_skips_email_channel_without_api_key() {
+        let notifications_config = NotificationsYamlConfig {
+            channels: vec![NotificationChannelYamlConfig {
+                name: "broken-email".to_string(),
+                provider: "email".to_string(),
+                webhook_url: None,
+                api_key: None,
+                from: Some("from@test.com".to_string()),
+                to: Some("to@test.com".to_string()),
+                events: vec!["task.completed".to_string()],
+            }],
+        };
+
+        let dispatcher = notifications_config.build_dispatcher();
+        assert_eq!(dispatcher.channel_count(), 0);
+    }
+
+    #[test]
+    fn test_build_dispatcher_skips_email_channel_without_from_address() {
+        let notifications_config = NotificationsYamlConfig {
+            channels: vec![NotificationChannelYamlConfig {
+                name: "broken-email".to_string(),
+                provider: "email".to_string(),
+                webhook_url: None,
+                api_key: Some("re_key".to_string()),
+                from: None,
+                to: Some("to@test.com".to_string()),
+                events: vec!["task.completed".to_string()],
+            }],
+        };
+
+        let dispatcher = notifications_config.build_dispatcher();
+        assert_eq!(dispatcher.channel_count(), 0);
+    }
+
+    #[test]
+    fn test_build_dispatcher_skips_email_channel_without_to_address() {
+        let notifications_config = NotificationsYamlConfig {
+            channels: vec![NotificationChannelYamlConfig {
+                name: "broken-email".to_string(),
+                provider: "email".to_string(),
+                webhook_url: None,
+                api_key: Some("re_key".to_string()),
+                from: Some("from@test.com".to_string()),
+                to: None,
+                events: vec!["task.completed".to_string()],
+            }],
+        };
+
+        let dispatcher = notifications_config.build_dispatcher();
+        assert_eq!(dispatcher.channel_count(), 0);
+    }
+
+    #[test]
+    fn test_build_dispatcher_skips_unknown_provider() {
+        let notifications_config = NotificationsYamlConfig {
+            channels: vec![NotificationChannelYamlConfig {
+                name: "unknown-channel".to_string(),
+                provider: "telegram".to_string(),
+                webhook_url: Some("https://t.me/webhook".to_string()),
+                api_key: None,
+                from: None,
+                to: None,
+                events: vec!["task.completed".to_string()],
+            }],
+        };
+
+        let dispatcher = notifications_config.build_dispatcher();
+        assert_eq!(dispatcher.channel_count(), 0);
+    }
+
+    #[test]
+    fn test_build_dispatcher_creates_multiple_channels() {
+        let notifications_config = NotificationsYamlConfig {
+            channels: vec![
+                NotificationChannelYamlConfig {
+                    name: "team-slack".to_string(),
+                    provider: "slack".to_string(),
+                    webhook_url: Some("https://hooks.slack.com/services/T00/B00/xxx".to_string()),
+                    api_key: None,
+                    from: None,
+                    to: None,
+                    events: vec!["task.completed".to_string()],
+                },
+                NotificationChannelYamlConfig {
+                    name: "desktop".to_string(),
+                    provider: "system".to_string(),
+                    webhook_url: None,
+                    api_key: None,
+                    from: None,
+                    to: None,
+                    events: vec!["task.failed".to_string()],
+                },
+            ],
+        };
+
+        let dispatcher = notifications_config.build_dispatcher();
+        assert_eq!(dispatcher.channel_count(), 2);
+    }
+
+    #[test]
+    fn test_build_dispatcher_skips_unknown_events_but_keeps_valid_ones() {
+        let notifications_config = NotificationsYamlConfig {
+            channels: vec![NotificationChannelYamlConfig {
+                name: "system-channel".to_string(),
+                provider: "system".to_string(),
+                webhook_url: None,
+                api_key: None,
+                from: None,
+                to: None,
+                events: vec![
+                    "task.completed".to_string(),
+                    "bogus.event".to_string(),
+                    "task.failed".to_string(),
+                ],
+            }],
+        };
+
+        let dispatcher = notifications_config.build_dispatcher();
+        assert_eq!(dispatcher.channel_count(), 1);
+    }
+
+    #[test]
+    fn test_build_dispatcher_with_env_var_substitution_in_webhook_url() {
+        unsafe {
+            std::env::set_var(
+                "KRAKEN_TEST_SLACK_WEBHOOK",
+                "https://hooks.slack.com/resolved",
+            );
+        }
+
+        let notifications_config = NotificationsYamlConfig {
+            channels: vec![NotificationChannelYamlConfig {
+                name: "env-slack".to_string(),
+                provider: "slack".to_string(),
+                webhook_url: Some("${KRAKEN_TEST_SLACK_WEBHOOK}".to_string()),
+                api_key: None,
+                from: None,
+                to: None,
+                events: vec!["task.completed".to_string()],
+            }],
+        };
+
+        let dispatcher = notifications_config.build_dispatcher();
+        assert_eq!(dispatcher.channel_count(), 1);
+
+        unsafe {
+            std::env::remove_var("KRAKEN_TEST_SLACK_WEBHOOK");
+        }
+    }
+
+    #[test]
+    fn test_load_config_with_notifications_section() {
+        let temporary_directory = std::env::temp_dir();
+        let config_file_path =
+            temporary_directory.join("kraken_test_notifications_config.yml");
+
+        let yaml_content = r#"
+repo: "/home/user/project"
+notifications:
+  channels:
+    - name: team-slack
+      provider: slack
+      webhookUrl: "https://hooks.slack.com/services/T00/B00/xxx"
+      events:
+        - task.completed
+        - task.failed
+    - name: desktop
+      provider: system
+      events:
+        - task.completed
+"#;
+
+        let mut config_file = std::fs::File::create(&config_file_path)
+            .expect("should create test config file");
+        config_file
+            .write_all(yaml_content.as_bytes())
+            .expect("should write test config");
+
+        let config = DaemonConfig::load(Some(&config_file_path))
+            .expect("should parse config with notifications");
+
+        assert_eq!(config.notifications.channels.len(), 2);
+        assert_eq!(config.notifications.channels[0].name, "team-slack");
+        assert_eq!(config.notifications.channels[0].provider, "slack");
+        assert_eq!(config.notifications.channels[0].events.len(), 2);
+        assert_eq!(config.notifications.channels[1].name, "desktop");
+        assert_eq!(config.notifications.channels[1].provider, "system");
+
+        let _ = std::fs::remove_file(&config_file_path);
     }
 }
