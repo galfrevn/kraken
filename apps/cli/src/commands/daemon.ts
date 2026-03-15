@@ -187,27 +187,18 @@ async function startDaemon(args: string[]): Promise<void> {
   };
 
   if (process.platform === "win32") {
-    // Bun spawn doesn't detach on Windows — child dies when parent exits.
-    // Use PowerShell Start-Process which creates a truly independent process.
-    // Pass --log-file as CLI arg (not env var) since Start-Process doesn't inherit env.
     const daemonBinaryPath = daemonCommand[0]!;
     const daemonCliArguments = [...daemonCommand.slice(1), `--log-file=${DAEMON_LOG_FILE_PATH}`];
-    const powershellArgumentListElements = daemonCliArguments.map(
-      (singleArgument) => `'${singleArgument.replace(/'/g, "''")}'`,
-    );
-    const powershellArgumentListExpression = powershellArgumentListElements.join(",");
-    const escapedBinaryPath = daemonBinaryPath.replace(/'/g, "''");
-    const escapedWorkingDirectory = daemonDirectory.replace(/'/g, "''");
 
-    const powershellStartProcessCommand = [
-      `Start-Process`,
-      `-FilePath '${escapedBinaryPath}'`,
-      `-ArgumentList @(${powershellArgumentListExpression})`,
-      `-WorkingDirectory '${escapedWorkingDirectory}'`,
-      `-WindowStyle Hidden`,
-    ].join(" ");
+    const launcherScriptPath = join(KRAKEN_HOME_DIRECTORY, "daemon-launcher.cmd");
+    const launcherScriptLines = [
+      "@echo off",
+      `cd /d "${daemonDirectory}"`,
+      `"${daemonBinaryPath}" ${daemonCliArguments.map((argument) => `"${argument}"`).join(" ")}`,
+    ];
+    writeFileSync(launcherScriptPath, launcherScriptLines.join("\r\n"));
 
-    Bun.spawnSync(["powershell", "-NoProfile", "-Command", powershellStartProcessCommand], {
+    Bun.spawnSync(["cmd", "/c", "start", "/b", "", launcherScriptPath], {
       stdio: ["ignore", "ignore", "ignore"],
     });
   } else {
