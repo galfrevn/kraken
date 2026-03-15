@@ -18,6 +18,7 @@ use tokio::signal;
 use tonic::transport::Server;
 use tracing::{error, info, warn};
 use tracing_subscriber::EnvFilter;
+use tracing_subscriber::fmt::writer::MakeWriterExt;
 
 use daemon::config::DaemonConfig;
 use daemon::reload::ReloadableNotificationDispatcher;
@@ -31,12 +32,25 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     // -----------------------------------------------------------------------
     // 1. Initialize tracing/logging
     // -----------------------------------------------------------------------
-    tracing_subscriber::fmt()
-        .with_env_filter(
-            EnvFilter::from_default_env()
-                .add_directive("kraken_daemon=info".parse()?),
-        )
-        .init();
+    let log_file_path = std::env::var("KRAKEN_DAEMON_LOG_FILE").ok();
+    let tracing_filter = EnvFilter::from_default_env()
+        .add_directive("kraken_daemon=info".parse()?);
+
+    if let Some(ref log_path) = log_file_path {
+        let log_file = std::fs::OpenOptions::new()
+            .create(true)
+            .append(true)
+            .open(log_path)?;
+        tracing_subscriber::fmt()
+            .with_env_filter(tracing_filter)
+            .with_ansi(false)
+            .with_writer(log_file)
+            .init();
+    } else {
+        tracing_subscriber::fmt()
+            .with_env_filter(tracing_filter)
+            .init();
+    }
 
     info!("kraken daemon starting");
 

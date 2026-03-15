@@ -180,6 +180,12 @@ async function startDaemon(args: string[]): Promise<void> {
   // Truncate log file on each start
   writeFileSync(DAEMON_LOG_FILE_PATH, `--- daemon starting at ${new Date().toISOString()} ---\n`);
 
+  // The daemon writes logs to file when KRAKEN_DAEMON_LOG_FILE is set
+  const daemonEnvironment: Record<string, string> = {
+    ...process.env as Record<string, string>,
+    KRAKEN_DAEMON_LOG_FILE: DAEMON_LOG_FILE_PATH,
+  };
+
   if (process.platform === "win32") {
     // Bun spawn doesn't detach on Windows — child dies when parent exits.
     // Use PowerShell Start-Process with -NoNewWindow to launch independently.
@@ -188,13 +194,15 @@ async function startDaemon(args: string[]): Promise<void> {
     const argumentListValue = binaryArgs.length > 0
       ? `-ArgumentList ${binaryArgs.map((a) => `'${a}'`).join(",")}`
       : "";
+
+    // Pass env vars via $env: prefix in PowerShell
     const powershellCommand = [
+      `$env:KRAKEN_DAEMON_LOG_FILE='${DAEMON_LOG_FILE_PATH}';`,
       `Start-Process`,
       `-FilePath '${binaryPath}'`,
       argumentListValue,
       `-WorkingDirectory '${daemonDirectory}'`,
       `-NoNewWindow`,
-      `-RedirectStandardError '${DAEMON_LOG_FILE_PATH}'`,
     ].filter(Boolean).join(" ");
 
     Bun.spawnSync(["powershell", "-NoProfile", "-Command", powershellCommand], {
@@ -207,6 +215,7 @@ async function startDaemon(args: string[]): Promise<void> {
       cwd: daemonDirectory,
       stdout: logFileDescriptor,
       stderr: logFileDescriptor,
+      env: daemonEnvironment,
     });
   }
 
