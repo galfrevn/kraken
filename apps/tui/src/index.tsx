@@ -153,35 +153,24 @@ export async function main(): Promise<void> {
   registerPluginsCommand(pluginRegistry);
   registerToolDisplayNames(pluginRegistry.getToolDisplayNames());
 
-  // In daemon mode, the daemon handles all LLM calls, tool execution, and task running.
-  // We only create the local agent stack when NOT connected to a daemon.
-  const languageModelClient = daemonStore
-    ? null
-    : new LanguageModelClient(configuration.services.gatewayUrl, configuration.languageModel);
+  // LanguageModelClient is always created so ThreadManager/ChatEngine can initialize
+  // without null checks. In daemon mode, actual LLM calls go through DaemonStore, not this client.
+  const languageModelClient = new LanguageModelClient(
+    daemonStore ? daemonUrl : configuration.services.gatewayUrl,
+    configuration.languageModel,
+  );
 
-  const toolRegistry = daemonStore
-    ? createDefaultToolRegistry({
-        languageModelClient: null as any,
-        schedulerClient,
-        taskQueueManager,
-        timerManager,
-        database,
-        commandPolicy: configuration.commands,
-        workingDirectory: configuration.repo,
-        pluginTools: pluginRegistry.getTools(),
-        profile: "chat",
-      })
-    : createDefaultToolRegistry({
-        languageModelClient: languageModelClient!,
-        schedulerClient,
-        taskQueueManager,
-        timerManager,
-        database,
-        commandPolicy: configuration.commands,
-        workingDirectory: configuration.repo,
-        pluginTools: pluginRegistry.getTools(),
-        profile: "chat",
-      });
+  const toolRegistry = createDefaultToolRegistry({
+    languageModelClient,
+    schedulerClient,
+    taskQueueManager,
+    timerManager,
+    database,
+    commandPolicy: configuration.commands,
+    workingDirectory: configuration.repo,
+    pluginTools: pluginRegistry.getTools(),
+    profile: "chat",
+  });
 
   const hookDispatcher = pluginRegistry.getHookDispatcher();
   let localTaskRunnerDaemon: TaskRunnerDaemon | null = null;
@@ -202,7 +191,7 @@ export async function main(): Promise<void> {
   }
 
   const threadManager = new ThreadManager(
-    languageModelClient as any,
+    languageModelClient,
     toolRegistry,
     configuration.repo,
     database,
