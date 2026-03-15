@@ -221,17 +221,25 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     });
 
     // -----------------------------------------------------------------------
-    // 13. Create WorkerServiceImplementation
+    // 13. Initialize LLM provider router and create WorkerServiceImplementation
     // -----------------------------------------------------------------------
-    let gateway_base_url = format!(
-        "http://localhost:{}",
-        daemon_config.services.webhook_port
+    let llm_provider_router = Arc::new(
+        llm::router::LlmProviderRouter::from_environment().map_err(|llm_router_error| {
+            error!(error = %llm_router_error, "failed to initialize LLM provider router");
+            llm_router_error
+        })?,
+    );
+
+    info!(
+        default_provider = %llm_provider_router.default_provider_name(),
+        available_providers = ?llm_provider_router.available_providers(),
+        "LLM provider router initialized for worker service"
     );
 
     let worker_service_implementation = services::worker_service::WorkerServiceImplementation::new(
         Arc::clone(&shared_task_store),
         orchestrator_heartbeat_tracker,
-        gateway_base_url,
+        Arc::clone(&llm_provider_router),
         activity_event_sender.clone(),
     );
 
