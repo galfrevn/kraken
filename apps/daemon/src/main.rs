@@ -62,7 +62,10 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     // -----------------------------------------------------------------------
     // 1. Initialize tracing/logging
     // -----------------------------------------------------------------------
-    let log_file_path = std::env::var("KRAKEN_DAEMON_LOG_FILE").ok();
+    let log_file_path = std::env::args()
+        .find(|arg| arg.starts_with("--log-file="))
+        .map(|arg| arg.strip_prefix("--log-file=").unwrap().to_string())
+        .or_else(|| std::env::var("KRAKEN_DAEMON_LOG_FILE").ok());
     let tracing_filter = EnvFilter::from_default_env()
         .add_directive("kraken_daemon=info".parse()?);
 
