@@ -1,5 +1,5 @@
 import { spawn } from "bun";
-import { existsSync, readFileSync, writeFileSync, unlinkSync, mkdirSync, openSync, appendFileSync } from "node:fs";
+import { existsSync, readFileSync, writeFileSync, unlinkSync, mkdirSync, openSync } from "node:fs";
 import { join } from "node:path";
 import { homedir } from "node:os";
 import { createClient } from "@connectrpc/connect";
@@ -190,13 +190,24 @@ async function startDaemon(args: string[]): Promise<void> {
     // Bun spawn doesn't detach on Windows — child dies when parent exits.
     // Use PowerShell Start-Process which creates a truly independent process.
     // Pass --log-file as CLI arg (not env var) since Start-Process doesn't inherit env.
-    const binaryPath = daemonCommand[0]!;
-    const allArgs = [...daemonCommand.slice(1), `--log-file=${DAEMON_LOG_FILE_PATH}`];
-    const argumentListPart = `-ArgumentList ${allArgs.map((a) => `'"${a}"'`).join(",")}`;
+    const daemonBinaryPath = daemonCommand[0]!;
+    const daemonCliArguments = [...daemonCommand.slice(1), `--log-file=${DAEMON_LOG_FILE_PATH}`];
+    const powershellArgumentListElements = daemonCliArguments.map(
+      (singleArgument) => `'${singleArgument.replace(/'/g, "''")}'`,
+    );
+    const powershellArgumentListExpression = powershellArgumentListElements.join(",");
+    const escapedBinaryPath = daemonBinaryPath.replace(/'/g, "''");
+    const escapedWorkingDirectory = daemonDirectory.replace(/'/g, "''");
 
-    const powershellScript = `Start-Process -FilePath '${binaryPath}' ${argumentListPart} -WorkingDirectory '${daemonDirectory}' -WindowStyle Hidden`;
+    const powershellStartProcessCommand = [
+      `Start-Process`,
+      `-FilePath '${escapedBinaryPath}'`,
+      `-ArgumentList @(${powershellArgumentListExpression})`,
+      `-WorkingDirectory '${escapedWorkingDirectory}'`,
+      `-WindowStyle Hidden`,
+    ].join(" ");
 
-    Bun.spawnSync(["powershell", "-NoProfile", "-Command", powershellScript], {
+    Bun.spawnSync(["powershell", "-NoProfile", "-Command", powershellStartProcessCommand], {
       stdio: ["ignore", "ignore", "ignore"],
     });
   } else {

@@ -23,11 +23,13 @@ export async function execute(_args: string[]): Promise<void> {
   );
 
   console.log(`\n  ${bold("Examples:")}\n`);
-  console.log(`    ${colorize("kraken", "cyan")}                    start TUI with all services`);
-  console.log(
-    `    ${colorize("kraken init", "cyan")}               setup kraken in current project`,
-  );
-  console.log(`    ${colorize("kraken doctor", "cyan")}             check system health`);
+  console.log(`    ${colorize("kraken", "cyan")}                          start TUI with all services`);
+  console.log(`    ${colorize("kraken init", "cyan")}                     setup kraken in current project`);
+  console.log(`    ${colorize("kraken doctor", "cyan")}                   check system health`);
+  console.log(`    ${colorize("kraken provider switch", "cyan")}          change LLM provider and model`);
+  console.log(`    ${colorize("kraken notification add", "cyan")}         add a notification channel`);
+  console.log(`    ${colorize("kraken trigger add", "cyan")}              add a new trigger`);
+  console.log(`    ${colorize("kraken config validate", "cyan")}          validate configuration`);
   console.log(`    ${colorize("kraken config get", "cyan")} languageModel.model`);
   console.log(`    ${colorize("kraken plugins create", "cyan")} my-plugin`);
   console.log();

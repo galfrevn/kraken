@@ -1,6 +1,7 @@
 import { existsSync, readFileSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { bold, colorize, fail, success, warn, KRAKEN_HOME } from "@/constants.ts";
+import { API_KEY_ENV_VAR_BY_PROVIDER } from "@/providers.ts";
 
 function findConfigFile(): string | null {
   const globalConfig = join(KRAKEN_HOME, "kraken.yml");
@@ -117,6 +118,143 @@ function rewriteYamlValue(content: string, keyPath: string, newValue: string): s
   return content;
 }
 
+function validateCronExpression(cronExpression: string): boolean {
+  const cronFields = cronExpression.trim().split(/\s+/);
+  return cronFields.length === 5;
+}
+
+function validateConfiguration(configurationFilePath: string): void {
+  const fileContents = readFileSync(configurationFilePath, "utf-8");
+  const parsedConfiguration = parseYamlSimple(fileContents);
+
+  let validationErrorCount = 0;
+  let validationWarningCount = 0;
+
+  console.log(`\n  ${bold("Configuration Validation")} ${colorize(`(${configurationFilePath})`, "dim")}\n`);
+
+  if (!parsedConfiguration.repo) {
+    fail("missing required field: repo");
+    validationErrorCount++;
+  } else {
+    success("repo is set");
+  }
+
+  const languageModelSection = parsedConfiguration.languageModel as Record<string, string> | undefined;
+
+  if (!languageModelSection?.provider) {
+    fail("missing required field: languageModel.provider");
+    validationErrorCount++;
+  } else {
+    success(`languageModel.provider: ${languageModelSection.provider}`);
+  }
+
+  if (!languageModelSection?.model) {
+    fail("missing required field: languageModel.model");
+    validationErrorCount++;
+  } else {
+    success(`languageModel.model: ${languageModelSection.model}`);
+  }
+
+  if (languageModelSection?.provider) {
+    const expectedEnvironmentVariable = API_KEY_ENV_VAR_BY_PROVIDER[languageModelSection.provider];
+    if (expectedEnvironmentVariable) {
+      const apiKeyValue = Bun.env[expectedEnvironmentVariable];
+      if (apiKeyValue) {
+        success(`${expectedEnvironmentVariable} is set in environment`);
+      } else {
+        const envFilePath = join(KRAKEN_HOME, ".env");
+        if (existsSync(envFilePath)) {
+          const envFileContents = readFileSync(envFilePath, "utf-8");
+          const envFileHasKey = envFileContents.includes(`${expectedEnvironmentVariable}=`);
+          if (envFileHasKey) {
+            success(`${expectedEnvironmentVariable} found in ~/.kraken/.env`);
+          } else {
+            fail(`${expectedEnvironmentVariable} not found (required for ${languageModelSection.provider})`);
+            validationErrorCount++;
+          }
+        } else {
+          fail(`${expectedEnvironmentVariable} not found and ~/.kraken/.env does not exist`);
+          validationErrorCount++;
+        }
+      }
+    }
+  }
+
+  const triggersSection = parsedConfiguration.triggers as Record<string, unknown> | undefined;
+
+  if (triggersSection) {
+    const cronsSubsection = triggersSection.crons;
+    if (typeof cronsSubsection === "object" && cronsSubsection !== null) {
+      const cronLines = fileContents.split("\n");
+      let insideCronsSection = false;
+
+      for (const currentLine of cronLines) {
+        const trimmedLine = currentLine.trim();
+        if (trimmedLine === "crons:" && currentLine.startsWith("  ")) {
+          insideCronsSection = true;
+          continue;
+        }
+
+        if (insideCronsSection) {
+          const lineIndentation = currentLine.length - currentLine.trimStart().length;
+          if (lineIndentation <= 2 && trimmedLine && !trimmedLine.startsWith("#")) {
+            insideCronsSection = false;
+            continue;
+          }
+
+          if (trimmedLine.startsWith("expression:")) {
+            const cronExpressionValue = trimmedLine.slice("expression:".length).trim().replace(/^["']|["']$/g, "");
+            if (cronExpressionValue && !validateCronExpression(cronExpressionValue)) {
+              warn(`cron expression "${cronExpressionValue}" does not have 5 fields`);
+              validationWarningCount++;
+            } else if (cronExpressionValue) {
+              success(`cron expression valid: ${cronExpressionValue}`);
+            }
+          }
+        }
+      }
+    }
+  }
+
+  const notificationsSection = parsedConfiguration.notifications as Record<string, unknown> | undefined;
+
+  if (notificationsSection) {
+    const notificationLines = fileContents.split("\n");
+    for (const currentLine of notificationLines) {
+      const trimmedLine = currentLine.trim();
+
+      if (trimmedLine.startsWith("url:")) {
+        const webhookUrlValue = trimmedLine.slice("url:".length).trim().replace(/^["']|["']$/g, "");
+        if (webhookUrlValue && !webhookUrlValue.startsWith("${") && !webhookUrlValue.startsWith("https://")) {
+          warn(`notification URL should start with https:// (found: ${webhookUrlValue.slice(0, 30)}...)`);
+          validationWarningCount++;
+        }
+      }
+
+      if (trimmedLine.startsWith("secret:")) {
+        const secretValue = trimmedLine.slice("secret:".length).trim().replace(/^["']|["']$/g, "");
+        if (secretValue && !secretValue.startsWith("${")) {
+          warn(`webhook secret should use env var reference (\${ENV_VAR}) instead of plain string`);
+          validationWarningCount++;
+        }
+      }
+    }
+  }
+
+  console.log();
+  if (validationErrorCount === 0 && validationWarningCount === 0) {
+    success("Configuration is valid!");
+  } else {
+    if (validationErrorCount > 0) {
+      fail(`${validationErrorCount} error(s) found`);
+    }
+    if (validationWarningCount > 0) {
+      warn(`${validationWarningCount} warning(s) found`);
+    }
+  }
+  console.log();
+}
+
 export async function execute(args: string[]): Promise<void> {
   const configPath = findConfigFile();
 
@@ -198,6 +336,11 @@ export async function execute(args: string[]): Promise<void> {
     return;
   }
 
+  if (subcommand === "validate") {
+    validateConfiguration(configPath);
+    return;
+  }
+
   console.log(`\n  ${bold("Usage:")}`);
   console.log(
     `    ${colorize("kraken config", "cyan")}                    show full configuration`,
@@ -212,6 +355,9 @@ export async function execute(args: string[]): Promise<void> {
     `    ${colorize("kraken config set-key", "cyan")} <key>      set the API key in ~/.kraken/.env`,
   );
   console.log(
-    `    ${colorize("kraken config path", "cyan")}               show config file path\n`,
+    `    ${colorize("kraken config path", "cyan")}               show config file path`,
+  );
+  console.log(
+    `    ${colorize("kraken config validate", "cyan")}           validate configuration\n`,
   );
 }

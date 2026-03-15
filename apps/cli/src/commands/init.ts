@@ -1,37 +1,9 @@
-import { existsSync, mkdirSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, writeFileSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 import * as p from "@clack/prompts";
 import { KRAKEN_HOME, printBanner } from "@/constants.ts";
-
-const LLM_PROVIDERS = [
-  { value: "openrouter", label: "OpenRouter", hint: "access to all models" },
-  { value: "anthropic", label: "Anthropic", hint: "Claude direct" },
-  { value: "openai", label: "OpenAI", hint: "GPT direct" },
-];
-
-const MODELS_BY_PROVIDER: Record<string, { value: string; label: string; hint?: string }[]> = {
-  openrouter: [
-    { value: "anthropic/claude-sonnet-4", label: "Claude Sonnet 4", hint: "recommended" },
-    { value: "moonshotai/kimi-k2.5", label: "Kimi K2.5", hint: "reasoning, fast" },
-    { value: "deepseek/deepseek-v3.2", label: "DeepSeek V3.2", hint: "fast, cheap" },
-    { value: "anthropic/claude-sonnet-4.6", label: "Claude Sonnet 4.6" },
-    { value: "google/gemini-2.5-pro", label: "Gemini 2.5 Pro" },
-  ],
-  anthropic: [
-    { value: "claude-sonnet-4", label: "Claude Sonnet 4" },
-    { value: "claude-sonnet-4.6", label: "Claude Sonnet 4.6" },
-  ],
-  openai: [
-    { value: "gpt-4o", label: "GPT-4o" },
-    { value: "o3-mini", label: "o3-mini" },
-  ],
-};
-
-const API_KEY_ENV_BY_PROVIDER: Record<string, string> = {
-  openrouter: "OPENROUTER_API_KEY",
-  anthropic: "ANTHROPIC_API_KEY",
-  openai: "OPENAI_API_KEY",
-};
+import { LLM_PROVIDERS, MODELS_BY_PROVIDER, API_KEY_ENV_VAR_BY_PROVIDER } from "@/providers.ts";
+import { appendYamlArrayItem } from "@/yaml-writer.ts";
 
 const SECURITY_POLICIES = [
   {
@@ -138,7 +110,7 @@ export async function execute(_args: string[]): Promise<void> {
   );
 
   let apiKey = "";
-  const envVarName = API_KEY_ENV_BY_PROVIDER[provider] ?? "OPENROUTER_API_KEY";
+  const envVarName = API_KEY_ENV_VAR_BY_PROVIDER[provider] ?? "OPENROUTER_API_KEY";
   const existingKey = Bun.env[envVarName];
 
   if (existingKey) {
@@ -276,6 +248,138 @@ export async function execute(_args: string[]): Promise<void> {
         p.log.error(`${name} — failed to download`);
       }
     }
+  }
+
+  const shouldSetupNotifications = ensureCancel(
+    await p.confirm({
+      message: "Set up a notification channel?",
+      initialValue: false,
+    }),
+  );
+
+  if (shouldSetupNotifications) {
+    const notificationProviderSelection = ensureCancel(
+      await p.select({
+        message: "Notification provider",
+        options: [
+          { value: "slack", label: "Slack", hint: "webhook URL" },
+          { value: "discord", label: "Discord", hint: "webhook URL" },
+          { value: "system", label: "System", hint: "desktop notifications" },
+        ],
+      }),
+    );
+
+    let notificationChannelItem: Record<string, unknown> = {
+      name: `${notificationProviderSelection}-alerts`,
+      provider: notificationProviderSelection,
+      events: ["task.completed", "task.failed"],
+    };
+
+    if (notificationProviderSelection === "slack" || notificationProviderSelection === "discord") {
+      const notificationWebhookUrl = ensureCancel(
+        await p.text({
+          message: `Enter ${notificationProviderSelection} webhook URL`,
+          placeholder: "https://hooks.slack.com/services/...",
+          validate: (inputValue = "") => {
+            if (!inputValue.trim()) return "Webhook URL is required";
+            if (!inputValue.startsWith("https://")) return "URL must start with https://";
+          },
+        }),
+      );
+
+      notificationChannelItem.url = notificationWebhookUrl;
+    }
+
+    let currentConfigContents = readFileSync(configPath, "utf-8");
+    currentConfigContents = appendYamlArrayItem(
+      currentConfigContents,
+      ["notifications", "channels"],
+      notificationChannelItem,
+    );
+    writeFileSync(configPath, currentConfigContents);
+    p.log.success(`Added ${notificationProviderSelection} notification channel`);
+  }
+
+  const shouldSetupTrigger = ensureCancel(
+    await p.confirm({
+      message: "Set up a trigger?",
+      initialValue: false,
+    }),
+  );
+
+  if (shouldSetupTrigger) {
+    const triggerPresetSelection = ensureCancel(
+      await p.select({
+        message: "Select a trigger preset",
+        options: [
+          { value: "daily-review", label: "Daily code review", hint: "9am weekdays" },
+          { value: "github-issues", label: "GitHub issue handler", hint: "auto-respond to issues" },
+          { value: "custom-cron", label: "Custom cron", hint: "define your own schedule" },
+        ],
+      }),
+    );
+
+    let currentConfigContents = readFileSync(configPath, "utf-8");
+
+    if (triggerPresetSelection === "daily-review") {
+      currentConfigContents = appendYamlArrayItem(
+        currentConfigContents,
+        ["triggers", "crons"],
+        {
+          name: "daily-review",
+          expression: "0 9 * * 1-5",
+          task: "Review open PRs and summarize status for {{event.date}}",
+        },
+      );
+    } else if (triggerPresetSelection === "github-issues") {
+      currentConfigContents = appendYamlArrayItem(
+        currentConfigContents,
+        ["triggers", "webhooks"],
+        {
+          name: "github-issues",
+          provider: "github",
+          secret: "${GITHUB_WEBHOOK_SECRET}",
+          events: [
+            { type: "issues.opened", filter: ["label:kraken"], task: "Investigate issue #{{event.issue.number}}: {{event.issue.title}}" },
+          ],
+        },
+      );
+    } else if (triggerPresetSelection === "custom-cron") {
+      const customCronExpression = ensureCancel(
+        await p.text({
+          message: "Cron expression (min hour dom month dow)",
+          placeholder: "0 9 * * 1-5",
+          validate: (inputValue = "") => {
+            if (!inputValue.trim()) return "Cron expression is required";
+            const cronFields = inputValue.trim().split(/\s+/);
+            if (cronFields.length !== 5) return "Must have exactly 5 fields";
+          },
+        }),
+      );
+
+      const customCronTask = ensureCancel(
+        await p.text({
+          message: "Task template",
+          placeholder: "Run daily maintenance tasks",
+          validate: (inputValue = "") => {
+            if (!inputValue.trim()) return "Task template is required";
+          },
+        }),
+      );
+
+      currentConfigContents = appendYamlArrayItem(
+        currentConfigContents,
+        ["triggers", "crons"],
+        {
+          name: "custom-cron",
+          expression: customCronExpression,
+          task: customCronTask,
+        },
+      );
+    }
+
+    writeFileSync(configPath, currentConfigContents);
+    p.log.success(`Added ${triggerPresetSelection} trigger`);
   }
 
   p.note(

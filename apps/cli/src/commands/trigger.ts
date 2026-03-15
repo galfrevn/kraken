@@ -1,6 +1,13 @@
 import { existsSync, readFileSync } from "node:fs";
 import { join } from "node:path";
-import { bold, colorize, fail, KRAKEN_HOME } from "@/constants.ts";
+import * as p from "@clack/prompts";
+import { bold, colorize, fail, success, KRAKEN_HOME } from "@/constants.ts";
+import {
+  readConfigFile,
+  writeConfigFile,
+  appendYamlArrayItem,
+  removeYamlArrayItemByName,
+} from "@/yaml-writer.ts";
 
 // ---------------------------------------------------------------------------
 // YAML config types (mirrors the Rust TriggersYamlConfig)
@@ -532,6 +539,385 @@ function generateSampleWebhookPayload(provider: string, eventType: string): Reco
 }
 
 // ---------------------------------------------------------------------------
+// Add / Remove subcommands
+// ---------------------------------------------------------------------------
+
+const TRIGGER_TYPE_OPTIONS = [
+  { value: "cron", label: "Cron", hint: "run on a schedule" },
+  { value: "webhook", label: "Webhook", hint: "respond to GitHub/GitLab events" },
+  { value: "watcher", label: "Watcher", hint: "react to file changes" },
+];
+
+const WEBHOOK_PROVIDER_OPTIONS = [
+  { value: "github", label: "GitHub" },
+  { value: "gitlab", label: "GitLab" },
+];
+
+function getAllTriggerNames(triggersConfiguration: TriggersYamlConfig): string[] {
+  const allNames: string[] = [];
+  for (const cronTrigger of triggersConfiguration.crons ?? []) allNames.push(cronTrigger.name);
+  for (const webhookTrigger of triggersConfiguration.webhooks ?? []) allNames.push(webhookTrigger.name);
+  for (const watcherTrigger of triggersConfiguration.watchers ?? []) allNames.push(watcherTrigger.name);
+  return allNames;
+}
+
+async function addTriggerInteractively(): Promise<void> {
+  const currentFileContents = readConfigFile();
+
+  if (!currentFileContents) {
+    fail("no kraken.yml found. Run 'kraken init' to create one.");
+    process.exit(1);
+  }
+
+  p.intro("Add trigger");
+
+  const selectedTriggerType = await p.select({
+    message: "Select trigger type",
+    options: TRIGGER_TYPE_OPTIONS,
+  });
+
+  if (p.isCancel(selectedTriggerType)) {
+    p.cancel("Cancelled.");
+    return;
+  }
+
+  const existingTriggersConfiguration = parseSimpleYamlTriggersSection(currentFileContents);
+  const existingTriggerNames = existingTriggersConfiguration
+    ? getAllTriggerNames(existingTriggersConfiguration)
+    : [];
+
+  const triggerName = await p.text({
+    message: "Trigger name",
+    placeholder: "my-trigger",
+    validate: (inputValue = "") => {
+      if (!inputValue.trim()) return "Name is required";
+      if (!/^[a-zA-Z0-9_-]+$/.test(inputValue)) return "Use only letters, numbers, hyphens, and underscores";
+      if (existingTriggerNames.includes(inputValue)) return `Trigger "${inputValue}" already exists`;
+    },
+  });
+
+  if (p.isCancel(triggerName)) {
+    p.cancel("Cancelled.");
+    return;
+  }
+
+  if (selectedTriggerType === "cron") {
+    await addCronTrigger(currentFileContents, triggerName);
+  } else if (selectedTriggerType === "webhook") {
+    await addWebhookTrigger(currentFileContents, triggerName);
+  } else if (selectedTriggerType === "watcher") {
+    await addWatcherTrigger(currentFileContents, triggerName);
+  }
+}
+
+async function addCronTrigger(currentFileContents: string, triggerName: string): Promise<void> {
+  const cronExpression = await p.text({
+    message: "Cron expression (5 fields: min hour dom month dow)",
+    placeholder: "0 9 * * 1-5",
+    validate: (inputValue = "") => {
+      if (!inputValue.trim()) return "Cron expression is required";
+      const cronFields = inputValue.trim().split(/\s+/);
+      if (cronFields.length !== 5) return "Must have exactly 5 fields (minute hour day-of-month month day-of-week)";
+    },
+  });
+
+  if (p.isCancel(cronExpression)) {
+    p.cancel("Cancelled.");
+    return;
+  }
+
+  const taskTemplate = await p.text({
+    message: "Task template (use {{event.date}} for date placeholder)",
+    placeholder: "Review open PRs and summarize status for {{event.date}}",
+    validate: (inputValue = "") => {
+      if (!inputValue.trim()) return "Task template is required";
+    },
+  });
+
+  if (p.isCancel(taskTemplate)) {
+    p.cancel("Cancelled.");
+    return;
+  }
+
+  const branchPrefix = await p.text({
+    message: "Branch prefix (optional, leave empty to skip)",
+    placeholder: "kraken/review-",
+  });
+
+  if (p.isCancel(branchPrefix)) {
+    p.cancel("Cancelled.");
+    return;
+  }
+
+  const cronTriggerItem: Record<string, unknown> = {
+    name: triggerName,
+    expression: cronExpression,
+    task: taskTemplate,
+  };
+
+  if (branchPrefix && branchPrefix.trim()) {
+    cronTriggerItem.branchPrefix = branchPrefix;
+  }
+
+  const updatedFileContents = appendYamlArrayItem(
+    currentFileContents,
+    ["triggers", "crons"],
+    cronTriggerItem,
+  );
+
+  writeConfigFile(updatedFileContents);
+  success(`Added cron trigger "${triggerName}"`);
+  p.outro("Trigger added to kraken.yml.");
+}
+
+async function addWebhookTrigger(currentFileContents: string, triggerName: string): Promise<void> {
+  const selectedWebhookProvider = await p.select({
+    message: "Select webhook provider",
+    options: WEBHOOK_PROVIDER_OPTIONS,
+  });
+
+  if (p.isCancel(selectedWebhookProvider)) {
+    p.cancel("Cancelled.");
+    return;
+  }
+
+  const webhookSecret = await p.text({
+    message: "Webhook secret (use ${ENV_VAR} for env variable reference)",
+    placeholder: "${GITHUB_WEBHOOK_SECRET}",
+    validate: (inputValue = "") => {
+      if (!inputValue.trim()) return "Webhook secret is required";
+    },
+  });
+
+  if (p.isCancel(webhookSecret)) {
+    p.cancel("Cancelled.");
+    return;
+  }
+
+  const webhookEvents: { type: string; filter: string[]; task: string }[] = [];
+  let shouldAddMoreEvents = true;
+
+  while (shouldAddMoreEvents) {
+    const eventType = await p.text({
+      message: "Event type (e.g. issues.opened, pull_request.opened, push)",
+      placeholder: "issues.opened",
+      validate: (inputValue = "") => {
+        if (!inputValue.trim()) return "Event type is required";
+      },
+    });
+
+    if (p.isCancel(eventType)) {
+      p.cancel("Cancelled.");
+      return;
+    }
+
+    const eventFilters = await p.text({
+      message: "Filters (comma-separated, leave empty for none)",
+      placeholder: "label:kraken, label:bug",
+    });
+
+    if (p.isCancel(eventFilters)) {
+      p.cancel("Cancelled.");
+      return;
+    }
+
+    const eventTaskTemplate = await p.text({
+      message: "Task template for this event",
+      placeholder: "Investigate issue #{{event.issue.number}}: {{event.issue.title}}",
+      validate: (inputValue = "") => {
+        if (!inputValue.trim()) return "Task template is required";
+      },
+    });
+
+    if (p.isCancel(eventTaskTemplate)) {
+      p.cancel("Cancelled.");
+      return;
+    }
+
+    const parsedFilters = eventFilters && eventFilters.trim()
+      ? eventFilters.split(",").map((filterValue) => filterValue.trim()).filter(Boolean)
+      : [];
+
+    webhookEvents.push({
+      type: eventType,
+      filter: parsedFilters,
+      task: eventTaskTemplate,
+    });
+
+    const shouldContinueAddingEvents = await p.confirm({
+      message: "Add another event?",
+      initialValue: false,
+    });
+
+    if (p.isCancel(shouldContinueAddingEvents)) {
+      p.cancel("Cancelled.");
+      return;
+    }
+
+    shouldAddMoreEvents = shouldContinueAddingEvents;
+  }
+
+  const webhookTriggerItem: Record<string, unknown> = {
+    name: triggerName,
+    provider: selectedWebhookProvider,
+    secret: webhookSecret,
+    events: webhookEvents.map((webhookEvent) => {
+      const eventItem: Record<string, unknown> = { type: webhookEvent.type };
+      if (webhookEvent.filter.length > 0) {
+        eventItem.filter = webhookEvent.filter;
+      }
+      eventItem.task = webhookEvent.task;
+      return eventItem;
+    }),
+  };
+
+  const updatedFileContents = appendYamlArrayItem(
+    currentFileContents,
+    ["triggers", "webhooks"],
+    webhookTriggerItem,
+  );
+
+  writeConfigFile(updatedFileContents);
+  success(`Added webhook trigger "${triggerName}" with ${webhookEvents.length} event(s)`);
+  p.outro("Trigger added to kraken.yml.");
+}
+
+async function addWatcherTrigger(currentFileContents: string, triggerName: string): Promise<void> {
+  const watchedPaths = await p.text({
+    message: "Paths to watch (comma-separated)",
+    placeholder: "src/, tests/",
+    validate: (inputValue = "") => {
+      if (!inputValue.trim()) return "At least one path is required";
+    },
+  });
+
+  if (p.isCancel(watchedPaths)) {
+    p.cancel("Cancelled.");
+    return;
+  }
+
+  const ignorePatterns = await p.text({
+    message: "Ignore patterns (comma-separated, leave empty for none)",
+    placeholder: "node_modules/, .git/, *.log",
+  });
+
+  if (p.isCancel(ignorePatterns)) {
+    p.cancel("Cancelled.");
+    return;
+  }
+
+  const debounceMilliseconds = await p.text({
+    message: "Debounce (ms)",
+    placeholder: "500",
+    initialValue: "500",
+    validate: (inputValue = "") => {
+      const parsedNumber = parseInt(inputValue, 10);
+      if (Number.isNaN(parsedNumber) || parsedNumber < 0) return "Must be a positive number";
+    },
+  });
+
+  if (p.isCancel(debounceMilliseconds)) {
+    p.cancel("Cancelled.");
+    return;
+  }
+
+  const taskTemplate = await p.text({
+    message: "Task template (use {{event.path}} for changed file path)",
+    placeholder: "Review changes in {{event.path}} and suggest improvements",
+    validate: (inputValue = "") => {
+      if (!inputValue.trim()) return "Task template is required";
+    },
+  });
+
+  if (p.isCancel(taskTemplate)) {
+    p.cancel("Cancelled.");
+    return;
+  }
+
+  const parsedWatchedPaths = watchedPaths.split(",").map((pathValue) => pathValue.trim()).filter(Boolean);
+  const parsedIgnorePatterns = ignorePatterns && ignorePatterns.trim()
+    ? ignorePatterns.split(",").map((patternValue) => patternValue.trim()).filter(Boolean)
+    : [];
+
+  const watcherTriggerItem: Record<string, unknown> = {
+    name: triggerName,
+    paths: parsedWatchedPaths,
+    task: taskTemplate,
+    debounceMs: parseInt(debounceMilliseconds, 10),
+  };
+
+  if (parsedIgnorePatterns.length > 0) {
+    watcherTriggerItem.ignore = parsedIgnorePatterns;
+  }
+
+  const updatedFileContents = appendYamlArrayItem(
+    currentFileContents,
+    ["triggers", "watchers"],
+    watcherTriggerItem,
+  );
+
+  writeConfigFile(updatedFileContents);
+  success(`Added watcher trigger "${triggerName}"`);
+  p.outro("Trigger added to kraken.yml.");
+}
+
+function removeTrigger(triggerNameToRemove: string): void {
+  const currentFileContents = readConfigFile();
+
+  if (!currentFileContents) {
+    fail("no kraken.yml found. Run 'kraken init' to create one.");
+    process.exit(1);
+  }
+
+  const existingTriggersConfiguration = parseSimpleYamlTriggersSection(currentFileContents);
+
+  if (!existingTriggersConfiguration) {
+    fail("no triggers section found in kraken.yml");
+    process.exit(1);
+  }
+
+  const allExistingTriggerNames = getAllTriggerNames(existingTriggersConfiguration);
+
+  if (!allExistingTriggerNames.includes(triggerNameToRemove)) {
+    fail(`trigger "${triggerNameToRemove}" not found`);
+    if (allExistingTriggerNames.length > 0) {
+      console.log(`\n  Available triggers:`);
+      for (const existingName of allExistingTriggerNames) {
+        console.log(`    - ${colorize(existingName, "cyan")}`);
+      }
+    }
+    console.log();
+    process.exit(1);
+  }
+
+  let updatedFileContents = currentFileContents;
+
+  const matchingCronTrigger = existingTriggersConfiguration.crons?.find(
+    (cronTrigger) => cronTrigger.name === triggerNameToRemove,
+  );
+  if (matchingCronTrigger) {
+    updatedFileContents = removeYamlArrayItemByName(updatedFileContents, ["triggers", "crons"], triggerNameToRemove);
+  }
+
+  const matchingWebhookTrigger = existingTriggersConfiguration.webhooks?.find(
+    (webhookTrigger) => webhookTrigger.name === triggerNameToRemove,
+  );
+  if (matchingWebhookTrigger) {
+    updatedFileContents = removeYamlArrayItemByName(updatedFileContents, ["triggers", "webhooks"], triggerNameToRemove);
+  }
+
+  const matchingWatcherTrigger = existingTriggersConfiguration.watchers?.find(
+    (watcherTrigger) => watcherTrigger.name === triggerNameToRemove,
+  );
+  if (matchingWatcherTrigger) {
+    updatedFileContents = removeYamlArrayItemByName(updatedFileContents, ["triggers", "watchers"], triggerNameToRemove);
+  }
+
+  writeConfigFile(updatedFileContents);
+  success(`Removed trigger "${triggerNameToRemove}"`);
+}
+
+// ---------------------------------------------------------------------------
 // Entry point
 // ---------------------------------------------------------------------------
 
@@ -539,8 +925,10 @@ function printTriggerUsage(): void {
   console.log(`\n  ${bold("Usage:")}\n`);
   console.log(`    ${colorize("kraken trigger", "cyan")} ${colorize("<subcommand> [options]", "dim")}\n`);
   console.log(`  ${bold("Subcommands:")}\n`);
-  console.log(`    ${colorize("list", "cyan")}            List all configured triggers`);
-  console.log(`    ${colorize("test", "cyan")} ${colorize("<name>", "dim")}     Dry-run a trigger with a sample payload\n`);
+  console.log(`    ${colorize("list", "cyan")}              List all configured triggers`);
+  console.log(`    ${colorize("add", "cyan")}               Interactive wizard to add a trigger`);
+  console.log(`    ${colorize("remove", "cyan")} ${colorize("<name>", "dim")}     Remove a trigger from configuration`);
+  console.log(`    ${colorize("test", "cyan")} ${colorize("<name>", "dim")}       Dry-run a trigger with a sample payload\n`);
 }
 
 export async function execute(args: string[]): Promise<void> {
@@ -551,6 +939,18 @@ export async function execute(args: string[]): Promise<void> {
     case "list":
       listTriggers();
       break;
+    case "add":
+      await addTriggerInteractively();
+      break;
+    case "remove": {
+      const triggerNameToRemoveArgument = remainingArgs.find((argument) => !argument.startsWith("-"));
+      if (!triggerNameToRemoveArgument) {
+        fail("missing trigger name. Usage: kraken trigger remove <name>");
+        process.exit(1);
+      }
+      removeTrigger(triggerNameToRemoveArgument);
+      break;
+    }
     case "test": {
       const triggerNameArgument = remainingArgs.find((arg) => !arg.startsWith("-"));
       if (!triggerNameArgument) {
