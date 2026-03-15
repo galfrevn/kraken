@@ -54,7 +54,7 @@ interface ApplicationProps {
 
 export function Application({
   store,
-  daemonStore: _daemonStore,
+  daemonStore,
   threadManager,
   pluginRegistry,
   pluginFailures,
@@ -211,7 +211,7 @@ export function Application({
                   />
                 )}
                 {activeView === "dashboard" && (
-                  <DashboardView store={store} pluginRegistry={pluginRegistry} />
+                  <DashboardView store={store} daemonStore={daemonStore} pluginRegistry={pluginRegistry} />
                 )}
                 {activeView === "tasks" && (
                   <TasksView store={store} focused={activeView === "tasks"} />
