@@ -395,6 +395,10 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     // -----------------------------------------------------------------------
     // 12. Initialize LLM provider router and create WorkerServiceImplementation
     // -----------------------------------------------------------------------
+    if std::env::var("LLM_PROVIDER").is_err() && !daemon_config.language_model.provider.is_empty() {
+        unsafe { std::env::set_var("LLM_PROVIDER", &daemon_config.language_model.provider); }
+    }
+
     let llm_provider_router = Arc::new(
         match llm::router::LlmProviderRouter::from_environment() {
             Ok(router) => {
