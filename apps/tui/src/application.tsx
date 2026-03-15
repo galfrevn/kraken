@@ -4,6 +4,7 @@ import { DialogProvider } from "@opentui-ui/dialog/react";
 import { Toaster, toast } from "@opentui-ui/toast/react";
 import { COLORS } from "@/theme.ts";
 import type { TuiStore } from "@/store.ts";
+import type { DaemonStore } from "@/daemon-store.ts";
 import type { ThreadManager } from "@/threads.ts";
 import type { PluginRegistry } from "@core/plugins/registry.ts";
 import { ChatView } from "@/views/chat.tsx";
@@ -43,6 +44,7 @@ export interface PluginLoadFailure {
 
 interface ApplicationProps {
   store: TuiStore;
+  daemonStore?: DaemonStore | null;
   threadManager: ThreadManager;
   pluginRegistry: PluginRegistry;
   pluginFailures?: PluginLoadFailure[];
@@ -52,6 +54,7 @@ interface ApplicationProps {
 
 export function Application({
   store,
+  daemonStore: _daemonStore,
   threadManager,
   pluginRegistry,
   pluginFailures,

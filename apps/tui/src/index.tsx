@@ -22,6 +22,8 @@ import { ProjectIndexer } from "@core/memory/indexer.ts";
 import { PluginRegistry, type PluginEntry } from "@core/plugins/index.ts";
 import type { SetupField } from "@/views/setup.tsx";
 import { TuiStore } from "@/store.ts";
+import { DaemonConnection } from "@/daemon-connection.ts";
+import { DaemonStore } from "@/daemon-store.ts";
 import { ThreadManager } from "@/threads.ts";
 import { createSessionExecutor } from "@/executor.ts";
 import { registerPluginsCommand } from "@/commands.ts";
@@ -73,8 +75,30 @@ function mergePluginEntries(
   return merged;
 }
 
+async function attemptDaemonConnection(daemonUrl: string): Promise<DaemonConnection | null> {
+  const daemonConnection = new DaemonConnection(daemonUrl);
+  const daemonIsReachable = await daemonConnection.connect();
+  if (daemonIsReachable) {
+    return daemonConnection;
+  }
+  return null;
+}
+
 export async function main(): Promise<void> {
   const configuration = await loadConfiguration();
+
+  const daemonUrl = process.env["KRAKEN_DAEMON_URL"] ?? "http://localhost:50051";
+  const activeDaemonConnection = await attemptDaemonConnection(daemonUrl);
+  const daemonStore = activeDaemonConnection
+    ? new DaemonStore(activeDaemonConnection)
+    : null;
+
+  if (daemonStore) {
+    console.log(`[tui] daemon mode: connected to ${daemonUrl}`);
+  } else {
+    console.log("[tui] local mode: daemon not available, running standalone");
+  }
+
   const database = new AgentDatabase(configuration.databasePath);
   const taskQueueManager = new TaskQueueManager(database);
   const schedulerClient = createSchedulerClient(configuration.services.schedulerUrl);
@@ -260,6 +284,7 @@ export async function main(): Promise<void> {
   createRoot(renderer).render(
     <Application
       store={store}
+      daemonStore={daemonStore}
       threadManager={threadManager}
       pluginRegistry={pluginRegistry}
       pluginFailures={pluginResult.failed}
