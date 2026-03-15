@@ -53,28 +53,46 @@ export async function execute(_args: string[]): Promise<void> {
   }
 
   const spinnerInstance = p.spinner();
-  spinnerInstance.start("Stopping daemon if running");
+  spinnerInstance.start("Checking for running daemon");
 
   // Stop the daemon first so files aren't locked
+  let daemonWasRunning = false;
+
+  // Attempt 1: use PID file
   const daemonPidPath = join(KRAKEN_HOME, "daemon.pid");
   if (existsSync(daemonPidPath)) {
     try {
       const daemonPid = parseInt(readFileSync(daemonPidPath, "utf-8").trim(), 10);
       if (!Number.isNaN(daemonPid)) {
         try {
+          process.kill(daemonPid, 0); // check if alive
+          daemonWasRunning = true;
           process.kill(daemonPid, "SIGTERM");
         } catch { /* already dead */ }
-        // Wait for daemon to exit
-        for (let waitAttempt = 0; waitAttempt < 10; waitAttempt++) {
-          await new Promise((resolve) => setTimeout(resolve, 500));
-          try {
-            process.kill(daemonPid, 0);
-          } catch {
-            break; // process is dead
-          }
-        }
       }
     } catch { /* best-effort */ }
+  }
+
+  // Attempt 2: kill by process name (catches daemons without PID file)
+  if (!daemonWasRunning) {
+    try {
+      if (process.platform === "win32") {
+        const killResult = Bun.spawnSync(["taskkill", "/F", "/IM", "kraken-daemon.exe"], {
+          stdio: ["ignore", "ignore", "ignore"],
+        });
+        if (killResult.exitCode === 0) daemonWasRunning = true;
+      } else {
+        const killResult = Bun.spawnSync(["pkill", "-f", "kraken-daemon"], {
+          stdio: ["ignore", "ignore", "ignore"],
+        });
+        if (killResult.exitCode === 0) daemonWasRunning = true;
+      }
+    } catch { /* best-effort */ }
+  }
+
+  if (daemonWasRunning) {
+    spinnerInstance.message("Waiting for daemon to stop");
+    await new Promise((resolve) => setTimeout(resolve, 3000));
   }
 
   spinnerInstance.message("Removing kraken");
