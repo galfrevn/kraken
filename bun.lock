@@ -54,12 +54,8 @@
         "typescript": "^5",
       },
     },
-    "apps/gateway": {
-      "name": "@kraken/gateway",
-      "version": "0.1.0",
-    },
-    "apps/scheduler": {
-      "name": "@kraken/scheduler",
+    "apps/daemon": {
+      "name": "@kraken/daemon",
       "version": "0.1.0",
     },
     "apps/tui": {
@@ -184,11 +180,9 @@
 
     "@kraken/core": ["@kraken/core@workspace:apps/core"],
 
-    "@kraken/gateway": ["@kraken/gateway@workspace:apps/gateway"],
+    "@kraken/daemon": ["@kraken/daemon@workspace:apps/daemon"],
 
     "@kraken/plugins": ["@kraken/plugins@workspace:packages/plugins"],
-
-    "@kraken/scheduler": ["@kraken/scheduler@workspace:apps/scheduler"],
 
     "@kraken/sdk": ["@kraken/sdk@workspace:packages/sdk"],
 

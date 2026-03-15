@@ -17,10 +17,9 @@ export async function execute(_args: string[]): Promise<void> {
   }
 
   console.log(`\n  ${bold("Start options:")}\n`);
-  console.log(`    ${colorize("--no-scheduler", "cyan")}  start without the scheduler service`);
-  console.log(`    ${colorize("--no-gateway", "cyan")}    start without the gateway service`);
+  console.log(`    ${colorize("--no-daemon", "cyan")}     start without the daemon process`);
   console.log(
-    `    ${colorize("--dev", "cyan")}           use cargo run / go run instead of built binaries`,
+    `    ${colorize("--dev", "cyan")}           use cargo run instead of built binaries`,
   );
 
   console.log(`\n  ${bold("Examples:")}\n`);

@@ -37,10 +37,9 @@ if (-not (Get-Command cargo -ErrorAction SilentlyContinue)) {
 }
 Success "cargo $((cargo --version) -replace 'cargo ','')"
 
-if (-not (Get-Command go -ErrorAction SilentlyContinue)) {
-    Fail "go is not installed. Install it: https://go.dev/dl"
+if (Get-Command go -ErrorAction SilentlyContinue) {
+    Success "go $((go version) -replace 'go version go' -replace ' .*','') (optional)"
 }
-Success "go $((go version) -replace 'go version go' -replace ' .*','')"
 
 # -------------------------------------------------------------------
 # 2. Setup protoc
@@ -98,7 +97,6 @@ if (Get-Command buf -ErrorAction SilentlyContinue) {
     Success "protobuf code generated"
 
     Push-Location gen/go; go mod tidy; Pop-Location
-    Push-Location apps/gateway; go mod tidy; Pop-Location
     Success "go modules synced"
 } else {
     if ((Test-Path "gen/go/agent") -and (Test-Path "gen/ts/agent")) {
@@ -110,32 +108,23 @@ if (Get-Command buf -ErrorAction SilentlyContinue) {
 }
 
 # -------------------------------------------------------------------
-# 5. Build scheduler (Rust)
+# 5. Build daemon (Rust)
 # -------------------------------------------------------------------
-Step "building scheduler (rust)"
-Push-Location apps/scheduler
+Step "building daemon (rust)"
+Push-Location apps/daemon
 cargo build --release
 Pop-Location
-Success "scheduler built -> apps/scheduler/target/release/scheduler.exe"
+Success "daemon built -> apps/daemon/target/release/kraken-daemon.exe"
 
 # -------------------------------------------------------------------
-# 6. Build gateway (Go)
-# -------------------------------------------------------------------
-Step "building gateway (go)"
-Push-Location apps/gateway
-go build -o ./bin/gateway.exe ./cmd/gateway
-Pop-Location
-Success "gateway built -> apps/gateway/bin/gateway.exe"
-
-# -------------------------------------------------------------------
-# 7. Register global CLI
+# 6. Register global CLI
 # -------------------------------------------------------------------
 Step "registering kraken CLI"
 bun link
 Success "kraken command registered globally"
 
 # -------------------------------------------------------------------
-# 8. Verify
+# 7. Verify
 # -------------------------------------------------------------------
 Step "verifying installation"
 

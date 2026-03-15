@@ -498,52 +498,36 @@ function checkToolchain(resultCollector: CheckResult[]): void {
       ? cargoCheck.version
       : "not installed (https://rustup.rs)",
   });
-
-  const goCheck = checkCommandAvailability("go", ["version"]);
-  resultCollector.push({
-    label: "Go:",
-    status: goCheck.available ? "ok" : "warn",
-    message: goCheck.available ? goCheck.version : "not installed (https://go.dev/dl)",
-  });
 }
 
 function checkBinaries(resultCollector: CheckResult[]): void {
-  const schedulerReleaseBinaryPath = join(
+  const daemonReleaseBinaryPath = join(
     KRAKEN_ROOT,
     "apps",
-    "scheduler",
+    "daemon",
     "target",
     "release",
-    "scheduler",
+    "kraken-daemon",
   );
-  const schedulerDebugBinaryPath = join(
+  const daemonDebugBinaryPath = join(
     KRAKEN_ROOT,
     "apps",
-    "scheduler",
+    "daemon",
     "target",
     "debug",
-    "scheduler",
+    "kraken-daemon",
   );
-  const schedulerBinaryExists =
-    existsSync(schedulerReleaseBinaryPath) || existsSync(schedulerDebugBinaryPath);
+  const daemonBinaryExists =
+    existsSync(daemonReleaseBinaryPath) || existsSync(daemonDebugBinaryPath);
 
   resultCollector.push({
-    label: "Scheduler:",
-    status: schedulerBinaryExists ? "ok" : "warn",
-    message: schedulerBinaryExists
-      ? existsSync(schedulerReleaseBinaryPath)
+    label: "Daemon:",
+    status: daemonBinaryExists ? "ok" : "warn",
+    message: daemonBinaryExists
+      ? existsSync(daemonReleaseBinaryPath)
         ? "release build found"
         : "debug build found"
       : "not built -- run setup.sh",
-  });
-
-  const gatewayBinaryPath = join(KRAKEN_ROOT, "apps", "gateway", "bin", "gateway");
-  const gatewayBinaryExists = existsSync(gatewayBinaryPath);
-
-  resultCollector.push({
-    label: "Gateway:",
-    status: gatewayBinaryExists ? "ok" : "warn",
-    message: gatewayBinaryExists ? "built binary found" : "not built -- run setup.sh",
   });
 }
 

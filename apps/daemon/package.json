@@ -1,5 +1,5 @@
 {
-  "name": "@kraken/scheduler",
+  "name": "@kraken/daemon",
   "version": "0.1.0",
   "private": true,
   "scripts": {

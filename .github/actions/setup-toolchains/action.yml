@@ -12,11 +12,6 @@ runs:
     - name: Install Rust
       uses: dtolnay/rust-toolchain@stable
 
-    - name: Setup Go
-      uses: actions/setup-go@v5
-      with:
-        go-version-file: apps/gateway/go.mod
-
     - name: Setup protoc
       uses: arduino/setup-protoc@v3
       with:
@@ -28,8 +23,8 @@ runs:
         path: |
           ~/.cargo/registry
           ~/.cargo/git
-          apps/scheduler/target
-        key: rust-${{ runner.os }}-${{ hashFiles('apps/scheduler/Cargo.lock') }}
+          apps/daemon/target
+        key: rust-${{ runner.os }}-${{ hashFiles('apps/daemon/Cargo.lock') }}
         restore-keys: rust-${{ runner.os }}-
 
     - name: Cache Bun dependencies

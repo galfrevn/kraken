@@ -78,9 +78,9 @@ function buildDaemonEnvironment(configuration: AgentConfiguration): Record<strin
 
 function spawnDaemon(developmentMode: boolean, configuration: AgentConfiguration): Subprocess {
   const releaseBinaryName = process.platform === "win32" ? "kraken-daemon.exe" : "kraken-daemon";
-  const releaseBinaryPath = join(KRAKEN_ROOT, "apps", "scheduler", "target", "release", releaseBinaryName);
-  const debugBinaryPath = join(KRAKEN_ROOT, "apps", "scheduler", "target", "debug", releaseBinaryName);
-  const schedulerDirectory = join(KRAKEN_ROOT, "apps", "scheduler");
+  const releaseBinaryPath = join(KRAKEN_ROOT, "apps", "daemon", "target", "release", releaseBinaryName);
+  const debugBinaryPath = join(KRAKEN_ROOT, "apps", "daemon", "target", "debug", releaseBinaryName);
+  const daemonDirectory = join(KRAKEN_ROOT, "apps", "daemon");
   const daemonEnvironment = buildDaemonEnvironment(configuration);
 
   if (!developmentMode && existsSync(releaseBinaryPath)) {
@@ -105,7 +105,7 @@ function spawnDaemon(developmentMode: boolean, configuration: AgentConfiguration
 
   return spawn({
     cmd: ["cargo", "run", "--bin", "kraken-daemon", "--quiet"],
-    cwd: schedulerDirectory,
+    cwd: daemonDirectory,
     stdout: "ignore",
     stderr: "ignore",
     env: daemonEnvironment,

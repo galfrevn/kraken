@@ -108,9 +108,9 @@ async function startDaemon(args: string[]): Promise<void> {
     cleanupStalePidFile();
   }
 
-  const releaseBinaryPath = join(KRAKEN_ROOT, "apps", "scheduler", "target", "release", DAEMON_BINARY_NAME);
-  const debugBinaryPath = join(KRAKEN_ROOT, "apps", "scheduler", "target", "debug", DAEMON_BINARY_NAME);
-  const schedulerDirectory = join(KRAKEN_ROOT, "apps", "scheduler");
+  const releaseBinaryPath = join(KRAKEN_ROOT, "apps", "daemon", "target", "release", DAEMON_BINARY_NAME);
+  const debugBinaryPath = join(KRAKEN_ROOT, "apps", "daemon", "target", "debug", DAEMON_BINARY_NAME);
+  const daemonDirectory = join(KRAKEN_ROOT, "apps", "daemon");
 
   let daemonCommand: string[];
 
@@ -146,7 +146,7 @@ async function startDaemon(args: string[]): Promise<void> {
 
     const foregroundProcess = spawn({
       cmd: daemonCommand,
-      cwd: schedulerDirectory,
+      cwd: daemonDirectory,
       stdout: "inherit",
       stderr: "inherit",
     });
@@ -173,7 +173,7 @@ async function startDaemon(args: string[]): Promise<void> {
 
   const backgroundProcess = spawn({
     cmd: daemonCommand,
-    cwd: schedulerDirectory,
+    cwd: daemonDirectory,
     stdout: "ignore",
     stderr: "ignore",
   });

@@ -144,7 +144,7 @@ bun install --frozen-lockfile 2>/dev/null || bun install
 success "dependencies installed"
 
 # -------------------------------------------------------------------
-# 5. Get scheduler & gateway binaries (pre-built or build from source)
+# 5. Get daemon binary (pre-built or build from source)
 # -------------------------------------------------------------------
 step "setting up native binaries"
 
@@ -182,26 +182,14 @@ if [ "$PREBUILT_OK" = false ]; then
 
   if command -v cargo &>/dev/null; then
     success "cargo found: $(cargo --version | awk '{print $2}')"
-    step "building scheduler (rust)"
-    cd apps/scheduler
+    step "building daemon (rust)"
+    cd apps/daemon
     cargo build --release 2>&1 | tail -1
-    cp target/release/scheduler "$KRAKEN_LIB/scheduler" 2>/dev/null || true
-    success "scheduler built"
+    cp target/release/kraken-daemon "$KRAKEN_LIB/kraken-daemon" 2>/dev/null || true
+    success "daemon built"
     cd "$KRAKEN_SRC"
   else
-    warn "cargo not found -- scheduler won't be available (https://rustup.rs)"
-  fi
-
-  if command -v go &>/dev/null; then
-    success "go found: $(go version | awk '{print $3}' | sed 's/go//')"
-    step "building gateway (go)"
-    cd apps/gateway
-    go build -o ./bin/gateway ./cmd/gateway
-    cp bin/gateway "$KRAKEN_LIB/gateway" 2>/dev/null || true
-    success "gateway built"
-    cd "$KRAKEN_SRC"
-  else
-    warn "go not found -- gateway won't be available (https://go.dev/dl)"
+    warn "cargo not found -- daemon won't be available (https://rustup.rs)"
   fi
 fi
 

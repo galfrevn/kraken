@@ -5,7 +5,7 @@ import { VERSION } from "@/constants.ts";
 type CommandModule = { execute: (args: string[]) => Promise<void> };
 
 const COMMANDS: Record<string, { description: string; module: string }> = {
-  start: { description: "Start the TUI with scheduler and gateway", module: "@/commands/start.ts" },
+  start: { description: "Start the TUI with the daemon", module: "@/commands/start.ts" },
   chat: { description: "One-shot task submission to the daemon (pipe-friendly)", module: "@/commands/chat.ts" },
   daemon: { description: "Manage the kraken daemon (start/stop/status/restart/reload)", module: "@/commands/daemon.ts" },
   task: { description: "Manage tasks (list/submit/cancel/cleanup)", module: "@/commands/task.ts" },

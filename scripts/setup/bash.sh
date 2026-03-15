@@ -48,11 +48,10 @@ fi
 CARGO_VERSION=$(cargo --version | awk '{print $2}')
 success "cargo $CARGO_VERSION"
 
-if ! command -v go &>/dev/null; then
-  fail "go is not installed. Install it: https://go.dev/dl"
+if command -v go &>/dev/null; then
+  GO_VERSION=$(go version | awk '{print $3}' | sed 's/go//')
+  success "go $GO_VERSION (optional)"
 fi
-GO_VERSION=$(go version | awk '{print $3}' | sed 's/go//')
-success "go $GO_VERSION"
 
 # -------------------------------------------------------------------
 # 2. Install TypeScript dependencies
@@ -71,7 +70,6 @@ if command -v buf &>/dev/null; then
   success "protobuf code generated"
 
   cd gen/go && go mod tidy && cd "$PROJECT_ROOT"
-  cd apps/gateway && go mod tidy && cd "$PROJECT_ROOT"
   success "go modules synced"
 else
   if [ -d gen/go/agent ] && [ -d gen/ts/agent ]; then
@@ -83,32 +81,23 @@ else
 fi
 
 # -------------------------------------------------------------------
-# 4. Build scheduler (Rust)
+# 4. Build daemon (Rust)
 # -------------------------------------------------------------------
-step "building scheduler (rust)"
-cd apps/scheduler
+step "building daemon (rust)"
+cd apps/daemon
 cargo build --release 2>&1 | tail -1
-success "scheduler built → apps/scheduler/target/release/scheduler"
+success "daemon built → apps/daemon/target/release/kraken-daemon"
 cd "$PROJECT_ROOT"
 
 # -------------------------------------------------------------------
-# 5. Build gateway (Go)
-# -------------------------------------------------------------------
-step "building gateway (go)"
-cd apps/gateway
-go build -o ./bin/gateway ./cmd/gateway
-success "gateway built → apps/gateway/bin/gateway"
-cd "$PROJECT_ROOT"
-
-# -------------------------------------------------------------------
-# 6. Register global CLI
+# 5. Register global CLI
 # -------------------------------------------------------------------
 step "registering kraken CLI"
 bun link 2>&1 | tail -2
 success "kraken command registered globally"
 
 # -------------------------------------------------------------------
-# 7. Verify
+# 6. Verify
 # -------------------------------------------------------------------
 step "verifying installation"
 

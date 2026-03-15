@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## What is Kraken
 
-Kraken is an autonomous developer agent with a three-process architecture: a **Rust scheduler** (cron + file watchers), a **Go gateway** (LLM proxy + webhooks), and a **TypeScript TUI** (React terminal UI via OpenTUI). The CLI spawns all three and orchestrates communication over ConnectRPC on localhost.
+Kraken is an autonomous developer agent with a two-process architecture: a **Rust daemon** (LLM proxy, orchestrator, cron, file watchers, webhooks, notifications) and a **TypeScript TUI** (React terminal UI via OpenTUI). The CLI spawns both and orchestrates communication over ConnectRPC on localhost.
 
 ## Common Commands
 
@@ -28,12 +28,7 @@ bun run proto:lint        # Lint proto definitions (buf lint)
 bun test                  # Run tests (only core has tests currently)
 bun run build             # bun build src/index.ts --outdir dist --target bun
 
-# Gateway (Go) — run from apps/gateway/
-go build -o ./bin/gateway ./cmd/gateway
-go test ./...
-go vet ./...
-
-# Scheduler (Rust) — run from apps/scheduler/
+# Daemon (Rust) — run from apps/daemon/
 cargo build --release
 cargo test
 cargo clippy -- -D warnings
@@ -46,7 +41,7 @@ bun run build             # bun build src/index.tsx --outdir dist --target bun
 ### Developer setup from scratch
 
 ```bash
-bash scripts/setup.sh     # Installs deps, generates proto, builds Rust/Go, links CLI
+bash scripts/setup.sh     # Installs deps, generates proto, builds Rust, links CLI
 ```
 
 ## Architecture
@@ -57,8 +52,7 @@ bash scripts/setup.sh     # Installs deps, generates proto, builds Rust/Go, link
 apps/
   cli/          # TypeScript — CLI entry point, command dispatch, process orchestration
   core/         # TypeScript — Agent brain: execution loop, tools, storage, plugins, clients
-  gateway/      # Go — LLM proxy (OpenRouter/Anthropic/OpenAI) + webhook receiver (ConnectRPC)
-  scheduler/    # Rust — Cron engine + file watcher, streams events via gRPC (tonic)
+  daemon/       # Rust — Full daemon: LLM proxy, orchestrator, cron, file watchers, webhooks
   tui/          # TypeScript/React — Terminal UI (OpenTUI), composes all core subsystems
 packages/
   configuration/  # Shared tsconfig.base.json (all TS apps extend this)
@@ -74,7 +68,7 @@ gen/
 
 **No build step in dev for TypeScript.** The TUI's `tsconfig.json` maps `@/*` to both `./src/*` and `../core/src/*`. The CLI dynamically imports `apps/tui/src/index.tsx` at runtime. Bun resolves `.ts`/`.tsx` imports directly.
 
-**Protobuf as the API contract.** All cross-language contracts live in `proto/agent/v1/`. Buf generates TS and Go code. The Rust scheduler compiles protos separately via `tonic_build` in `build.rs`.
+**Protobuf as the API contract.** All cross-language contracts live in `proto/agent/v1/`. Buf generates TS and Go code. The Rust daemon compiles protos separately via `tonic_build` in `build.rs`.
 
 **XML-based tool-calling protocol.** The agent emits `<tool_call>{"name": "...", "parameters": {...}}</tool_call>` tags instead of native provider tool-calling APIs. This makes the system LLM-provider-agnostic. Parsing is in `apps/core/src/agent/parser.ts`.
 
@@ -86,10 +80,9 @@ gen/
 
 ### Service Ports
 
-| Service   | Default Port | Env Variable     |
-| --------- | ------------ | ---------------- |
-| Scheduler | 50051        | `SCHEDULER_PORT` |
-| Gateway   | 50052        | `GATEWAY_PORT`   |
+| Service | Default Port | Env Variable     |
+| ------- | ------------ | ---------------- |
+| Daemon  | 50051        | `SCHEDULER_PORT` |
 
 ### Key Environment Variables
 
@@ -98,7 +91,7 @@ gen/
 | `KRAKEN_OPENROUTER_API_KEY` / `OPENROUTER_API_KEY` / `ANTHROPIC_API_KEY` / `OPENAI_API_KEY` | LLM provider API key                                        |
 | `BRAVE_SEARCH_API_KEY`                                                                      | Web search tool                                             |
 | `KRAKEN_CONFIGURATION_FILE`                                                                 | Override config file path (default: `~/.kraken/kraken.yml`) |
-| `KRAKEN_SCHEDULER_URL` / `KRAKEN_GATEWAY_URL`                                               | Override service URLs                                       |
+| `KRAKEN_SCHEDULER_URL`                                                                      | Override daemon service URL                                 |
 
 ## Tech Stack
 
@@ -107,8 +100,7 @@ gen/
 - **TypeScript:** ESNext target, strict mode, `verbatimModuleSyntax: true`
 - **TUI framework:** OpenTUI (`@opentui/react`) — not Ink, not DOM
 - **JSX:** `jsxImportSource: "@opentui/react"` in tsconfig
-- **Go:** 1.26 (gateway)
-- **Rust:** Edition 2024, tokio async (scheduler)
+- **Rust:** Edition 2024, tokio async (daemon)
 - **RPC:** ConnectRPC (HTTP/1.1 + H2C), protobuf
 - **Database:** SQLite via `bun:sqlite`
 - **Linting:** oxlint (config: `.oxlintrc.json`)

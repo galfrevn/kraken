@@ -82,35 +82,19 @@ async function updateFromSource(): Promise<boolean> {
   }
   success("dependencies updated");
 
-  const schedulerDirectory = join(KRAKEN_ROOT, "apps", "scheduler");
-  if (existsSync(join(schedulerDirectory, "Cargo.toml"))) {
-    step("rebuilding scheduler");
+  const daemonDirectory = join(KRAKEN_ROOT, "apps", "daemon");
+  if (existsSync(join(daemonDirectory, "Cargo.toml"))) {
+    step("rebuilding daemon");
     const cargoBuild = Bun.spawnSync({
       cmd: ["cargo", "build", "--release"],
-      cwd: schedulerDirectory,
+      cwd: daemonDirectory,
       stdout: "pipe",
       stderr: "pipe",
     });
     if (cargoBuild.exitCode === 0) {
-      success("scheduler rebuilt");
+      success("daemon rebuilt");
     } else {
-      warn("scheduler build failed -- will use cargo run as fallback");
-    }
-  }
-
-  const gatewayDirectory = join(KRAKEN_ROOT, "apps", "gateway");
-  if (existsSync(join(gatewayDirectory, "go.mod"))) {
-    step("rebuilding gateway");
-    const goBuild = Bun.spawnSync({
-      cmd: ["go", "build", "-o", "./bin/gateway", "./cmd/gateway"],
-      cwd: gatewayDirectory,
-      stdout: "pipe",
-      stderr: "pipe",
-    });
-    if (goBuild.exitCode === 0) {
-      success("gateway rebuilt");
-    } else {
-      warn("gateway build failed -- will use go run as fallback");
+      warn("daemon build failed -- will use cargo run as fallback");
     }
   }
 

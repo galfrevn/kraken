@@ -20,7 +20,7 @@ Kraken was born from a simple observation: tools like [Claude Code](https://gith
 
 However, most existing tools focus on a single interaction model: the developer asks, the agent responds. Kraken takes this further by introducing persistent autonomy. Rather than waiting for human input, Kraken can monitor file changes, respond to webhooks, execute scheduled tasks, and delegate work to sub-agents — all while maintaining a rich terminal interface for real-time collaboration. The goal is not to replace the developer but to act as a tireless companion that handles the repetitive, the mechanical, and the tedious, freeing the developer to focus on design, architecture, and the problems that actually require human judgment.
 
-This project is also an exercise in polyglot systems design. By combining Rust (for low-latency scheduling and OS-level file watching), Go (for high-throughput HTTP proxying and webhook handling), and TypeScript (for the agent brain, plugin system, and terminal UI), Kraken explores how each language's strengths can be composed into a cohesive whole through protobuf-defined contracts and local RPC.
+This project is also an exercise in polyglot systems design. By combining Rust (for the full daemon: LLM proxy, scheduling, file watching, webhooks, and orchestration) and TypeScript (for the agent brain, plugin system, and terminal UI), Kraken explores how each language's strengths can be composed into a cohesive whole through protobuf-defined contracts and local RPC.
 
 <p align="center">
   <img src="docs/assets/front.png" alt="Kraken" width="700" />
@@ -30,7 +30,7 @@ This project is also an exercise in polyglot systems design. By combining Rust (
 
 ## What is Kraken?
 
-Kraken is an AI-powered autonomous agent built on a **three-process architecture**: a Rust scheduler, a Go gateway, and a TypeScript TUI, all orchestrated from a single CLI command. Unlike traditional coding assistants that operate in a request-response loop, Kraken is designed to run continuously — monitoring your project, reacting to external events, and executing tasks on your behalf without requiring constant supervision.
+Kraken is an AI-powered autonomous agent built on a **two-process architecture**: a Rust daemon and a TypeScript TUI, all orchestrated from a single CLI command. Unlike traditional coding assistants that operate in a request-response loop, Kraken is designed to run continuously — monitoring your project, reacting to external events, and executing tasks on your behalf without requiring constant supervision.
 
 At its core, Kraken treats the development environment as an event-driven system. File changes, cron triggers, and incoming webhooks are all normalized into a unified event stream that feeds into the agent's execution loop. The agent then decides how to respond: running tests after a source file changes, reviewing a pull request when a GitHub webhook arrives, or executing a scheduled code quality scan. Each of these behaviors is configurable through a declarative YAML file, and the agent's capabilities can be extended at runtime through a plugin system.
 
@@ -44,35 +44,33 @@ The terminal interface is built with OpenTUI, a React-based framework for termin
 
 ## Architecture
 
-Kraken's architecture is intentionally distributed across three cooperating processes, each written in the language best suited for its responsibilities. The processes communicate over ConnectRPC on localhost, using protobuf-defined contracts as the single source of truth for all cross-language interfaces.
+Kraken's architecture is distributed across two cooperating processes, each written in the language best suited for its responsibilities. The processes communicate over ConnectRPC on localhost, using protobuf-defined contracts as the single source of truth for all cross-language interfaces.
 
-The **Scheduler** is written in Rust and handles two performance-sensitive tasks: cron-based job scheduling and OS-level file system watching. Rust was chosen here because both operations require low-latency event processing and direct interaction with operating system APIs. The scheduler uses `tokio` for async execution and `notify` for cross-platform file watching, streaming events to the TUI process via gRPC.
-
-The **Gateway** is written in Go and serves as the LLM proxy and webhook ingestion point. It normalizes requests across multiple LLM providers (OpenRouter, Anthropic, OpenAI), handles streaming responses, and validates incoming webhook signatures from GitHub and GitLab. Go's strengths in HTTP handling, concurrency, and deployment simplicity make it a natural fit for this role.
+The **Daemon** is written in Rust and handles all backend responsibilities: LLM proxy (normalizing requests across OpenRouter, Anthropic, OpenAI, and Ollama), cron-based job scheduling, OS-level file system watching, webhook ingestion, task orchestration, and notifications. Rust was chosen for its performance guarantees, low-latency event processing, and direct interaction with operating system APIs. The daemon uses `tokio` for async execution, `notify` for cross-platform file watching, and `reqwest` for LLM HTTP streaming.
 
 The **TUI** is written in TypeScript and contains the agent brain — the execution loop, tool registry, conversation history, persistent memory, plugin system, and SQLite storage layer. It renders a terminal interface using OpenTUI and orchestrates all interactions between the user, the LLM, and the supporting services.
 
-| Service       | Language   | Port  | Role                                                 |
-| ------------- | ---------- | ----- | ---------------------------------------------------- |
-| **Scheduler** | Rust       | 50051 | Cron engine + file watchers, streams events via gRPC |
-| **Gateway**   | Go         | 50052 | LLM proxy (multi-provider) + webhook receiver        |
-| **TUI**       | TypeScript | —     | Terminal UI, agent brain, tools, storage             |
+| Service    | Language   | Port  | Role                                                              |
+| ---------- | ---------- | ----- | ----------------------------------------------------------------- |
+| **Daemon** | Rust       | 50051 | LLM proxy, orchestrator, cron, file watchers, webhooks            |
+| **TUI**    | TypeScript | —     | Terminal UI, agent brain, tools, storage                          |
 
 ```
-┌─────────────────────────────────────────────────┐
-│                     CLI                         │
-│              (spawns & orchestrates)             │
-├────────────────┬────────────────┬───────────────┤
-│   Scheduler    │    Gateway     │     TUI       │
-│    (Rust)      │     (Go)      │ (TypeScript)   │
-│                │               │               │
-│  • Cron jobs   │  • LLM proxy  │  • Agent loop │
-│  • Watchers    │  • Webhooks   │  • Tools      │
-│  • Events      │  • Streaming  │  • Storage    │
-│                │               │  • Plugins    │
-└────────┬───────┴───────┬───────┴───────┬───────┘
-         │    ConnectRPC (localhost)      │
-         └───────────────────────────────┘
+┌──────────────────────────────────────┐
+│                CLI                   │
+│         (spawns & orchestrates)      │
+├──────────────────┬───────────────────┤
+│     Daemon       │       TUI        │
+│     (Rust)       │   (TypeScript)   │
+│                  │                  │
+│  • LLM proxy    │  • Agent loop    │
+│  • Cron jobs    │  • Tools         │
+│  • Watchers     │  • Storage       │
+│  • Webhooks     │  • Plugins       │
+│  • Orchestrator │  • Memory        │
+└────────┬─────────┴─────────┬────────┘
+         │  ConnectRPC (localhost)  │
+         └─────────────────────────┘
 ```
 
 ---
@@ -102,7 +100,6 @@ If you prefer to build everything yourself:
 #### Prerequisites
 
 - [Bun](https://bun.sh) 1.3.10+
-- [Go](https://go.dev) 1.26+
 - [Rust](https://rustup.rs) (stable, edition 2024)
 - [Buf CLI](https://buf.build/docs/installation) for protobuf generation
 - [protoc](https://grpc.io/docs/protoc-installation/) for proto compilation
@@ -286,11 +283,8 @@ bun run format
 # Run tests (core)
 cd apps/core && bun test
 
-# Build scheduler only
-cd apps/scheduler && cargo build --release
-
-# Build gateway only
-cd apps/gateway && go build -o ./bin/gateway ./cmd/gateway
+# Build daemon only
+cd apps/daemon && cargo build --release
 ```
 
 ---
@@ -303,8 +297,7 @@ The repository is organized as a monorepo with five applications, three shared p
 apps/
   cli/            TypeScript — CLI entry point, process orchestration
   core/           TypeScript — Agent brain: execution loop, tools, storage, plugins
-  gateway/        Go — LLM proxy + webhook receiver (ConnectRPC)
-  scheduler/      Rust — Cron engine + file watcher (gRPC/tonic)
+  daemon/         Rust — Full daemon: LLM proxy, orchestrator, cron, watchers, webhooks
   tui/            TypeScript/React — Terminal UI (OpenTUI)
 packages/
   sdk/            Plugin authoring API
@@ -320,15 +313,14 @@ gen/
 
 ## Tech stack
 
-Kraken deliberately combines multiple language ecosystems, selecting each for the specific strengths it brings to the system. TypeScript provides the flexibility and ecosystem needed for the agent brain, plugin system, and terminal UI. Go offers the concurrency model and HTTP primitives required for a high-throughput LLM proxy. Rust delivers the performance guarantees necessary for real-time scheduling and file system monitoring. Protobuf and ConnectRPC bind them together with type-safe, language-agnostic contracts.
+Kraken deliberately combines multiple language ecosystems, selecting each for the specific strengths it brings to the system. TypeScript provides the flexibility and ecosystem needed for the agent brain, plugin system, and terminal UI. Rust delivers the performance guarantees necessary for the daemon: LLM proxying, real-time scheduling, file system monitoring, and webhook handling. Protobuf and ConnectRPC bind them together with type-safe, language-agnostic contracts.
 
 | Layer         | Technology                                  |
 | ------------- | ------------------------------------------- |
 | Monorepo      | Turborepo + Bun                             |
 | TypeScript    | ESNext, strict mode, `verbatimModuleSyntax` |
 | TUI framework | OpenTUI (`@opentui/react`)                  |
-| Gateway       | Go 1.26                                     |
-| Scheduler     | Rust (edition 2024), tokio async            |
+| Daemon        | Rust (edition 2024), tokio async            |
 | RPC           | ConnectRPC, protobuf                        |
 | Database      | SQLite via `bun:sqlite` (WAL mode)          |
 | Linting       | oxlint                                      |

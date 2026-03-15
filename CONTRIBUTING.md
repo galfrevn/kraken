@@ -7,7 +7,6 @@ Thanks for your interest in contributing to Kraken! This guide will help you get
 ### Prerequisites
 
 - [Bun](https://bun.sh/) 1.3.10+
-- [Go](https://go.dev/) 1.26+
 - [Rust](https://www.rust-lang.org/) (stable, edition 2024)
 - [Buf CLI](https://buf.build/) for protobuf generation
 - [protoc](https://grpc.io/docs/protoc-installation/) for proto compilation
@@ -32,13 +31,12 @@ bun run dev
 
 Kraken is a monorepo with three core services:
 
-| App              | Language         | Purpose                                               |
-| ---------------- | ---------------- | ----------------------------------------------------- |
-| `apps/cli`       | TypeScript       | CLI entry point and process orchestration             |
-| `apps/core`      | TypeScript       | Agent brain — execution loop, tools, storage, plugins |
-| `apps/gateway`   | Go               | LLM proxy and webhook receiver (ConnectRPC)           |
-| `apps/scheduler` | Rust             | Cron engine and file watcher (gRPC via tonic)         |
-| `apps/tui`       | TypeScript/React | Terminal UI (OpenTUI)                                 |
+| App              | Language         | Purpose                                                        |
+| ---------------- | ---------------- | -------------------------------------------------------------- |
+| `apps/cli`       | TypeScript       | CLI entry point and process orchestration                      |
+| `apps/core`      | TypeScript       | Agent brain — execution loop, tools, storage, plugins          |
+| `apps/daemon`    | Rust             | Full daemon: LLM proxy, orchestrator, cron, watchers, webhooks |
+| `apps/tui`       | TypeScript/React | Terminal UI (OpenTUI)                                          |
 
 Shared packages live in `packages/` and protobuf definitions in `proto/agent/v1/`.
 
@@ -67,8 +65,7 @@ bun run typecheck       # Type-check all TypeScript
 
 # Per-service tests
 cd apps/core && bun test
-cd apps/gateway && go test ./...
-cd apps/scheduler && cargo test
+cd apps/daemon && cargo test
 ```
 
 ### 4. Commit

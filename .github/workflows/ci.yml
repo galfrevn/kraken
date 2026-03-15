@@ -96,22 +96,6 @@ jobs:
             echo "No test files found, skipping"
           fi
 
-  test-go:
-    name: Tests — Go
-    runs-on: ubuntu-latest
-    steps:
-      - name: Checkout repository
-        uses: actions/checkout@v4
-
-      - name: Setup Go
-        uses: actions/setup-go@v5
-        with:
-          go-version-file: apps/gateway/go.mod
-
-      - name: Run Go tests
-        working-directory: apps/gateway
-        run: go test ./...
-
   test-rust:
     name: Tests — Rust
     runs-on: ubuntu-latest
@@ -133,17 +117,17 @@ jobs:
           path: |
             ~/.cargo/registry
             ~/.cargo/git
-            apps/scheduler/target
-          key: rust-${{ runner.os }}-${{ hashFiles('apps/scheduler/Cargo.lock') }}
+            apps/daemon/target
+          key: rust-${{ runner.os }}-${{ hashFiles('apps/daemon/Cargo.lock') }}
           restore-keys: rust-${{ runner.os }}-
 
       - name: Run Rust tests
-        working-directory: apps/scheduler
+        working-directory: apps/daemon
         run: cargo test
 
   build-check:
     name: Build Verification
-    needs: [format, lint, typecheck, test-ts, test-go, test-rust]
+    needs: [format, lint, typecheck, test-ts, test-rust]
     runs-on: ubuntu-latest
     steps:
       - name: Checkout repository
@@ -152,13 +136,9 @@ jobs:
       - name: Setup toolchains
         uses: ./.github/actions/setup-toolchains
 
-      - name: Build scheduler
-        working-directory: apps/scheduler
+      - name: Build daemon
+        working-directory: apps/daemon
         run: cargo build --release
-
-      - name: Build gateway
-        working-directory: apps/gateway
-        run: go build -o gateway ./cmd/gateway
 
       - name: Build TypeScript apps
         run: bun run build
