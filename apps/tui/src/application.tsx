@@ -11,6 +11,7 @@ import { ChatView } from "@/views/chat.tsx";
 import { DashboardView } from "@/views/dashboard.tsx";
 import { TasksView } from "@/views/tasks.tsx";
 import { ReviewsView } from "@/views/reviews.tsx";
+import { TriggersView } from "@/views/triggers.tsx";
 import { LogsView } from "@/views/logs.tsx";
 import { ThreadSidebar } from "@/views/sidebar.tsx";
 import { SetupPanel, type SetupField } from "@/views/setup.tsx";
@@ -190,7 +191,7 @@ export function Application({
           />
         ) : (
           <>
-            <Header activeView={activeView} chatInputFocused={chatInputFocused} />
+            <Header activeView={activeView} chatInputFocused={chatInputFocused} isDaemonMode={!!daemonStore} />
 
             <box flexGrow={1} padding={1} gap={1} flexDirection="row">
               {activeView === "chat" && width >= SIDEBAR_MIN_TERMINAL_WIDTH && (
@@ -217,7 +218,11 @@ export function Application({
                   <TasksView store={store} daemonStore={daemonStore} focused={activeView === "tasks"} />
                 )}
                 {activeView === "reviews" && (
-                  <ReviewsView store={store} focused={activeView === "reviews"} />
+                  daemonStore ? (
+                    <TriggersView focused={activeView === "reviews"} />
+                  ) : (
+                    <ReviewsView store={store} focused={activeView === "reviews"} />
+                  )
                 )}
                 {activeView === "logs" && (
                   <LogsView store={store} focused={activeView === "logs"} />
@@ -236,11 +241,19 @@ export function Application({
 function Header({
   activeView,
   chatInputFocused,
+  isDaemonMode,
 }: {
   activeView: ViewName;
   chatInputFocused: boolean;
+  isDaemonMode: boolean;
 }) {
   const modeIndicator = activeView === "chat" && chatInputFocused ? "input" : "nav";
+
+  const daemonModeTabLabels: Record<ViewName, string> = {
+    ...TAB_LABELS,
+    reviews: "triggers",
+  };
+  const effectiveTabLabels = isDaemonMode ? daemonModeTabLabels : TAB_LABELS;
 
   return (
     <box
@@ -255,7 +268,7 @@ function Header({
       <text fg={COLORS.textMuted}>{"  │  "}</text>
       {VIEWS.map((view) => {
         const isActive = view === activeView;
-        const label = TAB_LABELS[view];
+        const label = effectiveTabLabels[view];
         return (
           <box flexDirection="row" paddingRight={1}>
             <text fg={isActive ? COLORS.text : COLORS.textMuted}>{" " + label + " "}</text>
