@@ -10,7 +10,7 @@
   ],
   "type": "module",
   "scripts": {
-    "dev": "turbo dev",
+    "dev": "bun run apps/cli/src/index.ts start --dev",
     "build": "turbo build",
     "typecheck": "turbo typecheck",
     "lint": "turbo run lint",
