@@ -205,6 +205,7 @@ export function Application({
                 {activeView === "chat" && (
                   <ChatView
                     threadManager={threadManager}
+                    daemonStore={daemonStore}
                     focused={chatInputFocused}
                     onRequestFocus={requestChatFocus}
                     onRequestBlur={requestChatBlur}

@@ -12,6 +12,7 @@ import { COLORS } from "@/theme.ts";
 import type { ChatMessage, Plan, FileAttachment, PendingSetup } from "@/engine.ts";
 import type { PendingQuestions, QuestionAnswer } from "@core/tools/question.ts";
 import type { PendingConfirmation, ConfirmationDecision } from "@core/tools/confirmation.ts";
+import type { DaemonStore } from "@/daemon-store.ts";
 import type { ThreadManager } from "@/threads.ts";
 import type { PluginRegistry, LoadedPlugin } from "@core/plugins/registry.ts";
 import { installPluginFromRegistry, type PluginRegistryManifest } from "@core/plugins/installer.ts";
@@ -327,6 +328,7 @@ function stripXmlTags(content: string): string {
 
 interface ChatViewProps {
   threadManager: ThreadManager;
+  daemonStore?: DaemonStore | null;
   focused: boolean;
   onRequestFocus: () => void;
   onRequestBlur: () => void;
@@ -337,6 +339,7 @@ const DOUBLE_ESCAPE_THRESHOLD_MILLISECONDS = 500;
 
 export function ChatView({
   threadManager,
+  daemonStore,
   focused,
   onRequestFocus,
   onRequestBlur,
@@ -903,6 +906,39 @@ export function ChatView({
       return;
     }
 
+    if (daemonStore) {
+      const truncatedTaskName =
+        currentText.length > 80 ? currentText.slice(0, 77) + "..." : currentText;
+      const submittedTaskId = await daemonStore.submitTask(
+        truncatedTaskName,
+        currentText,
+        5,
+      );
+
+      if (submittedTaskId) {
+        const submissionTimestamp = new Date();
+        const userMessage: ChatMessage = {
+          role: "user",
+          content: currentText,
+          timestamp: submissionTimestamp,
+        };
+        const daemonSubmissionMessage: ChatMessage = {
+          role: "status",
+          content: `Task submitted to daemon (ID: ${submittedTaskId}). Switch to Tasks tab to follow progress.`,
+          timestamp: submissionTimestamp,
+        };
+        setMessages((previousMessages) => [
+          ...previousMessages,
+          userMessage,
+          daemonSubmissionMessage,
+        ]);
+        toast.success(`Task submitted: ${submittedTaskId.slice(0, 8)}`);
+      } else {
+        toast.error("Failed to submit task to daemon");
+      }
+      return;
+    }
+
     const engine = threadManager.getActiveEngine();
 
     // Route feedback to plan when a draft plan exists
@@ -921,7 +957,7 @@ export function ChatView({
 
     // Update mode indicator immediately (planMode is consumed per-message)
     setInPlanMode(engine.isPlanMode());
-  }, [inputValue, threadManager]);
+  }, [inputValue, threadManager, daemonStore]);
 
   const engine = threadManager.getActiveEngine();
   const tokenUsage = engine.getTokenUsage();
@@ -936,6 +972,8 @@ export function ChatView({
 
   const threadLabel = threadCount > 1 ? `${threadTitle} (${threadCount} threads)` : threadTitle;
 
+  const isDaemonModeActive = !!daemonStore;
+
   const isPlanActive =
     inPlanMode ||
     (currentPlan !== null &&
@@ -947,6 +985,10 @@ export function ChatView({
     <box flexDirection="column" flexGrow={1} width="100%">
       <box flexDirection="row" paddingBottom={1}>
         <text fg={modeColor}>{modeLabel}</text>
+        <text fg={COLORS.textMuted}>{"  ·  "}</text>
+        <text fg={isDaemonModeActive ? COLORS.yellow : COLORS.textMuted}>
+          {isDaemonModeActive ? "daemon" : "local"}
+        </text>
         <text fg={COLORS.textMuted}>{"  ·  "}</text>
         <text fg={COLORS.textSecondary}>{threadLabel}</text>
         <box flexGrow={1} />
@@ -1077,15 +1119,17 @@ export function ChatView({
                 ref={textareaReference}
                 initialValue={inputValue}
                 placeholder={
-                  currentPlan?.status === "draft"
-                    ? "give feedback on the plan..."
-                    : currentPlan?.status === "executing"
-                      ? "plan executing..."
-                      : isPlanActive
-                        ? "describe what to plan... (shift+tab to switch mode)"
-                        : processing
-                          ? "type to queue a message..."
-                          : "message kraken..."
+                  isDaemonModeActive
+                    ? "describe a task for the daemon..."
+                    : currentPlan?.status === "draft"
+                      ? "give feedback on the plan..."
+                      : currentPlan?.status === "executing"
+                        ? "plan executing..."
+                        : isPlanActive
+                          ? "describe what to plan... (shift+tab to switch mode)"
+                          : processing
+                            ? "type to queue a message..."
+                            : "message kraken..."
                 }
                 placeholderColor={COLORS.textMuted}
                 backgroundColor={COLORS.inputBackground}
