@@ -1,4 +1,5 @@
-import { spawn } from "bun";
+import { spawn as bunSpawn } from "bun";
+import { spawn as nodeSpawn } from "node:child_process";
 import { existsSync, readFileSync, writeFileSync, unlinkSync, mkdirSync, openSync } from "node:fs";
 import { join } from "node:path";
 import { homedir } from "node:os";
@@ -146,7 +147,7 @@ async function startDaemon(args: string[]): Promise<void> {
     console.log(`\n  Starting daemon in foreground...`);
     console.log(`  ${colorize("Press Ctrl+C to stop.", "dim")}\n`);
 
-    const foregroundProcess = spawn({
+    const foregroundProcess = bunSpawn({
       cmd: daemonCommand,
       cwd: daemonDirectory,
       stdout: "inherit",
@@ -189,32 +190,17 @@ async function startDaemon(args: string[]): Promise<void> {
   if (process.platform === "win32") {
     const daemonBinaryPath = daemonCommand[0]!;
     const daemonCliArguments = [...daemonCommand.slice(1), `--log-file=${DAEMON_LOG_FILE_PATH}`];
+    const logFileDescriptor = openSync(DAEMON_LOG_FILE_PATH, "a");
 
-    const launcherScriptPath = join(KRAKEN_HOME_DIRECTORY, "daemon-launcher.cmd");
-    const launcherScriptLines = [
-      "@echo off",
-      `cd /d "${daemonDirectory}"`,
-      `"${daemonBinaryPath}" ${daemonCliArguments.map((argument) => `"${argument}"`).join(" ")}`,
-    ];
-    writeFileSync(launcherScriptPath, launcherScriptLines.join("\r\n"));
-
-    const scheduledTaskName = "KrakenDaemonStart";
-    Bun.spawnSync(["schtasks", "/delete", "/tn", scheduledTaskName, "/f"], {
-      stdio: ["ignore", "ignore", "ignore"],
+    const detachedDaemonProcess = nodeSpawn(daemonBinaryPath, daemonCliArguments, {
+      cwd: daemonDirectory,
+      stdio: ["ignore", logFileDescriptor, logFileDescriptor],
+      detached: true,
     });
-    Bun.spawnSync(
-      ["schtasks", "/create", "/tn", scheduledTaskName, "/tr", launcherScriptPath, "/sc", "ONCE", "/st", "00:00", "/f", "/rl", "LIMITED"],
-      { stdio: ["ignore", "ignore", "ignore"] },
-    );
-    Bun.spawnSync(["schtasks", "/run", "/tn", scheduledTaskName], {
-      stdio: ["ignore", "ignore", "ignore"],
-    });
-    Bun.spawnSync(["schtasks", "/delete", "/tn", scheduledTaskName, "/f"], {
-      stdio: ["ignore", "ignore", "ignore"],
-    });
+    detachedDaemonProcess.unref();
   } else {
     const logFileDescriptor = openSync(DAEMON_LOG_FILE_PATH, "a");
-    spawn({
+    bunSpawn({
       cmd: daemonCommand,
       cwd: daemonDirectory,
       stdout: logFileDescriptor,
