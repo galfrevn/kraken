@@ -181,24 +181,15 @@ async function startDaemon(args: string[]): Promise<void> {
   writeFileSync(DAEMON_LOG_FILE_PATH, `--- daemon starting at ${new Date().toISOString()} ---\n`);
   const logFileDescriptor = openSync(DAEMON_LOG_FILE_PATH, "a");
 
-  if (process.platform === "win32") {
-    // On Windows, Bun spawn doesn't detach properly. Use PowerShell Start-Process
-    // to create a truly independent process that survives CLI exit.
-    const escapedCommand = daemonCommand[0]!;
-    const escapedArgs = daemonCommand.slice(1).map((argument) => `"${argument}"`).join(" ");
-    const powershellScript = `Start-Process -FilePath "${escapedCommand}" -ArgumentList '${escapedArgs}' -WorkingDirectory "${daemonDirectory}" -RedirectStandardOutput "${DAEMON_LOG_FILE_PATH}" -RedirectStandardError "${DAEMON_LOG_FILE_PATH}" -WindowStyle Hidden`;
+  spawn({
+    cmd: daemonCommand,
+    cwd: daemonDirectory,
+    stdout: logFileDescriptor,
+    stderr: logFileDescriptor,
+  });
 
-    Bun.spawnSync(["powershell", "-Command", powershellScript], {
-      stdio: ["ignore", "ignore", "ignore"],
-    });
-  } else {
-    spawn({
-      cmd: daemonCommand,
-      cwd: daemonDirectory,
-      stdout: logFileDescriptor,
-      stderr: logFileDescriptor,
-    });
-  }
+  // Unref so the CLI process can exit without waiting for the daemon child
+  // (Bun doesn't support unref, but the process.exit() at the end handles it)
 
   // Wait for the daemon to start and write its PID file
   await sleep(2000);
@@ -210,6 +201,7 @@ async function startDaemon(args: string[]): Promise<void> {
     console.log(`  Logs: ${colorize(DAEMON_LOG_FILE_PATH, "dim")}`);
     console.log(`  Use ${colorize("kraken daemon status", "cyan")} to check status.`);
     console.log(`  Use ${colorize("kraken daemon stop", "cyan")} to stop.\n`);
+    process.exit(0);
   } else {
     // Check log file for errors
     const logContents = existsSync(DAEMON_LOG_FILE_PATH)
