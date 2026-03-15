@@ -188,4 +188,51 @@ export class DaemonStore {
       return false;
     }
   }
+
+  async sendChatMessage(
+    userMessage: string,
+    onTextDelta: (text: string) => void,
+    onActivity: (activity: string) => void,
+    onToolCall: (toolCallDescription: string) => void,
+    onToolResult: (toolResultSummary: string) => void,
+    onError: (errorMessage: string) => void,
+    onDone: () => void,
+  ): Promise<void> {
+    try {
+      const chatOutputStream = this.daemonConnection.streamChatMessages(userMessage);
+
+      for await (const chatOutputMessage of chatOutputStream) {
+        switch (chatOutputMessage.output.case) {
+          case "textDelta":
+            onTextDelta(chatOutputMessage.output.value);
+            break;
+          case "activity":
+            onActivity(chatOutputMessage.output.value);
+            break;
+          case "toolCallDescription":
+            onToolCall(chatOutputMessage.output.value);
+            break;
+          case "toolResultSummary":
+            onToolResult(chatOutputMessage.output.value);
+            break;
+          case "error":
+            onError(chatOutputMessage.output.value);
+            break;
+          case "waitingForInput":
+            onDone();
+            break;
+          case "done":
+            onDone();
+            break;
+        }
+      }
+    } catch (streamingError) {
+      const errorDescription =
+        streamingError instanceof Error
+          ? streamingError.message
+          : String(streamingError);
+      onError(`Chat streaming failed: ${errorDescription}`);
+      onDone();
+    }
+  }
 }

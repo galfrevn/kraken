@@ -2,17 +2,21 @@ import { createClient, type Client } from "@connectrpc/connect";
 import { createGrpcTransport } from "@connectrpc/connect-node";
 import {
   DaemonService,
+  AgentChatService,
   type GetStatusResponse,
   type DaemonServiceListTasksResponse,
   type GetTaskDetailResponse,
   type DaemonServiceSubmitTaskResponse,
   type DaemonServiceCancelTaskResponse,
+  type ChatOutput,
 } from "@gen/agent/v1/daemon_pb.ts";
 
 export type DaemonServiceClient = Client<typeof DaemonService>;
+export type AgentChatServiceClient = Client<typeof AgentChatService>;
 
 export class DaemonConnection {
   private daemonServiceClient: DaemonServiceClient;
+  private agentChatServiceClient: AgentChatServiceClient;
   private daemonUrl: string;
   private connectionEstablished: boolean = false;
 
@@ -20,6 +24,7 @@ export class DaemonConnection {
     this.daemonUrl = daemonUrl;
     const grpcTransport = createGrpcTransport({ baseUrl: daemonUrl });
     this.daemonServiceClient = createClient(DaemonService, grpcTransport);
+    this.agentChatServiceClient = createClient(AgentChatService, grpcTransport);
   }
 
   async connect(): Promise<boolean> {
@@ -66,6 +71,20 @@ export class DaemonConnection {
 
   async cancelTask(taskId: string): Promise<DaemonServiceCancelTaskResponse> {
     return await this.daemonServiceClient.cancelTask({ taskId });
+  }
+
+  async *streamChatMessages(userMessage: string): AsyncGenerator<ChatOutput> {
+    async function* createSingleMessageInputStream() {
+      yield { input: { case: "userMessage" as const, value: userMessage } };
+    }
+
+    const chatResponseStream = this.agentChatServiceClient.chat(
+      createSingleMessageInputStream(),
+    );
+
+    for await (const chatOutputMessage of chatResponseStream) {
+      yield chatOutputMessage;
+    }
   }
 
   isConnected(): boolean {

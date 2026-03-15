@@ -907,34 +907,141 @@ export function ChatView({
     }
 
     if (daemonStore) {
-      const truncatedTaskName =
-        currentText.length > 80 ? currentText.slice(0, 77) + "..." : currentText;
-      const submittedTaskId = await daemonStore.submitTask(
-        truncatedTaskName,
+      const daemonChatSubmissionTimestamp = new Date();
+      const daemonUserMessage: ChatMessage = {
+        role: "user",
+        content: currentText,
+        timestamp: daemonChatSubmissionTimestamp,
+      };
+      const daemonStreamingAssistantMessage: ChatMessage = {
+        role: "assistant",
+        content: "",
+        timestamp: daemonChatSubmissionTimestamp,
+        streaming: true,
+      };
+      setMessages((previousMessages) => [
+        ...previousMessages,
+        daemonUserMessage,
+        daemonStreamingAssistantMessage,
+      ]);
+      setProcessing(true);
+
+      let accumulatedAssistantResponseText = "";
+      let chatStreamingSucceeded = true;
+
+      await daemonStore.sendChatMessage(
         currentText,
-        5,
+        (textDelta) => {
+          accumulatedAssistantResponseText += textDelta;
+          setMessages((previousMessages) => {
+            const updatedMessages = [...previousMessages];
+            const lastMessageIndex = updatedMessages.length - 1;
+            const lastMessage = updatedMessages[lastMessageIndex];
+            if (lastMessage && lastMessage.role === "assistant" && lastMessage.streaming) {
+              updatedMessages[lastMessageIndex] = {
+                ...lastMessage,
+                content: accumulatedAssistantResponseText,
+              };
+            }
+            return updatedMessages;
+          });
+        },
+        (activityDescription) => {
+          setMessages((previousMessages) => [
+            ...previousMessages,
+            {
+              role: "status",
+              content: activityDescription,
+              timestamp: new Date(),
+            },
+          ]);
+        },
+        (toolCallDescription) => {
+          setMessages((previousMessages) => [
+            ...previousMessages,
+            {
+              role: "tool_call",
+              content: toolCallDescription,
+              timestamp: new Date(),
+            },
+          ]);
+          accumulatedAssistantResponseText = "";
+          const freshStreamingMessage: ChatMessage = {
+            role: "assistant",
+            content: "",
+            timestamp: new Date(),
+            streaming: true,
+          };
+          setMessages((previousMessages) => [...previousMessages, freshStreamingMessage]);
+        },
+        (toolResultSummary) => {
+          setMessages((previousMessages) => [
+            ...previousMessages,
+            {
+              role: "tool_result",
+              content: toolResultSummary,
+              timestamp: new Date(),
+              toolSuccess: true,
+            },
+          ]);
+          accumulatedAssistantResponseText = "";
+          const freshStreamingMessage: ChatMessage = {
+            role: "assistant",
+            content: "",
+            timestamp: new Date(),
+            streaming: true,
+          };
+          setMessages((previousMessages) => [...previousMessages, freshStreamingMessage]);
+        },
+        (streamingErrorMessage) => {
+          chatStreamingSucceeded = false;
+          setMessages((previousMessages) => [
+            ...previousMessages,
+            {
+              role: "error",
+              content: streamingErrorMessage,
+              timestamp: new Date(),
+            },
+          ]);
+        },
+        () => {
+          setMessages((previousMessages) => {
+            const finalizedMessages = [...previousMessages];
+            const lastIndex = finalizedMessages.length - 1;
+            const lastMessage = finalizedMessages[lastIndex];
+            if (lastMessage && lastMessage.role === "assistant" && lastMessage.streaming) {
+              if (lastMessage.content.trim() === "") {
+                finalizedMessages.splice(lastIndex, 1);
+              } else {
+                finalizedMessages[lastIndex] = { ...lastMessage, streaming: false };
+              }
+            }
+            return finalizedMessages;
+          });
+          setProcessing(false);
+        },
       );
 
-      if (submittedTaskId) {
-        const submissionTimestamp = new Date();
-        const userMessage: ChatMessage = {
-          role: "user",
-          content: currentText,
-          timestamp: submissionTimestamp,
-        };
-        const daemonSubmissionMessage: ChatMessage = {
-          role: "status",
-          content: `Task submitted to daemon (ID: ${submittedTaskId}). Switch to Tasks tab to follow progress.`,
-          timestamp: submissionTimestamp,
-        };
-        setMessages((previousMessages) => [
-          ...previousMessages,
-          userMessage,
-          daemonSubmissionMessage,
-        ]);
-        toast.success(`Task submitted: ${submittedTaskId.slice(0, 8)}`);
-      } else {
-        toast.error("Failed to submit task to daemon");
+      if (!chatStreamingSucceeded) {
+        toast.error("Streaming chat failed, falling back to task submission");
+        const truncatedTaskName =
+          currentText.length > 80 ? currentText.slice(0, 77) + "..." : currentText;
+        const submittedTaskId = await daemonStore.submitTask(
+          truncatedTaskName,
+          currentText,
+          5,
+        );
+        if (submittedTaskId) {
+          setMessages((previousMessages) => [
+            ...previousMessages,
+            {
+              role: "status",
+              content: `Fallback: task submitted to daemon (ID: ${submittedTaskId}). Switch to Tasks tab to follow progress.`,
+              timestamp: new Date(),
+            },
+          ]);
+          toast.success(`Task submitted: ${submittedTaskId.slice(0, 8)}`);
+        }
       }
       return;
     }
@@ -1120,7 +1227,7 @@ export function ChatView({
                 initialValue={inputValue}
                 placeholder={
                   isDaemonModeActive
-                    ? "describe a task for the daemon..."
+                    ? "message daemon..."
                     : currentPlan?.status === "draft"
                       ? "give feedback on the plan..."
                       : currentPlan?.status === "executing"
