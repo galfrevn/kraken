@@ -259,6 +259,7 @@ impl LlmProviderRouter {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use serial_test::serial;
 
     /// Helper to clear all provider-related environment variables so tests
     /// start from a known clean state.
@@ -266,9 +267,8 @@ mod tests {
     /// # Safety
     ///
     /// `std::env::remove_var` is unsafe in Rust 2024 because mutating
-    /// environment variables is not thread-safe. Our tests run serially
-    /// (`cargo test` uses `--test-threads=1` by default for env-mutating
-    /// tests) and we accept this trade-off for test ergonomics.
+    /// environment variables is not thread-safe. These tests use
+    /// `#[serial]` to ensure they never run concurrently.
     unsafe fn clear_provider_env_vars() {
         unsafe {
             std::env::remove_var("OPENROUTER_API_KEY");
@@ -285,6 +285,7 @@ mod tests {
 
     /// When no environment variables are set the router must return an error.
     #[test]
+    #[serial]
     fn from_environment_no_providers_returns_error() {
         unsafe { clear_provider_env_vars() };
 
@@ -297,6 +298,7 @@ mod tests {
 
     /// Setting `OPENAI_API_KEY` should register the OpenAI provider.
     #[test]
+    #[serial]
     fn from_environment_with_openai_key() {
         unsafe { clear_provider_env_vars() };
         unsafe { std::env::set_var("OPENAI_API_KEY", "sk-test-key") };
@@ -312,6 +314,7 @@ mod tests {
 
     /// Setting `LLM_PROVIDER` should be respected when the provider exists.
     #[test]
+    #[serial]
     fn from_environment_respects_llm_provider_env() {
         unsafe { clear_provider_env_vars() };
         unsafe {
@@ -335,6 +338,7 @@ mod tests {
     /// When `LLM_PROVIDER` names a provider that isn't configured, the router
     /// should fall back to the first available provider.
     #[test]
+    #[serial]
     fn from_environment_falls_back_when_default_not_configured() {
         unsafe { clear_provider_env_vars() };
         unsafe {
@@ -355,6 +359,7 @@ mod tests {
     /// Setting `OLLAMA_BASE_URL` should register the Ollama provider even
     /// without an API key.
     #[test]
+    #[serial]
     fn from_environment_with_ollama() {
         unsafe { clear_provider_env_vars() };
         unsafe { std::env::set_var("OLLAMA_BASE_URL", "http://my-ollama:11434/v1") };
@@ -369,6 +374,7 @@ mod tests {
     /// `resolve_provider` returns the correct provider and the default when
     /// the name is empty.
     #[test]
+    #[serial]
     fn resolve_provider_uses_default_when_empty() {
         unsafe { clear_provider_env_vars() };
         unsafe { std::env::set_var("OPENAI_API_KEY", "sk-test-key") };
@@ -395,6 +401,7 @@ mod tests {
     /// `KRAKEN_OPENROUTER_API_KEY` should work as a fallback for
     /// `OPENROUTER_API_KEY`.
     #[test]
+    #[serial]
     fn from_environment_with_kraken_openrouter_key() {
         unsafe { clear_provider_env_vars() };
         unsafe { std::env::set_var("KRAKEN_OPENROUTER_API_KEY", "sk-or-test") };

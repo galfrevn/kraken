@@ -33,3 +33,6 @@ futures = "0.3"
 
 [build-dependencies]
 tonic-build = "0.13"
+
+[dev-dependencies]
+serial_test = "3.4.0"
