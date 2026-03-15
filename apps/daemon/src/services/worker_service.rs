@@ -101,7 +101,7 @@ impl WorkerServiceImplementation {
 /// - `Tool` -> `LlmToolDefinition`
 /// - `ToolCallEntry` -> `LlmToolCall` (within messages)
 #[allow(clippy::result_large_err)]
-fn convert_proto_request_to_llm_completion_request(
+pub fn convert_proto_request_to_llm_completion_request(
     proto_request: &CompleteRequest,
 ) -> Result<LlmCompletionRequest, Status> {
     let messages: Vec<LlmChatMessage> = proto_request

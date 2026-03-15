@@ -23,6 +23,7 @@ use daemon::config::DaemonConfig;
 use daemon::reload::ReloadableNotificationDispatcher;
 use proto::agent::v1::agent_chat_service_server::AgentChatServiceServer;
 use proto::agent::v1::daemon_service_server::DaemonServiceServer;
+use proto::agent::v1::gateway_service_server::GatewayServiceServer;
 use proto::agent::v1::scheduler_service_server::SchedulerServiceServer;
 use proto::agent::v1::worker_service_server::WorkerServiceServer;
 
@@ -492,6 +493,11 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         scheduler_event_sender,
     );
 
+    let gateway_service_implementation =
+        services::gateway_service::GatewayServiceImplementation::new(
+            Arc::clone(&llm_provider_router),
+        );
+
     info!(
         port = daemon_port,
         "daemon gRPC server starting"
@@ -540,6 +546,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         .add_service(WorkerServiceServer::new(worker_service_implementation))
         .add_service(DaemonServiceServer::new(daemon_service_implementation))
         .add_service(AgentChatServiceServer::new(agent_chat_service_implementation))
+        .add_service(GatewayServiceServer::new(gateway_service_implementation))
         .serve_with_shutdown(daemon_listen_address, async {
             signal::ctrl_c().await.ok();
             info!("received shutdown signal (ctrl+c)");
