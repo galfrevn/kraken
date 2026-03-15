@@ -10,8 +10,8 @@ use crate::notifications::slack::SlackNotificationChannel;
 use crate::notifications::system::SystemNotificationChannel;
 use crate::notifications::types::NotificationEventType;
 use crate::triggers::types::{
-    CronTriggerConfig, TriggerFilter, WatcherTriggerConfig, WebhookEventConfig,
-    WebhookTriggerConfig,
+    CronTriggerConfig, SlashCommandTriggerConfig, TriggerFilter, WatcherTriggerConfig,
+    WebhookEventConfig, WebhookTriggerConfig,
 };
 
 /// Top-level daemon configuration, loaded from kraken.yml.
@@ -120,6 +120,8 @@ pub struct TriggersYamlConfig {
     pub ci_failures: Vec<CiFailureTriggerYamlConfig>,
     #[serde(default)]
     pub pr_mentions: Vec<PrMentionTriggerYamlConfig>,
+    #[serde(default)]
+    pub slash_commands: Vec<SlashCommandTriggerYamlConfig>,
 }
 
 #[derive(Debug, Clone, Deserialize)]
@@ -175,6 +177,23 @@ pub struct PrMentionTriggerYamlConfig {
     #[serde(default = "default_pr_mention_keyword")]
     pub mention: String,
     pub task: String,
+}
+
+#[derive(Debug, Clone, Deserialize)]
+pub struct SlashCommandTriggerYamlConfig {
+    pub name: String,
+    pub provider: String,
+    pub token: String,
+    #[serde(default, rename = "appToken")]
+    pub app_token: Option<String>,
+    pub channel: String,
+    pub task: String,
+    #[serde(default = "default_slash_command_mention")]
+    pub mention: String,
+}
+
+fn default_slash_command_mention() -> String {
+    "@kraken".to_string()
 }
 
 fn default_pr_mention_keyword() -> String {
@@ -504,6 +523,29 @@ impl TriggersYamlConfig {
             })
             .collect()
     }
+
+    pub fn into_parsed_slash_command_trigger_configs(&self) -> Vec<SlashCommandTriggerConfig> {
+        self.slash_commands
+            .iter()
+            .map(|yaml_slash_command| {
+                let resolved_token = substitute_environment_variables(&yaml_slash_command.token);
+                let resolved_app_token = yaml_slash_command
+                    .app_token
+                    .as_ref()
+                    .map(|raw_app_token| substitute_environment_variables(raw_app_token));
+
+                SlashCommandTriggerConfig {
+                    name: yaml_slash_command.name.clone(),
+                    provider: yaml_slash_command.provider.clone(),
+                    token: resolved_token,
+                    app_token: resolved_app_token,
+                    channel: yaml_slash_command.channel.clone(),
+                    task_template: yaml_slash_command.task.clone(),
+                    mention: yaml_slash_command.mention.clone(),
+                }
+            })
+            .collect()
+    }
 }
 
 // ---------------------------------------------------------------------------
@@ -813,6 +855,7 @@ triggers:
         assert!(config.triggers.watchers.is_empty());
         assert!(config.triggers.ci_failures.is_empty());
         assert!(config.triggers.pr_mentions.is_empty());
+        assert!(config.triggers.slash_commands.is_empty());
     }
 
     #[test]
@@ -828,6 +871,7 @@ triggers:
             watchers: vec![],
             ci_failures: vec![],
             pr_mentions: vec![],
+            slash_commands: vec![],
         };
 
         let parsed_crons = triggers_config.into_parsed_cron_trigger_configs();
@@ -855,6 +899,7 @@ triggers:
             watchers: vec![],
             ci_failures: vec![],
             pr_mentions: vec![],
+            slash_commands: vec![],
         };
 
         let parsed_webhooks = triggers_config.into_parsed_webhook_trigger_configs();
@@ -881,6 +926,7 @@ triggers:
             watchers: vec![],
             ci_failures: vec![],
             pr_mentions: vec![],
+            slash_commands: vec![],
         };
 
         let parsed_webhooks = triggers_config.into_parsed_webhook_trigger_configs();
@@ -902,6 +948,7 @@ triggers:
             }],
             ci_failures: vec![],
             pr_mentions: vec![],
+            slash_commands: vec![],
         };
 
         let parsed_watchers = triggers_config.into_parsed_watcher_trigger_configs();
@@ -1368,6 +1415,7 @@ repo: "/home/user/project"
                 task: "Fix CI failure on {{event.head_branch}}".to_string(),
             }],
             pr_mentions: vec![],
+            slash_commands: vec![],
         };
 
         let expanded_webhooks = triggers_config.expand_sugar_triggers();
@@ -1403,6 +1451,7 @@ repo: "/home/user/project"
                 task: "Investigate CI failure".to_string(),
             }],
             pr_mentions: vec![],
+            slash_commands: vec![],
         };
 
         let expanded_webhooks = triggers_config.expand_sugar_triggers();
@@ -1435,6 +1484,7 @@ repo: "/home/user/project"
                 mention: default_pr_mention_keyword(),
                 task: "Respond to PR mention".to_string(),
             }],
+            slash_commands: vec![],
         };
 
         let expanded_webhooks = triggers_config.expand_sugar_triggers();
@@ -1470,6 +1520,7 @@ repo: "/home/user/project"
                 mention: "@mybot".to_string(),
                 task: "Handle custom mention".to_string(),
             }],
+            slash_commands: vec![],
         };
 
         let expanded_webhooks = triggers_config.expand_sugar_triggers();
@@ -1507,6 +1558,7 @@ repo: "/home/user/project"
                 mention: "@kraken".to_string(),
                 task: "Handle mention".to_string(),
             }],
+            slash_commands: vec![],
         };
 
         let parsed_webhooks = triggers_config.into_parsed_webhook_trigger_configs();

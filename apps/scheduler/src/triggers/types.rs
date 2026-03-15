@@ -270,6 +270,23 @@ pub struct WatcherTriggerConfig {
     pub task_template: String,
 }
 
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct SlashCommandTriggerConfig {
+    pub name: String,
+    pub provider: String,
+    pub token: String,
+    #[serde(default)]
+    pub app_token: Option<String>,
+    pub channel: String,
+    pub task_template: String,
+    #[serde(default = "default_mention_keyword")]
+    pub mention: String,
+}
+
+fn default_mention_keyword() -> String {
+    "@kraken".to_string()
+}
+
 // ---------------------------------------------------------------------------
 // Tests
 // ---------------------------------------------------------------------------

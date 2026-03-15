@@ -131,11 +131,15 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let parsed_watcher_trigger_configs = daemon_config
         .triggers
         .into_parsed_watcher_trigger_configs();
+    let parsed_slash_command_trigger_configs = daemon_config
+        .triggers
+        .into_parsed_slash_command_trigger_configs();
 
     info!(
         cron_triggers = parsed_cron_trigger_configs.len(),
         webhook_triggers = parsed_webhook_trigger_configs.len(),
         watcher_triggers = parsed_watcher_trigger_configs.len(),
+        slash_command_triggers = parsed_slash_command_trigger_configs.len(),
         "trigger configs parsed from configuration"
     );
 
@@ -218,6 +222,51 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     } else {
         None
     };
+
+    // Start Slack/Discord bot listeners for each configured slash_command trigger
+    let mut bot_listener_handles = Vec::new();
+    for slash_command_config in parsed_slash_command_trigger_configs {
+        let bot_listener_shutdown_receiver = daemon_state.shutdown_receiver.clone();
+        let bot_trigger_engine = Arc::clone(&trigger_engine);
+
+        match slash_command_config.provider.as_str() {
+            "slack" => {
+                info!(
+                    listener_name = %slash_command_config.name,
+                    channel = %slash_command_config.channel,
+                    "starting slack bot listener"
+                );
+                let slack_bot_listener = triggers::slack_bot::SlackBotListener::new(
+                    slash_command_config,
+                    bot_trigger_engine,
+                );
+                bot_listener_handles.push(tokio::spawn(async move {
+                    slack_bot_listener.run(bot_listener_shutdown_receiver).await;
+                }));
+            }
+            "discord" => {
+                info!(
+                    listener_name = %slash_command_config.name,
+                    channel = %slash_command_config.channel,
+                    "starting discord bot listener"
+                );
+                let discord_bot_listener = triggers::discord_bot::DiscordBotListener::new(
+                    slash_command_config,
+                    bot_trigger_engine,
+                );
+                bot_listener_handles.push(tokio::spawn(async move {
+                    discord_bot_listener.run(bot_listener_shutdown_receiver).await;
+                }));
+            }
+            unknown_provider => {
+                warn!(
+                    listener_name = %slash_command_config.name,
+                    provider = %unknown_provider,
+                    "unknown slash command provider, skipping"
+                );
+            }
+        }
+    }
 
     // -----------------------------------------------------------------------
     // 9c. Build notification dispatcher from config (wrapped for hot-reload)
@@ -460,6 +509,16 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             error!(
                 error = %webhook_join_error,
                 "webhook server task panicked during shutdown"
+            );
+        }
+    }
+
+    for (listener_index, bot_listener_handle) in bot_listener_handles.into_iter().enumerate() {
+        if let Err(bot_listener_join_error) = bot_listener_handle.await {
+            error!(
+                error = %bot_listener_join_error,
+                listener_index = listener_index,
+                "bot listener task panicked during shutdown"
             );
         }
     }
