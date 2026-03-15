@@ -273,6 +273,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         daemon_config.git.branch_prefix.clone(),
         shutdown_receiver_for_orchestrator,
         Arc::clone(&shared_notification_dispatcher),
+        daemon_config.costs.cost_warning_threshold_usd,
     );
 
     let orchestrator_heartbeat_tracker = orchestrator_instance.get_heartbeat_tracker();
@@ -342,6 +343,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         daemon_config.git.branch_prefix.clone(),
         daemon_state.shutdown_receiver.clone(),
         Arc::clone(&shared_notification_dispatcher),
+        daemon_config.costs.cost_warning_threshold_usd,
     ));
 
     let llm_providers_are_configured = llm_provider_router.has_any_providers();

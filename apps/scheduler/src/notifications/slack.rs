@@ -117,6 +117,11 @@ impl SlackNotificationChannel {
                 );
                 (header_text, body_markdown)
             }
+            NotificationEventType::CostWarningExceeded => {
+                let header_text = ":warning: Cost Warning".to_string();
+                let body_markdown = notification_event.summary.clone();
+                (header_text, body_markdown)
+            }
         }
     }
 }

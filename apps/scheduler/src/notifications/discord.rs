@@ -117,6 +117,11 @@ impl DiscordNotificationChannel {
                 );
                 (embed_title, embed_description, DISCORD_COLOR_GREEN)
             }
+            NotificationEventType::CostWarningExceeded => {
+                let embed_title = "Cost Warning".to_string();
+                let embed_description = notification_event.summary.clone();
+                (embed_title, embed_description, DISCORD_COLOR_RED)
+            }
         }
     }
 }

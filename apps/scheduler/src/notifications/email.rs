@@ -58,6 +58,9 @@ impl EmailNotificationChannel {
                 format!("Kraken: Trigger Fired - {}", trigger_name)
             }
             NotificationEventType::DailyDigest => "Kraken: Daily Digest".to_string(),
+            NotificationEventType::CostWarningExceeded => {
+                "Kraken: Cost Warning Exceeded".to_string()
+            }
         }
     }
 
@@ -139,6 +142,12 @@ impl EmailNotificationChannel {
                 format!(
                     "<h2>Pull Request Created</h2><p><b>{}</b></p><p><a href=\"{}\">{}</a></p>",
                     notification_event.task_name, pull_request_url, pull_request_url
+                )
+            }
+            NotificationEventType::CostWarningExceeded => {
+                format!(
+                    "<h2>Cost Warning Exceeded</h2><p>{}</p>",
+                    notification_event.summary
                 )
             }
         }

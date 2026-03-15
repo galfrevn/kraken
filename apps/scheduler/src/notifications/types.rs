@@ -12,6 +12,7 @@ pub enum NotificationEventType {
     PullRequestCreated,
     TriggerFired,
     DailyDigest,
+    CostWarningExceeded,
 }
 
 impl fmt::Display for NotificationEventType {
@@ -23,6 +24,9 @@ impl fmt::Display for NotificationEventType {
             NotificationEventType::PullRequestCreated => write!(formatter, "PullRequestCreated"),
             NotificationEventType::TriggerFired => write!(formatter, "TriggerFired"),
             NotificationEventType::DailyDigest => write!(formatter, "DailyDigest"),
+            NotificationEventType::CostWarningExceeded => {
+                write!(formatter, "CostWarningExceeded")
+            }
         }
     }
 }
@@ -140,5 +144,9 @@ mod tests {
         assert_eq!(format!("{}", NotificationEventType::PullRequestCreated), "PullRequestCreated");
         assert_eq!(format!("{}", NotificationEventType::TriggerFired), "TriggerFired");
         assert_eq!(format!("{}", NotificationEventType::DailyDigest), "DailyDigest");
+        assert_eq!(
+            format!("{}", NotificationEventType::CostWarningExceeded),
+            "CostWarningExceeded"
+        );
     }
 }

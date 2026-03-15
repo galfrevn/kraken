@@ -33,6 +33,10 @@ const STALE_WORKTREE_MAXIMUM_AGE_DAYS: u32 = 7;
 /// 24 hours = 24 * 60 * 60 = 86400 ticks.
 const DAILY_DIGEST_INTERVAL_TICKS: u64 = 86400;
 
+/// Number of tick cycles (each ~1 second) between cost threshold checks.
+/// 1 hour = 60 * 60 = 3600 ticks.
+const COST_WARNING_CHECK_INTERVAL_TICKS: u64 = 3600;
+
 pub struct Orchestrator {
     task_store: Arc<TaskStore>,
     heartbeat_tracker: Arc<HeartbeatTracker>,
@@ -47,6 +51,9 @@ pub struct Orchestrator {
     shutdown_receiver: watch::Receiver<bool>,
     ticks_since_last_stale_worktree_cleanup: u64,
     ticks_since_last_daily_digest: u64,
+    ticks_since_last_cost_warning_check: u64,
+    cost_warning_threshold_usd: Option<f64>,
+    cost_warning_already_fired_today: bool,
     notification_dispatcher: Arc<NotificationDispatcher>,
 }
 
@@ -64,6 +71,7 @@ impl Orchestrator {
         branch_prefix: String,
         shutdown_receiver: watch::Receiver<bool>,
         notification_dispatcher: Arc<NotificationDispatcher>,
+        cost_warning_threshold_usd: Option<f64>,
     ) -> Self {
         let heartbeat_tracker = Arc::new(HeartbeatTracker::new(heartbeat_timeout_seconds));
         let worktree_manager = Arc::new(WorktreeManager::new(
@@ -95,6 +103,9 @@ impl Orchestrator {
             shutdown_receiver,
             ticks_since_last_stale_worktree_cleanup: 0,
             ticks_since_last_daily_digest: 0,
+            ticks_since_last_cost_warning_check: 0,
+            cost_warning_threshold_usd,
+            cost_warning_already_fired_today: false,
             notification_dispatcher,
         }
     }
@@ -232,7 +243,14 @@ impl Orchestrator {
         self.ticks_since_last_daily_digest += 1;
         if self.ticks_since_last_daily_digest >= DAILY_DIGEST_INTERVAL_TICKS {
             self.ticks_since_last_daily_digest = 0;
+            self.cost_warning_already_fired_today = false;
             self.fire_daily_digest_notification().await;
+        }
+
+        self.ticks_since_last_cost_warning_check += 1;
+        if self.ticks_since_last_cost_warning_check >= COST_WARNING_CHECK_INTERVAL_TICKS {
+            self.ticks_since_last_cost_warning_check = 0;
+            self.check_cost_warning_threshold().await;
         }
     }
 
@@ -282,6 +300,63 @@ impl Orchestrator {
             task_id: "daily-digest".to_string(),
             summary: digest_summary,
             details: daily_digest_details,
+            timestamp: chrono::Utc::now(),
+        });
+    }
+
+    async fn check_cost_warning_threshold(&mut self) {
+        let configured_threshold = match self.cost_warning_threshold_usd {
+            Some(threshold_value) => threshold_value,
+            None => return,
+        };
+
+        if self.cost_warning_already_fired_today {
+            return;
+        }
+
+        let daily_statistics = self.task_store.get_daily_statistics().await;
+
+        if daily_statistics.total_cost_usd <= configured_threshold {
+            return;
+        }
+
+        self.cost_warning_already_fired_today = true;
+
+        warn!(
+            daily_cost_usd = daily_statistics.total_cost_usd,
+            threshold_usd = configured_threshold,
+            "daily cost warning threshold exceeded"
+        );
+
+        let mut cost_warning_details = HashMap::new();
+        cost_warning_details.insert(
+            "daily_cost_usd".to_string(),
+            format!("${:.4}", daily_statistics.total_cost_usd),
+        );
+        cost_warning_details.insert(
+            "threshold_usd".to_string(),
+            format!("${:.4}", configured_threshold),
+        );
+        cost_warning_details.insert(
+            "completed_tasks".to_string(),
+            daily_statistics.completed_task_count.to_string(),
+        );
+        cost_warning_details.insert(
+            "failed_tasks".to_string(),
+            daily_statistics.failed_task_count.to_string(),
+        );
+
+        let cost_warning_summary = format!(
+            "Daily cost ${:.4} exceeded threshold ${:.4}",
+            daily_statistics.total_cost_usd, configured_threshold,
+        );
+
+        self.fire_notification(NotificationEvent {
+            event_type: NotificationEventType::CostWarningExceeded,
+            task_name: "cost-warning".to_string(),
+            task_id: "cost-warning".to_string(),
+            summary: cost_warning_summary,
+            details: cost_warning_details,
             timestamp: chrono::Utc::now(),
         });
     }
@@ -789,6 +864,7 @@ mod tests {
             "kraken/".to_string(),
             shutdown_receiver,
             create_empty_notification_dispatcher(),
+            None,
         );
 
         assert_eq!(orchestrator.active_worker_count(), 0);
@@ -814,6 +890,7 @@ mod tests {
             "kraken/".to_string(),
             shutdown_receiver,
             create_empty_notification_dispatcher(),
+            None,
         );
 
         let heartbeat_tracker = orchestrator.get_heartbeat_tracker();
@@ -840,6 +917,7 @@ mod tests {
             "kraken/".to_string(),
             shutdown_receiver,
             create_empty_notification_dispatcher(),
+            None,
         );
 
         shutdown_sender.send(true).unwrap();
@@ -868,6 +946,7 @@ mod tests {
             "kraken/".to_string(),
             shutdown_receiver,
             create_empty_notification_dispatcher(),
+            None,
         );
 
         task_store
@@ -898,6 +977,7 @@ mod tests {
             "kraken/".to_string(),
             shutdown_receiver,
             create_empty_notification_dispatcher(),
+            None,
         );
 
         let created_task = task_store
@@ -939,6 +1019,7 @@ mod tests {
             "kraken/".to_string(),
             shutdown_receiver,
             create_empty_notification_dispatcher(),
+            None,
         );
 
         let created_task = task_store
@@ -1005,6 +1086,7 @@ mod tests {
             "kraken/".to_string(),
             shutdown_receiver,
             create_empty_notification_dispatcher(),
+            None,
         );
 
         let created_task = task_store
@@ -1084,6 +1166,7 @@ mod tests {
             "kraken/".to_string(),
             shutdown_receiver,
             create_empty_notification_dispatcher(),
+            None,
         );
 
         // When worker_working_directory matches repository_directory, no cleanup should happen
@@ -1113,6 +1196,7 @@ mod tests {
             "kraken/".to_string(),
             shutdown_receiver,
             create_empty_notification_dispatcher(),
+            None,
         );
 
         let created_task = task_store
@@ -1173,6 +1257,7 @@ mod tests {
             "kraken/".to_string(),
             shutdown_receiver,
             create_empty_notification_dispatcher(),
+            None,
         );
 
         let created_task = task_store
@@ -1220,6 +1305,7 @@ mod tests {
             "kraken/".to_string(),
             shutdown_receiver,
             create_empty_notification_dispatcher(),
+            None,
         );
 
         let created_task = task_store
@@ -1301,6 +1387,7 @@ mod tests {
             "kraken/".to_string(),
             shutdown_receiver,
             create_empty_notification_dispatcher(),
+            None,
         );
 
         let created_task = task_store
@@ -1370,6 +1457,7 @@ mod tests {
             "kraken/".to_string(),
             shutdown_receiver,
             create_empty_notification_dispatcher(),
+            None,
         );
 
         let created_task = task_store
@@ -1451,6 +1539,7 @@ mod tests {
             "kraken/".to_string(),
             shutdown_receiver,
             create_empty_notification_dispatcher(),
+            None,
         );
 
         orchestrator.fire_daily_digest_notification().await;
@@ -1475,6 +1564,7 @@ mod tests {
             "kraken/".to_string(),
             shutdown_receiver,
             create_empty_notification_dispatcher(),
+            None,
         );
 
         orchestrator.fire_daily_digest_notification().await;
@@ -1499,6 +1589,7 @@ mod tests {
             "kraken/".to_string(),
             shutdown_receiver,
             create_empty_notification_dispatcher(),
+            None,
         );
 
         assert_eq!(orchestrator.ticks_since_last_daily_digest, 0);

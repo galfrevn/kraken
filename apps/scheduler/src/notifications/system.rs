@@ -29,6 +29,9 @@ impl SystemNotificationChannel {
             }
             NotificationEventType::TriggerFired => "Kraken: Trigger Fired".to_string(),
             NotificationEventType::DailyDigest => "Kraken: Daily Digest".to_string(),
+            NotificationEventType::CostWarningExceeded => {
+                "Kraken: Cost Warning Exceeded".to_string()
+            }
         }
     }
 

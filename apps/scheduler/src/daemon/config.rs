@@ -46,6 +46,10 @@ pub struct DaemonConfig {
     /// Notification channel definitions.
     #[serde(default)]
     pub notifications: NotificationsYamlConfig,
+
+    /// Cost tracking and warning thresholds.
+    #[serde(default)]
+    pub costs: CostsConfig,
 }
 
 /// Controls how the orchestrator schedules and monitors worker tasks.
@@ -90,6 +94,14 @@ pub struct GitConfig {
     /// Prefix applied to branches created by the daemon (e.g. "kraken/fix-123").
     #[serde(rename = "branchPrefix", default = "default_branch_prefix")]
     pub branch_prefix: String,
+}
+
+/// Cost tracking configuration. When a daily spend threshold is set,
+/// the daemon fires a one-shot notification per day when the threshold is exceeded.
+#[derive(Debug, Clone, Default, Deserialize)]
+pub struct CostsConfig {
+    #[serde(default, rename = "costWarningThresholdUsd")]
+    pub cost_warning_threshold_usd: Option<f64>,
 }
 
 // ---------------------------------------------------------------------------
@@ -205,6 +217,7 @@ fn parse_notification_event_type_from_string(
         "pr.created" => Some(NotificationEventType::PullRequestCreated),
         "trigger.fired" => Some(NotificationEventType::TriggerFired),
         "daily_digest" => Some(NotificationEventType::DailyDigest),
+        "cost.warning" => Some(NotificationEventType::CostWarningExceeded),
         _ => None,
     }
 }
@@ -544,6 +557,7 @@ impl Default for DaemonConfig {
             git: GitConfig::default(),
             triggers: TriggersYamlConfig::default(),
             notifications: NotificationsYamlConfig::default(),
+            costs: CostsConfig::default(),
         }
     }
 }
@@ -657,6 +671,7 @@ mod tests {
         assert_eq!(config.services.daemon_port, 50051);
         assert_eq!(config.services.webhook_port, 50052);
         assert_eq!(config.git.branch_prefix, "kraken/");
+        assert!(config.costs.cost_warning_threshold_usd.is_none());
     }
 
     #[test]
@@ -956,6 +971,10 @@ triggers:
         assert_eq!(
             parse_notification_event_type_from_string("daily_digest"),
             Some(NotificationEventType::DailyDigest)
+        );
+        assert_eq!(
+            parse_notification_event_type_from_string("cost.warning"),
+            Some(NotificationEventType::CostWarningExceeded)
         );
     }
 
@@ -1280,6 +1299,56 @@ notifications:
         assert_eq!(config.notifications.channels[0].events.len(), 2);
         assert_eq!(config.notifications.channels[1].name, "desktop");
         assert_eq!(config.notifications.channels[1].provider, "system");
+
+        let _ = std::fs::remove_file(&config_file_path);
+    }
+
+    #[test]
+    fn test_load_config_with_costs_section() {
+        let temporary_directory = std::env::temp_dir();
+        let config_file_path =
+            temporary_directory.join("kraken_test_costs_config.yml");
+
+        let yaml_content = r#"
+repo: "/home/user/project"
+costs:
+  costWarningThresholdUsd: 5.50
+"#;
+
+        let mut config_file = std::fs::File::create(&config_file_path)
+            .expect("should create test config file");
+        config_file
+            .write_all(yaml_content.as_bytes())
+            .expect("should write test config");
+
+        let config = DaemonConfig::load(Some(&config_file_path))
+            .expect("should parse config with costs");
+
+        assert_eq!(config.costs.cost_warning_threshold_usd, Some(5.50));
+
+        let _ = std::fs::remove_file(&config_file_path);
+    }
+
+    #[test]
+    fn test_load_config_without_costs_section_defaults_to_none() {
+        let temporary_directory = std::env::temp_dir();
+        let config_file_path =
+            temporary_directory.join("kraken_test_no_costs_config.yml");
+
+        let yaml_content = r#"
+repo: "/home/user/project"
+"#;
+
+        let mut config_file = std::fs::File::create(&config_file_path)
+            .expect("should create test config file");
+        config_file
+            .write_all(yaml_content.as_bytes())
+            .expect("should write test config");
+
+        let config = DaemonConfig::load(Some(&config_file_path))
+            .expect("should parse config without costs");
+
+        assert!(config.costs.cost_warning_threshold_usd.is_none());
 
         let _ = std::fs::remove_file(&config_file_path);
     }
