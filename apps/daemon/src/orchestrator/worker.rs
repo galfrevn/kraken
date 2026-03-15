@@ -31,15 +31,24 @@ impl WorkerProcess {
         daemon_url: &str,
         worker_script_path: &str,
     ) -> Result<Self, String> {
-        let child_process = Command::new("bun")
+        let mut command_builder = Command::new("bun");
+        command_builder
             .arg("run")
             .arg(worker_script_path)
             .arg(format!("--task-id={task_id}"))
             .arg(format!("--daemon-url={daemon_url}"))
             .current_dir(working_directory)
             .stdout(Stdio::piped())
-            .stderr(Stdio::piped())
-            .spawn()
+            .stderr(Stdio::piped());
+
+        #[cfg(target_os = "windows")]
+        {
+            use std::os::windows::process::CommandExt;
+            const CREATE_NO_WINDOW: u32 = 0x08000000;
+            command_builder.creation_flags(CREATE_NO_WINDOW);
+        }
+
+        let child_process = command_builder.spawn()
             .map_err(|error| {
                 format!(
                     "failed to spawn worker for task '{task_id}' in '{working_directory}': {error}"
