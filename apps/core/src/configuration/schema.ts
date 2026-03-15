@@ -73,7 +73,7 @@ const subagentConfigurationSchema = z.object({
 
 const servicesConfigurationSchema = z.object({
   schedulerUrl: z.string().default("http://localhost:50051"),
-  gatewayUrl: z.string().default("http://localhost:50052"),
+  llmProxyUrl: z.string().default("http://localhost:50052"),
 });
 
 export const agentConfigurationSchema = z

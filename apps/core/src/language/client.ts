@@ -1,4 +1,4 @@
-import { createGatewayClient, type GatewayClient } from "@/clients/gateway.ts";
+import { createLlmProxyClient, type LlmProxyClient } from "@/clients/llm-proxy.ts";
 import { ConversationHistory } from "@/language/conversation.ts";
 
 import type { LanguageModelConfiguration } from "@/configuration/schema.ts";
@@ -15,7 +15,7 @@ import type { NativeTool } from "@/tools/schema.ts";
 export type ClientLogCallback = (level: "info" | "warn" | "error", message: string) => void;
 
 export class LanguageModelClient {
-  private gatewayClient: GatewayClient;
+  private llmProxyClient: LlmProxyClient;
   private model: string;
   private provider: string;
   private defaultTemperature: number;
@@ -24,8 +24,8 @@ export class LanguageModelClient {
   private nativeTools: NativeTool[] = [];
   private logCallback?: ClientLogCallback;
 
-  constructor(gatewayUrl: string, languageModelConfiguration: LanguageModelConfiguration) {
-    this.gatewayClient = createGatewayClient(gatewayUrl);
+  constructor(llmProxyUrl: string, languageModelConfiguration: LanguageModelConfiguration) {
+    this.llmProxyClient = createLlmProxyClient(llmProxyUrl);
     this.model = languageModelConfiguration.model;
     this.provider = languageModelConfiguration.provider;
     this.defaultTemperature = languageModelConfiguration.temperature;
@@ -51,7 +51,7 @@ export class LanguageModelClient {
     this.nativeTools = tools;
   }
 
-  private buildGatewayTools():
+  private buildProxyToolDefinitions():
     | {
         type: string;
         function: {
@@ -76,7 +76,7 @@ export class LanguageModelClient {
     }));
   }
 
-  private buildGatewayMessages(messages: ConversationMessage[]): {
+  private buildProxyMessages(messages: ConversationMessage[]): {
     role: string;
     content: string;
     toolCalls?: { id: string; type: string; function: { name: string; arguments: string } }[];
@@ -144,23 +144,23 @@ export class LanguageModelClient {
     messages: ConversationMessage[],
     options?: CompletionOptions,
   ): Promise<CompletionResult> {
-    const gatewayMessages = this.buildGatewayMessages(messages);
+    const proxyFormattedMessages = this.buildProxyMessages(messages);
 
     const systemMessage = messages.find((message) => message.role === "system");
     const systemPrompt = options?.systemPrompt ?? systemMessage?.content;
 
     this.clientLog(
       "info",
-      `complete: model=${options?.model ?? this.model}, messages=${gatewayMessages.length}`,
+      `complete: model=${options?.model ?? this.model}, messages=${proxyFormattedMessages.length}`,
     );
 
-    const response = await this.gatewayClient.complete({
+    const response = await this.llmProxyClient.complete({
       model: options?.model ?? this.model,
-      messages: gatewayMessages,
+      messages: proxyFormattedMessages,
       temperature: options?.temperature ?? this.defaultTemperature,
       maxTokens: options?.maxTokens ?? this.defaultMaxTokens,
       systemPrompt,
-      tools: options?.noTools ? [] : (this.buildGatewayTools() ?? []),
+      tools: options?.noTools ? [] : (this.buildProxyToolDefinitions() ?? []),
       provider: this.provider,
     });
 
@@ -262,20 +262,20 @@ export class LanguageModelClient {
   ): Promise<CompletionResult> {
     const allMessages = conversation.getMessagesWithSystemPrompt();
 
-    const gatewayMessages = this.buildGatewayMessages(allMessages);
-    this.clientLog("info", `stream: model=${this.model}, messages=${gatewayMessages.length}`);
+    const proxyFormattedMessages = this.buildProxyMessages(allMessages);
+    this.clientLog("info", `stream: model=${this.model}, messages=${proxyFormattedMessages.length}`);
 
     const systemMessage = allMessages.find((message) => message.role === "system");
     const systemPrompt = options?.systemPrompt ?? systemMessage?.content;
 
-    const stream = this.gatewayClient.streamComplete(
+    const stream = this.llmProxyClient.streamComplete(
       {
         model: this.model,
-        messages: gatewayMessages,
+        messages: proxyFormattedMessages,
         temperature: options?.temperature ?? this.defaultTemperature,
         maxTokens: options?.maxTokens ?? this.defaultMaxTokens,
         systemPrompt,
-        tools: this.buildGatewayTools() ?? [],
+        tools: this.buildProxyToolDefinitions() ?? [],
         provider: this.provider,
       },
       signal ? { signal } : undefined,

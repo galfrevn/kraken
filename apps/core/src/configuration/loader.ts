@@ -6,7 +6,7 @@ import { agentConfigurationSchema, type AgentConfiguration } from "@/configurati
 const ENVIRONMENT_VARIABLE = {
   configurationFile: "KRAKEN_CONFIGURATION_FILE",
   schedulerUrl: "KRAKEN_SCHEDULER_URL",
-  gatewayUrl: "KRAKEN_GATEWAY_URL",
+  llmProxyUrl: "KRAKEN_LLM_PROXY_URL",
   openrouterApiKey: "KRAKEN_OPENROUTER_API_KEY",
 } as const;
 
@@ -51,11 +51,11 @@ function applyEnvironmentOverrides(
     };
   }
 
-  const gatewayUrl = Bun.env[ENVIRONMENT_VARIABLE.gatewayUrl];
-  if (gatewayUrl) {
+  const llmProxyUrl = Bun.env[ENVIRONMENT_VARIABLE.llmProxyUrl];
+  if (llmProxyUrl) {
     overrides["services"] = {
       ...(overrides["services"] as Record<string, unknown>),
-      gatewayUrl,
+      llmProxyUrl,
     };
   }
 

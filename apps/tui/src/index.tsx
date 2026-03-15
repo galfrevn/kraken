@@ -148,7 +148,7 @@ export async function main(): Promise<void> {
   // LanguageModelClient is always created so ThreadManager/ChatEngine can initialize
   // without null checks. In daemon mode, actual LLM calls go through DaemonStore, not this client.
   const languageModelClient = new LanguageModelClient(
-    daemonStore ? daemonUrl : configuration.services.gatewayUrl,
+    daemonStore ? daemonUrl : configuration.services.llmProxyUrl,
     configuration.languageModel,
   );
 
