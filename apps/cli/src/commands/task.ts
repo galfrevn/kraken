@@ -189,38 +189,71 @@ async function taskSubmit(args: string[]): Promise<void> {
   console.log(`\n  Track with: ${colorize(`kraken task list`, "cyan")}\n`);
 }
 
-async function taskCancel(taskId: string | undefined): Promise<void> {
-  if (!taskId) {
+async function resolveFullTaskIdFromPrefix(
+  daemonServiceClient: ReturnType<typeof createDaemonServiceClient>,
+  taskIdPrefix: string,
+): Promise<string | null> {
+  const listTasksResponse = await daemonServiceClient.listTasks({ statusFilter: "", limit: 200 });
+  const matchingTask = listTasksResponse.tasks.find(
+    (task) => task.id === taskIdPrefix || task.id.startsWith(taskIdPrefix),
+  );
+  return matchingTask?.id ?? null;
+}
+
+async function taskCancel(taskIdInput: string | undefined): Promise<void> {
+  if (!taskIdInput) {
     fail("Missing task ID. Usage: kraken task cancel <task-id>");
     process.exit(1);
   }
 
   const daemonServiceClient = await verifyDaemonIsRunning();
 
-  const cancelResponse = await daemonServiceClient.cancelTask({ taskId });
+  const resolvedFullTaskId = await resolveFullTaskIdFromPrefix(daemonServiceClient, taskIdInput);
+  if (!resolvedFullTaskId) {
+    fail(`No task found matching "${taskIdInput}"`);
+    console.log();
+    process.exit(1);
+  }
 
-  if (cancelResponse.success) {
-    success(`Task ${colorize(taskId, "cyan")} cancelled.`);
-  } else {
-    fail(`Failed to cancel task ${taskId}. It may have already completed or does not exist.`);
+  try {
+    const cancelResponse = await daemonServiceClient.cancelTask({ taskId: resolvedFullTaskId });
+
+    if (cancelResponse.success) {
+      success(`Task ${colorize(resolvedFullTaskId.slice(0, 8), "cyan")} cancelled.`);
+    } else {
+      fail(`Cannot cancel task — it may have already completed.`);
+    }
+  } catch {
+    fail(`Failed to cancel task ${resolvedFullTaskId.slice(0, 8)}.`);
   }
   console.log();
 }
 
-async function retryTask(taskIdToRetry: string | undefined): Promise<void> {
-  if (!taskIdToRetry) {
+async function retryTask(taskIdInput: string | undefined): Promise<void> {
+  if (!taskIdInput) {
     fail("Missing task ID. Usage: kraken task retry <task-id>");
     process.exit(1);
   }
 
   const daemonServiceClient = await verifyDaemonIsRunning();
 
-  const retryTaskResponse = await daemonServiceClient.retryTask({ taskId: taskIdToRetry });
+  const resolvedFullTaskId = await resolveFullTaskIdFromPrefix(daemonServiceClient, taskIdInput);
+  if (!resolvedFullTaskId) {
+    fail(`No task found matching "${taskIdInput}"`);
+    console.log();
+    process.exit(1);
+  }
 
-  if (retryTaskResponse.success) {
-    success(`Task ${colorize(taskIdToRetry, "cyan")} queued for retry. New task ID: ${colorize(retryTaskResponse.newTaskId, "cyan")}`);
-  } else {
-    fail(`Failed to retry task ${taskIdToRetry}: ${retryTaskResponse.message}`);
+  try {
+    const retryTaskResponse = await daemonServiceClient.retryTask({ taskId: resolvedFullTaskId });
+
+    if (retryTaskResponse.success) {
+      success(`Retry task created: ${colorize(retryTaskResponse.newTaskId.slice(0, 8), "cyan")}`);
+    } else {
+      fail(`Failed to retry: ${retryTaskResponse.message}`);
+    }
+  } catch {
+    fail(`Failed to retry task ${resolvedFullTaskId.slice(0, 8)}.`);
   }
   console.log();
 }
