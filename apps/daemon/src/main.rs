@@ -339,7 +339,12 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let worker_script_path = worker_script_candidates
         .iter()
         .find(|candidate_path| std::path::Path::new(candidate_path).exists())
-        .map(|found_path| found_path.to_string())
+        .map(|found_path| {
+            // Convert to absolute path so workers in worktrees can find it
+            std::fs::canonicalize(found_path)
+                .map(|absolute| absolute.to_string_lossy().to_string())
+                .unwrap_or_else(|_| found_path.to_string())
+        })
         .unwrap_or_else(|| {
             warn!(
                 candidates = ?worker_script_candidates,
