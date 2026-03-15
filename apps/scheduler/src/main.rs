@@ -20,6 +20,7 @@ use tracing::{error, info, warn};
 use tracing_subscriber::EnvFilter;
 
 use daemon::config::DaemonConfig;
+use daemon::reload::ReloadableNotificationDispatcher;
 use proto::agent::v1::agent_chat_service_server::AgentChatServiceServer;
 use proto::agent::v1::daemon_service_server::DaemonServiceServer;
 use proto::agent::v1::scheduler_service_server::SchedulerServiceServer;
@@ -219,14 +220,19 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     };
 
     // -----------------------------------------------------------------------
-    // 9c. Build notification dispatcher from config
+    // 9c. Build notification dispatcher from config (wrapped for hot-reload)
     // -----------------------------------------------------------------------
     let notification_dispatcher = daemon_config.notifications.build_dispatcher();
     info!(
         notification_channel_count = notification_dispatcher.channel_count(),
         "notification dispatcher built from configuration"
     );
-    let shared_notification_dispatcher = Arc::new(notification_dispatcher);
+    let reloadable_notification_dispatcher = Arc::new(
+        ReloadableNotificationDispatcher::new(notification_dispatcher),
+    );
+    let shared_notification_dispatcher = reloadable_notification_dispatcher
+        .current_dispatcher()
+        .await;
 
     // -----------------------------------------------------------------------
     // 10. Find the worker script path
@@ -374,7 +380,36 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     );
 
     // -----------------------------------------------------------------------
-    // 16. Serve with shutdown signal (ctrl_c)
+    // 16. Spawn SIGHUP config hot-reload handler (Unix only)
+    // -----------------------------------------------------------------------
+    #[cfg(unix)]
+    {
+        let reloadable_dispatcher_for_sighup = Arc::clone(&reloadable_notification_dispatcher);
+        let configuration_file_path_for_sighup = command_line_config_path.clone();
+        tokio::spawn(async move {
+            use tokio::signal::unix::{signal, SignalKind};
+            let mut sighup_signal_stream = signal(SignalKind::hangup())
+                .expect("failed to register SIGHUP handler");
+            loop {
+                sighup_signal_stream.recv().await;
+                info!("SIGHUP received, reloading configuration");
+                daemon::reload::reload_configuration_from_disk(
+                    configuration_file_path_for_sighup.as_ref(),
+                    &reloadable_dispatcher_for_sighup,
+                )
+                .await;
+            }
+        });
+        info!("SIGHUP hot-reload handler registered");
+    }
+
+    #[cfg(not(unix))]
+    {
+        info!("SIGHUP hot-reload not available on this platform");
+    }
+
+    // -----------------------------------------------------------------------
+    // 17. Serve with shutdown signal (ctrl_c)
     // -----------------------------------------------------------------------
     Server::builder()
         .add_service(SchedulerServiceServer::new(scheduler_grpc_server))
@@ -388,7 +423,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         .await?;
 
     // -----------------------------------------------------------------------
-    // 17. Graceful shutdown sequence
+    // 18. Graceful shutdown sequence
     // -----------------------------------------------------------------------
     info!("beginning graceful shutdown");
 

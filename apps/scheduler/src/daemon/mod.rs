@@ -1,5 +1,6 @@
 pub mod config;
 pub mod process;
+pub mod reload;
 
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
