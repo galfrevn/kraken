@@ -1,5 +1,5 @@
 import { spawn } from "bun";
-import { existsSync, readFileSync, writeFileSync, unlinkSync, mkdirSync } from "node:fs";
+import { existsSync, readFileSync, writeFileSync, unlinkSync, mkdirSync, openSync, appendFileSync } from "node:fs";
 import { join } from "node:path";
 import { homedir } from "node:os";
 import { createClient } from "@connectrpc/connect";
@@ -7,7 +7,9 @@ import { createGrpcTransport } from "@connectrpc/connect-node";
 import { DaemonService } from "@gen/agent/v1/daemon_pb.ts";
 import { KRAKEN_ROOT, bold, colorize, success, warn, fail } from "@/constants.ts";
 
-const DAEMON_PID_FILE_PATH = join(homedir(), ".kraken", "daemon.pid");
+const KRAKEN_HOME_DIRECTORY = join(homedir(), ".kraken");
+const DAEMON_PID_FILE_PATH = join(KRAKEN_HOME_DIRECTORY, "daemon.pid");
+const DAEMON_LOG_FILE_PATH = join(KRAKEN_HOME_DIRECTORY, "daemon.log");
 const DEFAULT_DAEMON_GRPC_URL = "http://localhost:50051";
 
 const DAEMON_BINARY_NAME = process.platform === "win32" ? "kraken-daemon.exe" : "kraken-daemon";
@@ -168,35 +170,61 @@ async function startDaemon(args: string[]): Promise<void> {
     return;
   }
 
-  // Background mode: spawn detached
+  // Background mode: spawn detached, logs to file
   console.log(`\n  Starting daemon in background...`);
 
-  const backgroundProcess = spawn({
-    cmd: daemonCommand,
-    cwd: daemonDirectory,
-    stdout: "ignore",
-    stderr: "ignore",
-  });
+  if (!existsSync(KRAKEN_HOME_DIRECTORY)) {
+    mkdirSync(KRAKEN_HOME_DIRECTORY, { recursive: true });
+  }
 
-  // Wait a moment for the daemon to start and write its PID file
-  await sleep(1500);
+  // Truncate log file on each start so it doesn't grow forever
+  writeFileSync(DAEMON_LOG_FILE_PATH, `--- daemon starting at ${new Date().toISOString()} ---\n`);
+  const logFileDescriptor = openSync(DAEMON_LOG_FILE_PATH, "a");
+
+  if (process.platform === "win32") {
+    // On Windows, Bun spawn doesn't detach properly. Use PowerShell Start-Process
+    // to create a truly independent process that survives CLI exit.
+    const escapedCommand = daemonCommand[0]!;
+    const escapedArgs = daemonCommand.slice(1).map((argument) => `"${argument}"`).join(" ");
+    const powershellScript = `Start-Process -FilePath "${escapedCommand}" -ArgumentList '${escapedArgs}' -WorkingDirectory "${daemonDirectory}" -RedirectStandardOutput "${DAEMON_LOG_FILE_PATH}" -RedirectStandardError "${DAEMON_LOG_FILE_PATH}" -WindowStyle Hidden`;
+
+    Bun.spawnSync(["powershell", "-Command", powershellScript], {
+      stdio: ["ignore", "ignore", "ignore"],
+    });
+  } else {
+    spawn({
+      cmd: daemonCommand,
+      cwd: daemonDirectory,
+      stdout: logFileDescriptor,
+      stderr: logFileDescriptor,
+    });
+  }
+
+  // Wait for the daemon to start and write its PID file
+  await sleep(2000);
 
   const daemonPid = readDaemonPid();
 
   if (daemonPid !== null && isProcessAlive(daemonPid)) {
     success(`Daemon started (PID ${daemonPid})`);
-    console.log(`  Use ${colorize("kraken daemon status", "cyan")} to check status.`);
-    console.log(`  Use ${colorize("kraken daemon stop", "cyan")} to stop.\n`);
-  } else if (backgroundProcess.pid && isProcessAlive(backgroundProcess.pid)) {
-    // Daemon might not have written a PID file yet, but the process is alive
-    writeFileSync(DAEMON_PID_FILE_PATH, String(backgroundProcess.pid), "utf-8");
-    success(`Daemon started (PID ${backgroundProcess.pid})`);
+    console.log(`  Logs: ${colorize(DAEMON_LOG_FILE_PATH, "dim")}`);
     console.log(`  Use ${colorize("kraken daemon status", "cyan")} to check status.`);
     console.log(`  Use ${colorize("kraken daemon stop", "cyan")} to stop.\n`);
   } else {
-    fail("Daemon failed to start. Check logs for details.");
-    console.log(`  Try running with ${colorize("--fg", "cyan")} to see output:\n`);
-    console.log(`    ${colorize("kraken daemon start --fg", "cyan")}\n`);
+    // Check log file for errors
+    const logContents = existsSync(DAEMON_LOG_FILE_PATH)
+      ? readFileSync(DAEMON_LOG_FILE_PATH, "utf-8").trim()
+      : "";
+    fail("Daemon failed to start.");
+    if (logContents) {
+      console.log(`\n  Last log output:\n`);
+      for (const logLine of logContents.split("\n").slice(-10)) {
+        console.log(`    ${logLine}`);
+      }
+      console.log();
+    }
+    console.log(`  Full logs: ${colorize(DAEMON_LOG_FILE_PATH, "dim")}`);
+    console.log(`  Or try: ${colorize("kraken daemon start --fg", "cyan")}\n`);
     process.exit(1);
   }
 }
@@ -328,6 +356,27 @@ async function reloadDaemonConfiguration(): Promise<void> {
   }
 }
 
+function showDaemonLogs(args: string[]): void {
+  if (!existsSync(DAEMON_LOG_FILE_PATH)) {
+    console.log(`\n  No daemon logs found at ${DAEMON_LOG_FILE_PATH}`);
+    console.log(`  Start the daemon first: ${colorize("kraken daemon start", "cyan")}\n`);
+    return;
+  }
+
+  const tailLineCount = parseInt(args.find((argument) => argument.startsWith("--lines="))?.split("=")[1] ?? "50", 10);
+  const logFileContents = readFileSync(DAEMON_LOG_FILE_PATH, "utf-8");
+  const allLogLines = logFileContents.split("\n");
+  const lastLines = allLogLines.slice(-tailLineCount);
+
+  console.log(`\n  ${bold("Daemon logs")} ${colorize(`(last ${lastLines.length} lines)`, "dim")}`);
+  console.log(`  ${colorize(DAEMON_LOG_FILE_PATH, "dim")}\n`);
+
+  for (const logLine of lastLines) {
+    console.log(`  ${logLine}`);
+  }
+  console.log();
+}
+
 // ---------------------------------------------------------------------------
 // Entry point
 // ---------------------------------------------------------------------------
@@ -341,10 +390,13 @@ function printDaemonUsage(): void {
   console.log(`    ${colorize("status", "cyan")}    Show daemon status`);
   console.log(`    ${colorize("restart", "cyan")}   Stop and restart the daemon`);
   console.log(`    ${colorize("reload", "cyan")}    Reload configuration (SIGHUP)`);
+  console.log(`    ${colorize("logs", "cyan")}      Show daemon log output`);
   console.log(`\n  ${bold("Start options:")}\n`);
   console.log(`    ${colorize("--fg", "cyan")}            Run in foreground (inherit stdout/stderr)`);
   console.log(`    ${colorize("--dev", "cyan")}           Use debug binary instead of release`);
-  console.log(`    ${colorize("--config=PATH", "cyan")}   Pass config file path to daemon\n`);
+  console.log(`    ${colorize("--config=PATH", "cyan")}   Pass config file path to daemon`);
+  console.log(`\n  ${bold("Logs options:")}\n`);
+  console.log(`    ${colorize("--lines=N", "cyan")}       Show last N lines (default: 50)\n`);
 }
 
 export async function execute(args: string[]): Promise<void> {
@@ -366,6 +418,9 @@ export async function execute(args: string[]): Promise<void> {
       break;
     case "reload":
       await reloadDaemonConfiguration();
+      break;
+    case "logs":
+      showDaemonLogs(remainingArgs);
       break;
     default:
       if (subcommand) {
