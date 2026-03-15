@@ -30,6 +30,37 @@ use proto::agent::v1::worker_service_server::WorkerServiceServer;
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
     // -----------------------------------------------------------------------
+    // 0. Load ~/.kraken/.env (API keys written by kraken init)
+    // -----------------------------------------------------------------------
+    let dotenv_path = std::env::var("DOTENV_PATH")
+        .ok()
+        .map(std::path::PathBuf::from)
+        .unwrap_or_else(|| {
+            dirs_next::home_dir()
+                .unwrap_or_default()
+                .join(".kraken")
+                .join(".env")
+        });
+    if dotenv_path.exists() {
+        if let Ok(contents) = std::fs::read_to_string(&dotenv_path) {
+            for line in contents.lines() {
+                let trimmed = line.trim();
+                if trimmed.is_empty() || trimmed.starts_with('#') {
+                    continue;
+                }
+                if let Some((key, value)) = trimmed.split_once('=') {
+                    let key = key.trim();
+                    let value = value.trim();
+                    if std::env::var(key).is_err() {
+                        // Safety: called before any threads are spawned
+                        unsafe { std::env::set_var(key, value); }
+                    }
+                }
+            }
+        }
+    }
+
+    // -----------------------------------------------------------------------
     // 1. Initialize tracing/logging
     // -----------------------------------------------------------------------
     let log_file_path = std::env::var("KRAKEN_DAEMON_LOG_FILE").ok();
