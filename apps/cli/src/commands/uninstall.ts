@@ -35,8 +35,11 @@ export async function execute(_args: string[]): Promise<void> {
   p.log.message(`  ${KRAKEN_HOME}/kraken.yml     (configuration)`);
   p.log.message(`  ${KRAKEN_HOME}/.env           (API keys)`);
   p.log.message(`  ${KRAKEN_HOME}/agent.db       (conversations, tasks, memory)`);
+  p.log.message(`  ${KRAKEN_HOME}/daemon.db      (daemon tasks, logs)`);
+  p.log.message(`  ${KRAKEN_HOME}/daemon.pid     (daemon process ID)`);
   p.log.message(`  ${KRAKEN_HOME}/plugins/       (installed plugins)`);
   p.log.message(`  ${KRAKEN_HOME}/screenshots/   (browser screenshots)`);
+  p.log.message(`  .kraken-worktrees/            (task worktrees in repos)`);
   p.log.message(`  ~/.bun/bin/kraken             (CLI binary)`);
 
   const shouldContinue = await p.confirm({
@@ -50,7 +53,31 @@ export async function execute(_args: string[]): Promise<void> {
   }
 
   const spinnerInstance = p.spinner();
-  spinnerInstance.start("Removing kraken");
+  spinnerInstance.start("Stopping daemon if running");
+
+  // Stop the daemon first so files aren't locked
+  const daemonPidPath = join(KRAKEN_HOME, "daemon.pid");
+  if (existsSync(daemonPidPath)) {
+    try {
+      const daemonPid = parseInt(readFileSync(daemonPidPath, "utf-8").trim(), 10);
+      if (!Number.isNaN(daemonPid)) {
+        try {
+          process.kill(daemonPid, "SIGTERM");
+        } catch { /* already dead */ }
+        // Wait for daemon to exit
+        for (let waitAttempt = 0; waitAttempt < 10; waitAttempt++) {
+          await new Promise((resolve) => setTimeout(resolve, 500));
+          try {
+            process.kill(daemonPid, 0);
+          } catch {
+            break; // process is dead
+          }
+        }
+      }
+    } catch { /* best-effort */ }
+  }
+
+  spinnerInstance.message("Removing kraken");
 
   // Collect paths that couldn't be deleted (e.g. the running process on Windows)
   const deferredDeletes: string[] = [];
@@ -64,6 +91,16 @@ export async function execute(_args: string[]): Promise<void> {
     }
     // Try removing the now-empty directory; if still locked, defer it
     tryRemove(KRAKEN_HOME, deferredDeletes);
+  }
+
+  // Clean up worktrees in the current directory if it's a git repo
+  const localWorktreesDirectory = join(process.cwd(), ".kraken-worktrees");
+  if (existsSync(localWorktreesDirectory)) {
+    tryRemove(localWorktreesDirectory, deferredDeletes);
+    // Also prune git worktree references
+    try {
+      Bun.spawnSync(["git", "worktree", "prune"], { cwd: process.cwd(), stdio: ["ignore", "ignore", "ignore"] });
+    } catch { /* best-effort */ }
   }
 
   const home = homedir();
