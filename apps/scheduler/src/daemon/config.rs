@@ -48,6 +48,18 @@ pub struct OrchestratorConfig {
     /// Seconds without a heartbeat before a worker is considered dead.
     #[serde(rename = "heartbeatTimeoutSeconds", default = "default_heartbeat_timeout_seconds")]
     pub heartbeat_timeout_seconds: u64,
+
+    #[serde(default)]
+    pub retry: RetryConfig,
+}
+
+#[derive(Debug, Clone, Deserialize)]
+pub struct RetryConfig {
+    #[serde(rename = "maxRetries", default = "default_max_retries")]
+    pub max_retries: u32,
+
+    #[serde(rename = "backoffSeconds", default = "default_backoff_seconds")]
+    pub backoff_seconds: u64,
 }
 
 /// Network port configuration for daemon services.
@@ -119,6 +131,14 @@ pub struct WatcherTriggerYamlConfig {
     #[serde(default = "default_debounce_ms", rename = "debounceMs")]
     pub debounce_ms: u32,
     pub task: String,
+}
+
+fn default_max_retries() -> u32 {
+    2
+}
+
+fn default_backoff_seconds() -> u64 {
+    30
 }
 
 fn default_debounce_ms() -> u32 {
@@ -289,6 +309,16 @@ impl Default for OrchestratorConfig {
         Self {
             max_concurrent_tasks: default_max_concurrent_tasks(),
             heartbeat_timeout_seconds: default_heartbeat_timeout_seconds(),
+            retry: RetryConfig::default(),
+        }
+    }
+}
+
+impl Default for RetryConfig {
+    fn default() -> Self {
+        Self {
+            max_retries: default_max_retries(),
+            backoff_seconds: default_backoff_seconds(),
         }
     }
 }

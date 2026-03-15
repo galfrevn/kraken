@@ -394,6 +394,53 @@ impl TaskStore {
             .unwrap_or(0)
     }
 
+    pub async fn increment_attempt(
+        &self,
+        task_id: &str,
+    ) -> Result<(), String> {
+        let connection = self.database_pool.lock().await;
+
+        let rows_affected = connection
+            .execute(
+                "UPDATE daemon_tasks
+                 SET attempt = attempt + 1,
+                     updated_at = datetime('now')
+                 WHERE id = ?1",
+                params![task_id],
+            )
+            .map_err(|error| format!("failed to increment attempt: {error}"))?;
+
+        if rows_affected == 0 {
+            return Err(format!("no task found with id: {task_id}"));
+        }
+
+        Ok(())
+    }
+
+    pub async fn set_retry_context(
+        &self,
+        task_id: &str,
+        retry_context_message: &str,
+    ) -> Result<(), String> {
+        let connection = self.database_pool.lock().await;
+
+        let rows_affected = connection
+            .execute(
+                "UPDATE daemon_tasks
+                 SET error_message = ?1,
+                     updated_at = datetime('now')
+                 WHERE id = ?2",
+                params![retry_context_message, task_id],
+            )
+            .map_err(|error| format!("failed to set retry context: {error}"))?;
+
+        if rows_affected == 0 {
+            return Err(format!("no task found with id: {task_id}"));
+        }
+
+        Ok(())
+    }
+
     /// Counts the number of tasks with a given status.
     pub async fn count_by_status(&self, status: &str) -> i32 {
         let connection = self.database_pool.lock().await;

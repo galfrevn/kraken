@@ -288,12 +288,18 @@ impl WorkerService for WorkerServiceImplementation {
             .await
             .ok_or_else(|| Status::not_found(format!("task not found: {task_id}")))?;
 
+        let retry_context_for_response = if task.attempt > 1 {
+            task.error_message.unwrap_or_default()
+        } else {
+            String::new()
+        };
+
         Ok(Response::new(GetTaskResponse {
             task_id: task.id,
             name: task.name,
             description: task.description,
             working_dir: task.worker_dir.unwrap_or_default(),
-            retry_context: String::new(),
+            retry_context: retry_context_for_response,
             attempt: task.attempt,
         }))
     }
