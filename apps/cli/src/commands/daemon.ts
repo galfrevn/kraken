@@ -182,16 +182,24 @@ async function startDaemon(args: string[]): Promise<void> {
 
   if (process.platform === "win32") {
     // Bun spawn doesn't detach on Windows — child dies when parent exits.
-    // Use cmd /c start /b to create a truly independent process.
+    // Use PowerShell Start-Process with -NoNewWindow to launch independently.
     const binaryPath = daemonCommand[0]!;
-    const binaryArgs = daemonCommand.slice(1).join(" ");
-    const commandLine = binaryArgs
-      ? `"${binaryPath}" ${binaryArgs}`
-      : `"${binaryPath}"`;
-    Bun.spawnSync(
-      ["cmd", "/c", `start /b ${commandLine} >> "${DAEMON_LOG_FILE_PATH}" 2>&1`],
-      { cwd: daemonDirectory, stdio: ["ignore", "ignore", "ignore"] },
-    );
+    const binaryArgs = daemonCommand.slice(1);
+    const argumentListValue = binaryArgs.length > 0
+      ? `-ArgumentList ${binaryArgs.map((a) => `'${a}'`).join(",")}`
+      : "";
+    const powershellCommand = [
+      `Start-Process`,
+      `-FilePath '${binaryPath}'`,
+      argumentListValue,
+      `-WorkingDirectory '${daemonDirectory}'`,
+      `-NoNewWindow`,
+      `-RedirectStandardError '${DAEMON_LOG_FILE_PATH}'`,
+    ].filter(Boolean).join(" ");
+
+    Bun.spawnSync(["powershell", "-NoProfile", "-Command", powershellCommand], {
+      stdio: ["ignore", "ignore", "ignore"],
+    });
   } else {
     const logFileDescriptor = openSync(DAEMON_LOG_FILE_PATH, "a");
     spawn({
