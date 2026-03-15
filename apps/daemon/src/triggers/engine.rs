@@ -1,4 +1,5 @@
 use std::sync::Arc;
+use tokio::sync::RwLock;
 use tracing::{info, warn};
 
 use crate::db::tasks::TaskStore;
@@ -9,9 +10,9 @@ use super::types::{
 
 pub struct TriggerEngine {
     task_store: Arc<TaskStore>,
-    webhook_configs: Vec<WebhookTriggerConfig>,
-    cron_configs: Vec<CronTriggerConfig>,
-    watcher_configs: Vec<WatcherTriggerConfig>,
+    webhook_configs: RwLock<Vec<WebhookTriggerConfig>>,
+    cron_configs: RwLock<Vec<CronTriggerConfig>>,
+    watcher_configs: RwLock<Vec<WatcherTriggerConfig>>,
 }
 
 impl TriggerEngine {
@@ -23,10 +24,22 @@ impl TriggerEngine {
     ) -> Self {
         Self {
             task_store,
-            webhook_configs,
-            cron_configs,
-            watcher_configs,
+            webhook_configs: RwLock::new(webhook_configs),
+            cron_configs: RwLock::new(cron_configs),
+            watcher_configs: RwLock::new(watcher_configs),
         }
+    }
+
+    pub async fn update_configs(
+        &self,
+        new_webhook_configs: Vec<WebhookTriggerConfig>,
+        new_cron_configs: Vec<CronTriggerConfig>,
+        new_watcher_configs: Vec<WatcherTriggerConfig>,
+    ) {
+        *self.webhook_configs.write().await = new_webhook_configs;
+        *self.cron_configs.write().await = new_cron_configs;
+        *self.watcher_configs.write().await = new_watcher_configs;
+        info!("trigger engine configs updated");
     }
 
     pub async fn handle_trigger_event(&self, event: TriggerEvent) -> Option<String> {
@@ -40,8 +53,9 @@ impl TriggerEngine {
 
     async fn handle_webhook_event(&self, event: &TriggerEvent) -> Option<String> {
         let event_type_from_source = extract_event_type_from_source(&event.source);
+        let webhook_configs_guard = self.webhook_configs.read().await;
 
-        for webhook_config in &self.webhook_configs {
+        for webhook_config in webhook_configs_guard.iter() {
             for webhook_event_config in &webhook_config.events {
                 if webhook_event_config.event_type != event_type_from_source {
                     continue;
@@ -80,7 +94,8 @@ impl TriggerEngine {
     }
 
     async fn handle_cron_event(&self, event: &TriggerEvent) -> Option<String> {
-        for cron_config in &self.cron_configs {
+        let cron_configs_guard = self.cron_configs.read().await;
+        for cron_config in cron_configs_guard.iter() {
             let expected_source = format!("cron:{}", cron_config.name);
             if event.source != expected_source {
                 continue;
@@ -108,7 +123,8 @@ impl TriggerEngine {
     }
 
     async fn handle_file_change_event(&self, event: &TriggerEvent) -> Option<String> {
-        for watcher_config in &self.watcher_configs {
+        let watcher_configs_guard = self.watcher_configs.read().await;
+        for watcher_config in watcher_configs_guard.iter() {
             let expected_source = format!("file_change:{}", watcher_config.name);
             if event.source != expected_source {
                 continue;

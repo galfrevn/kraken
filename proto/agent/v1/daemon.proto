@@ -93,6 +93,17 @@ message TaskLogEntry {
   google.protobuf.Timestamp timestamp = 3;
 }
 
+message ReloadConfigRequest {}
+
+message ReloadConfigResponse {
+  bool success = 1;
+  string message = 2;
+  int32 cron_triggers_loaded = 3;
+  int32 webhook_triggers_loaded = 4;
+  int32 watcher_triggers_loaded = 5;
+  int32 notification_channels_loaded = 6;
+}
+
 service DaemonService {
   rpc GetStatus(GetStatusRequest) returns (GetStatusResponse);
   rpc SubmitTask(DaemonServiceSubmitTaskRequest) returns (DaemonServiceSubmitTaskResponse);
@@ -101,6 +112,7 @@ service DaemonService {
   rpc CancelTask(DaemonServiceCancelTaskRequest) returns (DaemonServiceCancelTaskResponse);
   rpc WatchTasks(WatchTasksRequest) returns (stream WatchTasksResponse);
   rpc StreamTaskLogs(StreamTaskLogsRequest) returns (stream StreamTaskLogsResponse);
+  rpc ReloadConfig(ReloadConfigRequest) returns (ReloadConfigResponse);
 }
 
 service AgentChatService {

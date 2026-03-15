@@ -461,6 +461,11 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             daemon_config.orchestrator.max_concurrent_tasks,
             activity_event_sender.clone(),
             llm_providers_are_configured,
+            Arc::clone(&cron_engine),
+            Arc::clone(&file_watcher_engine),
+            Arc::clone(&trigger_engine),
+            Arc::clone(&reloadable_notification_dispatcher),
+            command_line_config_path.clone(),
         );
 
     // -----------------------------------------------------------------------
@@ -491,8 +496,11 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     // -----------------------------------------------------------------------
     #[cfg(unix)]
     {
-        let reloadable_dispatcher_for_sighup = Arc::clone(&reloadable_notification_dispatcher);
-        let configuration_file_path_for_sighup = command_line_config_path.clone();
+        let sighup_notification_dispatcher = Arc::clone(&reloadable_notification_dispatcher);
+        let sighup_cron_engine = Arc::clone(&cron_engine);
+        let sighup_file_watcher_engine = Arc::clone(&file_watcher_engine);
+        let sighup_trigger_engine = Arc::clone(&trigger_engine);
+        let sighup_configuration_file_path = command_line_config_path.clone();
         tokio::spawn(async move {
             use tokio::signal::unix::{signal, SignalKind};
             let mut sighup_signal_stream = signal(SignalKind::hangup())
@@ -500,9 +508,12 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             loop {
                 sighup_signal_stream.recv().await;
                 info!("SIGHUP received, reloading configuration");
-                daemon::reload::reload_configuration_from_disk(
-                    configuration_file_path_for_sighup.as_ref(),
-                    &reloadable_dispatcher_for_sighup,
+                let _ = daemon::reload::reload_configuration_from_disk(
+                    sighup_configuration_file_path.as_ref(),
+                    &sighup_notification_dispatcher,
+                    &sighup_cron_engine,
+                    &sighup_file_watcher_engine,
+                    &sighup_trigger_engine,
                 )
                 .await;
             }

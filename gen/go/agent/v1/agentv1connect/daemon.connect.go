@@ -54,6 +54,9 @@ const (
 	// DaemonServiceStreamTaskLogsProcedure is the fully-qualified name of the DaemonService's
 	// StreamTaskLogs RPC.
 	DaemonServiceStreamTaskLogsProcedure = "/agent.v1.DaemonService/StreamTaskLogs"
+	// DaemonServiceReloadConfigProcedure is the fully-qualified name of the DaemonService's
+	// ReloadConfig RPC.
+	DaemonServiceReloadConfigProcedure = "/agent.v1.DaemonService/ReloadConfig"
 	// AgentChatServiceChatProcedure is the fully-qualified name of the AgentChatService's Chat RPC.
 	AgentChatServiceChatProcedure = "/agent.v1.AgentChatService/Chat"
 )
@@ -67,6 +70,7 @@ type DaemonServiceClient interface {
 	CancelTask(context.Context, *connect.Request[v1.DaemonServiceCancelTaskRequest]) (*connect.Response[v1.DaemonServiceCancelTaskResponse], error)
 	WatchTasks(context.Context, *connect.Request[v1.WatchTasksRequest]) (*connect.ServerStreamForClient[v1.WatchTasksResponse], error)
 	StreamTaskLogs(context.Context, *connect.Request[v1.StreamTaskLogsRequest]) (*connect.ServerStreamForClient[v1.StreamTaskLogsResponse], error)
+	ReloadConfig(context.Context, *connect.Request[v1.ReloadConfigRequest]) (*connect.Response[v1.ReloadConfigResponse], error)
 }
 
 // NewDaemonServiceClient constructs a client for the agent.v1.DaemonService service. By default, it
@@ -122,6 +126,12 @@ func NewDaemonServiceClient(httpClient connect.HTTPClient, baseURL string, opts 
 			connect.WithSchema(daemonServiceMethods.ByName("StreamTaskLogs")),
 			connect.WithClientOptions(opts...),
 		),
+		reloadConfig: connect.NewClient[v1.ReloadConfigRequest, v1.ReloadConfigResponse](
+			httpClient,
+			baseURL+DaemonServiceReloadConfigProcedure,
+			connect.WithSchema(daemonServiceMethods.ByName("ReloadConfig")),
+			connect.WithClientOptions(opts...),
+		),
 	}
 }
 
@@ -134,6 +144,7 @@ type daemonServiceClient struct {
 	cancelTask     *connect.Client[v1.DaemonServiceCancelTaskRequest, v1.DaemonServiceCancelTaskResponse]
 	watchTasks     *connect.Client[v1.WatchTasksRequest, v1.WatchTasksResponse]
 	streamTaskLogs *connect.Client[v1.StreamTaskLogsRequest, v1.StreamTaskLogsResponse]
+	reloadConfig   *connect.Client[v1.ReloadConfigRequest, v1.ReloadConfigResponse]
 }
 
 // GetStatus calls agent.v1.DaemonService.GetStatus.
@@ -171,6 +182,11 @@ func (c *daemonServiceClient) StreamTaskLogs(ctx context.Context, req *connect.R
 	return c.streamTaskLogs.CallServerStream(ctx, req)
 }
 
+// ReloadConfig calls agent.v1.DaemonService.ReloadConfig.
+func (c *daemonServiceClient) ReloadConfig(ctx context.Context, req *connect.Request[v1.ReloadConfigRequest]) (*connect.Response[v1.ReloadConfigResponse], error) {
+	return c.reloadConfig.CallUnary(ctx, req)
+}
+
 // DaemonServiceHandler is an implementation of the agent.v1.DaemonService service.
 type DaemonServiceHandler interface {
 	GetStatus(context.Context, *connect.Request[v1.GetStatusRequest]) (*connect.Response[v1.GetStatusResponse], error)
@@ -180,6 +196,7 @@ type DaemonServiceHandler interface {
 	CancelTask(context.Context, *connect.Request[v1.DaemonServiceCancelTaskRequest]) (*connect.Response[v1.DaemonServiceCancelTaskResponse], error)
 	WatchTasks(context.Context, *connect.Request[v1.WatchTasksRequest], *connect.ServerStream[v1.WatchTasksResponse]) error
 	StreamTaskLogs(context.Context, *connect.Request[v1.StreamTaskLogsRequest], *connect.ServerStream[v1.StreamTaskLogsResponse]) error
+	ReloadConfig(context.Context, *connect.Request[v1.ReloadConfigRequest]) (*connect.Response[v1.ReloadConfigResponse], error)
 }
 
 // NewDaemonServiceHandler builds an HTTP handler from the service implementation. It returns the
@@ -231,6 +248,12 @@ func NewDaemonServiceHandler(svc DaemonServiceHandler, opts ...connect.HandlerOp
 		connect.WithSchema(daemonServiceMethods.ByName("StreamTaskLogs")),
 		connect.WithHandlerOptions(opts...),
 	)
+	daemonServiceReloadConfigHandler := connect.NewUnaryHandler(
+		DaemonServiceReloadConfigProcedure,
+		svc.ReloadConfig,
+		connect.WithSchema(daemonServiceMethods.ByName("ReloadConfig")),
+		connect.WithHandlerOptions(opts...),
+	)
 	return "/agent.v1.DaemonService/", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		switch r.URL.Path {
 		case DaemonServiceGetStatusProcedure:
@@ -247,6 +270,8 @@ func NewDaemonServiceHandler(svc DaemonServiceHandler, opts ...connect.HandlerOp
 			daemonServiceWatchTasksHandler.ServeHTTP(w, r)
 		case DaemonServiceStreamTaskLogsProcedure:
 			daemonServiceStreamTaskLogsHandler.ServeHTTP(w, r)
+		case DaemonServiceReloadConfigProcedure:
+			daemonServiceReloadConfigHandler.ServeHTTP(w, r)
 		default:
 			http.NotFound(w, r)
 		}
@@ -282,6 +307,10 @@ func (UnimplementedDaemonServiceHandler) WatchTasks(context.Context, *connect.Re
 
 func (UnimplementedDaemonServiceHandler) StreamTaskLogs(context.Context, *connect.Request[v1.StreamTaskLogsRequest], *connect.ServerStream[v1.StreamTaskLogsResponse]) error {
 	return connect.NewError(connect.CodeUnimplemented, errors.New("agent.v1.DaemonService.StreamTaskLogs is not implemented"))
+}
+
+func (UnimplementedDaemonServiceHandler) ReloadConfig(context.Context, *connect.Request[v1.ReloadConfigRequest]) (*connect.Response[v1.ReloadConfigResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("agent.v1.DaemonService.ReloadConfig is not implemented"))
 }
 
 // AgentChatServiceClient is a client for the agent.v1.AgentChatService service.

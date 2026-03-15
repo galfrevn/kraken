@@ -1,3 +1,4 @@
+use std::path::PathBuf;
 use std::pin::Pin;
 use std::sync::Arc;
 use std::time::Instant;
@@ -11,6 +12,8 @@ use tokio_stream::StreamExt;
 use tonic::{Request, Response, Status};
 use tracing::{info, warn};
 
+use crate::cron::CronEngine;
+use crate::daemon::reload::{ReloadableNotificationDispatcher, reload_configuration_from_disk};
 use crate::db::tasks::{DaemonTask, TaskStore};
 use crate::orchestrator::Orchestrator;
 use crate::proto::agent::v1::{
@@ -21,10 +24,13 @@ use crate::proto::agent::v1::{
     DaemonTask as DaemonTaskProto,
     GetStatusRequest, GetStatusResponse,
     GetTaskDetailRequest, GetTaskDetailResponse,
+    ReloadConfigRequest, ReloadConfigResponse,
     StreamTaskLogsRequest, StreamTaskLogsResponse,
     TaskLogEntry,
     WatchTasksRequest, WatchTasksResponse,
 };
+use crate::triggers::engine::TriggerEngine;
+use crate::watcher::FileWatcherEngine;
 
 use super::worker_service::WorkerActivityEvent;
 
@@ -42,22 +48,15 @@ pub struct DaemonServiceImplementation {
     uptime_start_time: Instant,
     max_concurrent_workers: u32,
     activity_event_sender: broadcast::Sender<WorkerActivityEvent>,
-    /// Whether the daemon has at least one LLM provider configured.
-    /// The daemon itself IS the LLM gateway now (no separate Go process),
-    /// so `gateway_connected` in the status response is always `true`.
-    /// This field tracks whether workers will be able to make LLM calls.
     llm_providers_are_configured: bool,
+    cron_engine: Arc<CronEngine>,
+    file_watcher_engine: Arc<FileWatcherEngine>,
+    trigger_engine: Arc<TriggerEngine>,
+    reloadable_notification_dispatcher: Arc<ReloadableNotificationDispatcher>,
+    configuration_file_path: Option<PathBuf>,
 }
 
 impl DaemonServiceImplementation {
-    /// Creates a new DaemonServiceImplementation.
-    ///
-    /// - `task_store`: shared access to the SQLite-backed task table.
-    /// - `orchestrator`: shared orchestrator for querying active worker count.
-    /// - `uptime_start_time`: the instant the daemon started, used to compute uptime.
-    /// - `max_concurrent_workers`: the configured concurrency limit for workers.
-    /// - `activity_event_sender`: broadcast channel for worker activity events.
-    /// - `llm_providers_are_configured`: whether the LLM provider router has any providers.
     pub fn new(
         task_store: Arc<TaskStore>,
         orchestrator: Arc<Orchestrator>,
@@ -65,6 +64,11 @@ impl DaemonServiceImplementation {
         max_concurrent_workers: u32,
         activity_event_sender: broadcast::Sender<WorkerActivityEvent>,
         llm_providers_are_configured: bool,
+        cron_engine: Arc<CronEngine>,
+        file_watcher_engine: Arc<FileWatcherEngine>,
+        trigger_engine: Arc<TriggerEngine>,
+        reloadable_notification_dispatcher: Arc<ReloadableNotificationDispatcher>,
+        configuration_file_path: Option<PathBuf>,
     ) -> Self {
         Self {
             task_store,
@@ -73,6 +77,11 @@ impl DaemonServiceImplementation {
             max_concurrent_workers,
             activity_event_sender,
             llm_providers_are_configured,
+            cron_engine,
+            file_watcher_engine,
+            trigger_engine,
+            reloadable_notification_dispatcher,
+            configuration_file_path,
         }
     }
 }
@@ -413,14 +422,47 @@ impl DaemonService for DaemonServiceImplementation {
     type StreamTaskLogsStream =
         Pin<Box<dyn Stream<Item = Result<StreamTaskLogsResponse, Status>> + Send>>;
 
-    /// Log streaming is not yet implemented — will be added in Phase 4.
     async fn stream_task_logs(
         &self,
         _request: Request<StreamTaskLogsRequest>,
     ) -> Result<Response<Self::StreamTaskLogsStream>, Status> {
         Err(Status::unimplemented(
-            "log streaming implemented in Phase 4",
+            "log streaming not yet implemented",
         ))
+    }
+
+    async fn reload_config(
+        &self,
+        _request: Request<ReloadConfigRequest>,
+    ) -> Result<Response<ReloadConfigResponse>, Status> {
+        info!("reload_config RPC called");
+
+        match reload_configuration_from_disk(
+            self.configuration_file_path.as_ref(),
+            &self.reloadable_notification_dispatcher,
+            &self.cron_engine,
+            &self.file_watcher_engine,
+            &self.trigger_engine,
+        )
+        .await
+        {
+            Ok(reload_result) => Ok(Response::new(ReloadConfigResponse {
+                success: true,
+                message: "configuration reloaded successfully".to_string(),
+                cron_triggers_loaded: reload_result.cron_trigger_count as i32,
+                webhook_triggers_loaded: reload_result.webhook_trigger_count as i32,
+                watcher_triggers_loaded: reload_result.watcher_trigger_count as i32,
+                notification_channels_loaded: reload_result.notification_channel_count as i32,
+            })),
+            Err(reload_error_message) => Ok(Response::new(ReloadConfigResponse {
+                success: false,
+                message: reload_error_message,
+                cron_triggers_loaded: 0,
+                webhook_triggers_loaded: 0,
+                watcher_triggers_loaded: 0,
+                notification_channels_loaded: 0,
+            })),
+        }
     }
 }
 

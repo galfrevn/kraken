@@ -351,13 +351,6 @@ async function restartDaemon(args: string[]): Promise<void> {
 }
 
 async function reloadDaemonConfiguration(): Promise<void> {
-  if (process.platform === "win32") {
-    warn("Configuration reload via signal is not supported on Windows.");
-    console.log("  Restart the daemon instead:");
-    console.log(`    ${colorize("kraken daemon restart", "cyan")}\n`);
-    return;
-  }
-
   const daemonPid = readDaemonPid();
 
   if (daemonPid === null || !isProcessAlive(daemonPid)) {
@@ -369,12 +362,25 @@ async function reloadDaemonConfiguration(): Promise<void> {
   }
 
   try {
-    process.kill(daemonPid, "SIGHUP");
-    success(`Sent SIGHUP to daemon (PID ${daemonPid}). Configuration will be reloaded.`);
+    const daemonGrpcUrl = process.env.KRAKEN_SCHEDULER_URL || DEFAULT_DAEMON_GRPC_URL;
+    const grpcTransport = createGrpcTransport({ baseUrl: daemonGrpcUrl });
+    const daemonServiceClient = createClient(DaemonService, grpcTransport);
+
+    const reloadResponse = await daemonServiceClient.reloadConfig({});
+
+    if (reloadResponse.success) {
+      success("Configuration reloaded successfully.");
+      console.log(`    Cron triggers:          ${reloadResponse.cronTriggersLoaded}`);
+      console.log(`    Webhook triggers:       ${reloadResponse.webhookTriggersLoaded}`);
+      console.log(`    Watcher triggers:       ${reloadResponse.watcherTriggersLoaded}`);
+      console.log(`    Notification channels:  ${reloadResponse.notificationChannelsLoaded}`);
+    } else {
+      fail(`Reload failed: ${reloadResponse.message}`);
+    }
     console.log();
   } catch {
-    fail(`Failed to send SIGHUP to PID ${daemonPid}.`);
-    console.log();
+    fail("Failed to connect to daemon for reload. Is it running?");
+    console.log(`  Try: ${colorize("kraken daemon status", "cyan")}\n`);
   }
 }
 
