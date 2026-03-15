@@ -1,6 +1,6 @@
 import "opentui-spinner/react";
 
-import { useState, useEffect, useCallback, useRef, useMemo } from "react";
+import { useState, useEffect, useCallback, useRef, useMemo, type Dispatch, type SetStateAction } from "react";
 
 import { useDialog, useDialogKeyboard, useDialogState } from "@opentui-ui/dialog/react";
 import { toast } from "@opentui-ui/toast/react";
@@ -333,6 +333,8 @@ interface ChatViewProps {
   onRequestFocus: () => void;
   onRequestBlur: () => void;
   onQuestionStateChange?: (hasQuestions: boolean) => void;
+  daemonChatMessages?: ChatMessage[];
+  onDaemonChatMessagesChange?: Dispatch<SetStateAction<ChatMessage[]>>;
 }
 
 const DOUBLE_ESCAPE_THRESHOLD_MILLISECONDS = 500;
@@ -344,8 +346,14 @@ export function ChatView({
   onRequestFocus,
   onRequestBlur,
   onQuestionStateChange,
+  daemonChatMessages,
+  onDaemonChatMessagesChange,
 }: ChatViewProps) {
-  const [messages, setMessages] = useState<ChatMessage[]>([]);
+  const [localMessages, setLocalMessages] = useState<ChatMessage[]>([]);
+
+  const isDaemonModeWithPersistedMessages = !!daemonStore && !!daemonChatMessages && !!onDaemonChatMessagesChange;
+  const messages = isDaemonModeWithPersistedMessages ? daemonChatMessages : localMessages;
+  const setMessages = isDaemonModeWithPersistedMessages ? onDaemonChatMessagesChange : setLocalMessages;
   const [inputValue, setInputValue] = useState("");
   const [processing, setProcessing] = useState(false);
   const [queuedMessages, setQueuedMessages] = useState<string[]>([]);

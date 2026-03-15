@@ -1,5 +1,6 @@
 use std::pin::Pin;
 use std::sync::Arc;
+use std::time::Duration;
 
 use tokio::sync::broadcast;
 use tokio_stream::Stream;
@@ -159,38 +160,58 @@ impl AgentChatService for AgentChatServiceImplementation {
                         let streaming_task_store = Arc::clone(&task_store);
 
                         tokio::spawn(async move {
+                            let mut task_status_poll_interval =
+                                tokio::time::interval(Duration::from_secs(1));
+                            task_status_poll_interval.tick().await;
+
                             loop {
-                                match activity_subscription.recv().await {
-                                    Ok(activity_event) => {
-                                        if activity_event.task_id != streaming_task_id {
-                                            continue;
-                                        }
+                                tokio::select! {
+                                    received_activity = activity_subscription.recv() => {
+                                        match received_activity {
+                                            Ok(activity_event) => {
+                                                if activity_event.task_id != streaming_task_id {
+                                                    continue;
+                                                }
 
-                                        let chat_output_message = convert_activity_event_to_chat_output(
-                                            &activity_event.activity,
-                                        );
+                                                let chat_output_message = convert_activity_event_to_chat_output(
+                                                    &activity_event.activity,
+                                                );
 
-                                        if streaming_sender.send(Ok(chat_output_message)).await.is_err() {
-                                            info!(
-                                                task_id = %streaming_task_id,
-                                                "chat output channel closed, stopping activity forwarding"
-                                            );
-                                            return;
+                                                if streaming_sender.send(Ok(chat_output_message)).await.is_err() {
+                                                    info!(
+                                                        task_id = %streaming_task_id,
+                                                        "chat output channel closed, stopping activity forwarding"
+                                                    );
+                                                    return;
+                                                }
+                                            }
+                                            Err(broadcast::error::RecvError::Lagged(skipped_count)) => {
+                                                warn!(
+                                                    skipped_count = skipped_count,
+                                                    task_id = %streaming_task_id,
+                                                    "activity subscription lagged, some events were dropped"
+                                                );
+                                            }
+                                            Err(broadcast::error::RecvError::Closed) => {
+                                                info!(
+                                                    task_id = %streaming_task_id,
+                                                    "activity broadcast channel closed, stopping activity forwarding"
+                                                );
+                                                break;
+                                            }
                                         }
                                     }
-                                    Err(broadcast::error::RecvError::Lagged(skipped_count)) => {
-                                        warn!(
-                                            skipped_count = skipped_count,
-                                            task_id = %streaming_task_id,
-                                            "activity subscription lagged, some events were dropped"
-                                        );
-                                    }
-                                    Err(broadcast::error::RecvError::Closed) => {
-                                        info!(
-                                            task_id = %streaming_task_id,
-                                            "activity broadcast channel closed, stopping activity forwarding"
-                                        );
-                                        break;
+                                    _ = task_status_poll_interval.tick() => {
+                                        let polled_task_state = streaming_task_store
+                                            .get_task(&streaming_task_id)
+                                            .await;
+
+                                        match polled_task_state {
+                                            Some(ref task) if task.status == "completed" || task.status == "failed" || task.status == "cancelled" => {
+                                                break;
+                                            }
+                                            _ => {}
+                                        }
                                     }
                                 }
                             }

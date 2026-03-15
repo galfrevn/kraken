@@ -43,9 +43,7 @@ const DAEMON_TASK_STATUS_COLORS: Record<string, string> = {
 
 export function DashboardView({ store, daemonStore, pluginRegistry }: DashboardViewProps) {
   const [localHealth, setLocalHealth] = useState<ServiceHealth>({
-    gateway: false,
     scheduler: false,
-    gatewayVersion: "",
   });
   const [localTaskSummary, setLocalTaskSummary] = useState<TaskSummary>({
     pending: 0,
@@ -137,9 +135,6 @@ export function DashboardView({ store, daemonStore, pluginRegistry }: DashboardV
                 <text fg={connectedColor(daemonHealth.healthy)}>
                   {"  ● daemon:    " + connectedLabel(daemonHealth.healthy)}
                 </text>
-                <text fg={connectedColor(daemonHealth.gatewayConnected)}>
-                  {"  ● gateway:   " + connectedLabel(daemonHealth.gatewayConnected)}
-                </text>
                 <text fg={COLORS.textSecondary}>
                   {"  ↑ uptime:    " + formatUptimeDuration(daemonHealth.uptimeSeconds)}
                 </text>
@@ -149,10 +144,6 @@ export function DashboardView({ store, daemonStore, pluginRegistry }: DashboardV
               </>
             ) : (
               <>
-                <text fg={connectedColor(localHealth.gateway)}>
-                  {"  ● gateway:   " + connectedLabel(localHealth.gateway)}
-                  {localHealth.gatewayVersion ? ` (v${localHealth.gatewayVersion})` : ""}
-                </text>
                 <text fg={connectedColor(localHealth.scheduler)}>
                   {"  ● scheduler: " + connectedLabel(localHealth.scheduler)}
                 </text>

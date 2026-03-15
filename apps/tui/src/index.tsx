@@ -7,7 +7,6 @@ import { AgentDatabase } from "@core/storage/database.ts";
 import { TaskQueueManager } from "@core/queue/manager.ts";
 import { loadConfiguration } from "@core/configuration/loader.ts";
 import { createSchedulerClient } from "@core/clients/scheduler.ts";
-import { createGatewayClient } from "@core/clients/gateway.ts";
 import { LanguageModelClient } from "@core/language/client.ts";
 import {
   createDefaultToolRegistry,
@@ -105,16 +104,9 @@ export async function main(): Promise<void> {
 
   const timerManager = new TimerManager(taskQueueManager);
 
-  // In daemon mode, skip creating the gateway client — the daemon handles LLM directly.
-  // The gateway client is only needed in local mode for the in-process agent loop.
-  const gatewayClient = daemonStore
-    ? null
-    : createGatewayClient(configuration.services.gatewayUrl);
-
   const store = new TuiStore(
     database,
     taskQueueManager,
-    gatewayClient,
     schedulerClient,
     timerManager,
   );

@@ -1,13 +1,10 @@
 import type { AgentDatabase, TaskRow, TaskLogRow, EngineLogRow } from "@core/storage/database.ts";
 import type { TaskQueueManager } from "@core/queue/manager.ts";
 import type { SchedulerClient } from "@core/clients/scheduler.ts";
-import type { GatewayClient } from "@core/clients/gateway.ts";
 import type { TimerManager, TimerSummary } from "@core/scheduling/timers.ts";
 
 export interface ServiceHealth {
-  gateway: boolean;
   scheduler: boolean;
-  gatewayVersion: string;
 }
 
 export interface TaskSummary {
@@ -31,40 +28,25 @@ export interface ScheduledItem {
 export class TuiStore {
   readonly database: AgentDatabase;
   readonly taskQueueManager: TaskQueueManager;
-  private gatewayClient: GatewayClient | null;
   private schedulerClient: SchedulerClient;
   private timerManager: TimerManager;
 
   constructor(
     database: AgentDatabase,
     taskQueueManager: TaskQueueManager,
-    gatewayClient: GatewayClient | null,
     schedulerClient: SchedulerClient,
     timerManager: TimerManager,
   ) {
     this.database = database;
     this.taskQueueManager = taskQueueManager;
-    this.gatewayClient = gatewayClient;
     this.schedulerClient = schedulerClient;
     this.timerManager = timerManager;
   }
 
   async fetchServiceHealth(): Promise<ServiceHealth> {
     const health: ServiceHealth = {
-      gateway: false,
       scheduler: false,
-      gatewayVersion: "",
     };
-
-    if (this.gatewayClient) {
-      try {
-        const response = await this.gatewayClient.healthCheck({});
-        health.gateway = response.healthy;
-        health.gatewayVersion = response.version;
-      } catch {
-        health.gateway = false;
-      }
-    }
 
     try {
       await this.schedulerClient.listCrons({});

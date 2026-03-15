@@ -77,7 +77,6 @@ function generateKrakenYml(options: {
     "",
     "services:",
     "  schedulerUrl: http://localhost:50051",
-    "  gatewayUrl: http://localhost:50052",
     "",
     "scheduler:",
     "  crons: []",

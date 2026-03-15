@@ -6,6 +6,7 @@ import { COLORS } from "@/theme.ts";
 import type { TuiStore } from "@/store.ts";
 import type { DaemonStore } from "@/daemon-store.ts";
 import type { ThreadManager } from "@/threads.ts";
+import type { ChatMessage } from "@/engine.ts";
 import type { PluginRegistry } from "@core/plugins/registry.ts";
 import { ChatView } from "@/views/chat.tsx";
 import { DashboardView } from "@/views/dashboard.tsx";
@@ -66,6 +67,7 @@ export function Application({
   const [chatInputFocused, setChatInputFocused] = useState(true);
   const [hasQuestions, setHasQuestions] = useState(false);
   const [setupDone, setSetupDone] = useState(!pendingSetup || pendingSetup.length === 0);
+  const [daemonChatMessages, setDaemonChatMessages] = useState<ChatMessage[]>([]);
   const { width, height } = useTerminalDimensions();
 
   useEffect(() => {
@@ -210,6 +212,8 @@ export function Application({
                     onRequestFocus={requestChatFocus}
                     onRequestBlur={requestChatBlur}
                     onQuestionStateChange={setHasQuestions}
+                    daemonChatMessages={daemonChatMessages}
+                    onDaemonChatMessagesChange={setDaemonChatMessages}
                   />
                 )}
                 {activeView === "dashboard" && (
