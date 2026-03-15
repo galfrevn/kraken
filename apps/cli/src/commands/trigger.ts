@@ -1,6 +1,6 @@
 import { existsSync, readFileSync } from "node:fs";
 import { join } from "node:path";
-import { bold, colorize, fail, warn, KRAKEN_HOME } from "@/constants.ts";
+import { bold, colorize, fail, KRAKEN_HOME } from "@/constants.ts";
 
 // ---------------------------------------------------------------------------
 // YAML config types (mirrors the Rust TriggersYamlConfig)
@@ -38,10 +38,6 @@ interface TriggersYamlConfig {
   crons?: CronTriggerYamlConfig[];
   webhooks?: WebhookTriggerYamlConfig[];
   watchers?: WatcherTriggerYamlConfig[];
-}
-
-interface KrakenYamlConfig {
-  triggers?: TriggersYamlConfig;
 }
 
 // ---------------------------------------------------------------------------
