@@ -188,24 +188,21 @@ async function startDaemon(args: string[]): Promise<void> {
 
   if (process.platform === "win32") {
     // Bun spawn doesn't detach on Windows — child dies when parent exits.
-    // Use PowerShell Start-Process with -NoNewWindow to launch independently.
+    // Write a temp .cmd launcher that sets env vars and runs the daemon independently.
+    const launcherPath = join(KRAKEN_HOME_DIRECTORY, "daemon-launcher.cmd");
     const binaryPath = daemonCommand[0]!;
-    const binaryArgs = daemonCommand.slice(1);
-    const argumentListValue = binaryArgs.length > 0
-      ? `-ArgumentList ${binaryArgs.map((a) => `'${a}'`).join(",")}`
-      : "";
+    const binaryArgs = daemonCommand.slice(1).join(" ");
+    const launcherContent = [
+      `@echo off`,
+      `set "KRAKEN_DAEMON_LOG_FILE=${DAEMON_LOG_FILE_PATH}"`,
+      `set "DOTENV_PATH=${join(KRAKEN_HOME_DIRECTORY, ".env")}"`,
+      `cd /d "${daemonDirectory}"`,
+      binaryArgs ? `"${binaryPath}" ${binaryArgs}` : `"${binaryPath}"`,
+    ].join("\r\n");
+    writeFileSync(launcherPath, launcherContent);
 
-    // Pass env vars via $env: prefix in PowerShell
-    const powershellCommand = [
-      `$env:KRAKEN_DAEMON_LOG_FILE='${DAEMON_LOG_FILE_PATH}';`,
-      `Start-Process`,
-      `-FilePath '${binaryPath}'`,
-      argumentListValue,
-      `-WorkingDirectory '${daemonDirectory}'`,
-      `-NoNewWindow`,
-    ].filter(Boolean).join(" ");
-
-    Bun.spawnSync(["powershell", "-NoProfile", "-Command", powershellCommand], {
+    Bun.spawnSync(["cmd", "/c", "start", "/b", launcherPath], {
+      cwd: daemonDirectory,
       stdio: ["ignore", "ignore", "ignore"],
     });
   } else {
