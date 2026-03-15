@@ -109,21 +109,23 @@ export function appendYamlArrayItem(
   }
 
   const targetIndentationSpaces = sectionPath.length * 2;
+  const sectionHeaderLineIndex = sectionSearchResult.sectionHeaderLineIndex;
   const insertionLineIndex = sectionSearchResult.sectionEndLineIndex;
 
-  const currentLineAtInsertion = fileLines[insertionLineIndex - 1] ?? "";
+  const sectionHeaderLine = fileLines[sectionHeaderLineIndex] ?? "";
   const sectionIsEmptyArray =
-    currentLineAtInsertion.trim().endsWith("[]") ||
-    currentLineAtInsertion.trim().endsWith(": []");
+    sectionHeaderLine.trim().endsWith("[]") ||
+    sectionHeaderLine.trim().endsWith(": []");
 
   if (sectionIsEmptyArray) {
     const lastSectionKey = sectionPath[sectionPath.length - 1]!;
     const parentIndentation = " ".repeat((sectionPath.length - 1) * 2);
-    fileLines[insertionLineIndex - 1] = `${parentIndentation}${lastSectionKey}:`;
+    fileLines[sectionHeaderLineIndex] = `${parentIndentation}${lastSectionKey}:`;
   }
 
   const serializedItemLines = serializeItemToFlatYamlLines(itemToAppend, targetIndentationSpaces);
-  fileLines.splice(insertionLineIndex, 0, ...serializedItemLines);
+  const actualInsertionIndex = sectionIsEmptyArray ? sectionHeaderLineIndex + 1 : insertionLineIndex;
+  fileLines.splice(actualInsertionIndex, 0, ...serializedItemLines);
   return fileLines.join("\n");
 }
 
@@ -185,6 +187,7 @@ export function removeYamlArrayItemByName(
 
 interface SectionSearchResult {
   found: boolean;
+  sectionHeaderLineIndex: number;
   sectionEndLineIndex: number;
 }
 
@@ -194,6 +197,7 @@ function findSectionInYaml(
 ): SectionSearchResult {
   let currentSearchLineIndex = 0;
   let currentPathDepth = 0;
+  let lastMatchedLineIndex = 0;
 
   while (currentPathDepth < sectionPath.length && currentSearchLineIndex < fileLines.length) {
     const expectedSectionKey = sectionPath[currentPathDepth]!;
@@ -204,6 +208,7 @@ function findSectionInYaml(
     for (let lineIndex = currentSearchLineIndex; lineIndex < fileLines.length; lineIndex++) {
       const currentLine = fileLines[lineIndex]!;
       if (currentLine.startsWith(expectedLinePrefix)) {
+        lastMatchedLineIndex = lineIndex;
         currentSearchLineIndex = lineIndex + 1;
         currentPathDepth++;
         sectionFound = true;
@@ -212,12 +217,12 @@ function findSectionInYaml(
     }
 
     if (!sectionFound) {
-      return { found: false, sectionEndLineIndex: fileLines.length };
+      return { found: false, sectionHeaderLineIndex: 0, sectionEndLineIndex: fileLines.length };
     }
   }
 
   if (currentPathDepth < sectionPath.length) {
-    return { found: false, sectionEndLineIndex: fileLines.length };
+    return { found: false, sectionHeaderLineIndex: 0, sectionEndLineIndex: fileLines.length };
   }
 
   const sectionIndentationLevel = (sectionPath.length - 1) * 2;
@@ -234,7 +239,7 @@ function findSectionInYaml(
     sectionEndLineIndex++;
   }
 
-  return { found: true, sectionEndLineIndex };
+  return { found: true, sectionHeaderLineIndex: lastMatchedLineIndex, sectionEndLineIndex };
 }
 
 function buildNewSection(

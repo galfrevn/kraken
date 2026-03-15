@@ -31,7 +31,7 @@ const NOTIFICATION_EVENT_OPTIONS = [
 interface NotificationChannelConfig {
   name: string;
   provider: string;
-  url?: string;
+  webhookUrl?: string;
   apiKey?: string;
   events: string[];
 }
@@ -152,10 +152,10 @@ function listNotificationChannels(): void {
 
     console.log(`    ${colorize(channel.name, "cyan")}`);
     console.log(`      Provider: ${providerLabel}`);
-    if (channel.url) {
-      const maskedWebhookUrl = channel.url.startsWith("${")
-        ? channel.url
-        : channel.url.slice(0, 30) + "...";
+    if (channel.webhookUrl) {
+      const maskedWebhookUrl = channel.webhookUrl.startsWith("${")
+        ? channel.webhookUrl
+        : channel.webhookUrl.slice(0, 30) + "...";
       console.log(`      URL:      ${maskedWebhookUrl}`);
     }
     console.log(`      Events:   ${channel.events?.join(", ") || "none"}`);
@@ -247,7 +247,7 @@ async function addNotificationChannelInteractively(): Promise<void> {
   };
 
   if (webhookUrlValue) {
-    notificationChannelItem.url = webhookUrlValue;
+    notificationChannelItem.webhookUrl = webhookUrlValue;
   }
 
   if (apiKeyValue) {
