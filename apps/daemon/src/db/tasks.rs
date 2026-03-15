@@ -12,15 +12,20 @@ pub struct DaemonTask {
     pub description: String,
     pub status: String,
     pub priority: i32,
+    #[allow(dead_code)]
     pub trigger_id: Option<String>,
     pub trigger_type: Option<String>,
+    #[allow(dead_code)]
     pub trigger_payload: Option<String>,
     pub worker_pid: Option<i64>,
     pub worker_dir: Option<String>,
     pub started_at: Option<String>,
     pub completed_at: Option<String>,
+    #[allow(dead_code)]
     pub updated_at: String,
+    #[allow(dead_code)]
     pub timeout_ms: i64,
+    #[allow(dead_code)]
     pub exit_code: Option<i32>,
     pub output: Option<String>,
     pub error_message: Option<String>,
@@ -29,6 +34,7 @@ pub struct DaemonTask {
     pub completion_tokens: i64,
     pub estimated_cost_usd: f64,
     pub attempt: i32,
+    #[allow(dead_code)]
     pub max_retries: i32,
     pub created_at: String,
 }

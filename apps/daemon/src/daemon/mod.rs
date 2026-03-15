@@ -1,5 +1,4 @@
 pub mod config;
-pub mod process;
 pub mod reload;
 
 use std::path::{Path, PathBuf};
@@ -19,9 +18,11 @@ use config::DaemonConfig;
 /// to each service that needs it.
 pub struct DaemonState {
     /// Parsed and validated daemon configuration.
+    #[allow(dead_code)]
     pub config: DaemonConfig,
 
     /// Shared SQLite connection pool (single-writer, WAL-mode).
+    #[allow(dead_code)]
     pub database_pool: DatabasePool,
 
     /// Task CRUD operations backed by the database pool.
@@ -84,6 +85,7 @@ impl DaemonState {
     }
 
     /// Returns how many seconds the daemon has been running since startup.
+    #[allow(dead_code)]
     pub fn uptime_seconds(&self) -> u64 {
         self.start_time.elapsed().as_secs()
     }

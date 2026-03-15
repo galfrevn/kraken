@@ -21,6 +21,10 @@ message GetTaskResponse {
   string working_dir = 4;
   string retry_context = 5;
   int32 attempt = 6;
+  string model = 7;
+  string provider = 8;
+  float temperature = 9;
+  int32 max_tokens = 10;
 }
 
 message ReportProgressRequest {

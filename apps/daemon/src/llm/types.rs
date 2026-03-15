@@ -189,5 +189,6 @@ pub trait LlmProvider: Send + Sync {
     ) -> Result<(), LlmProviderError>;
 
     /// The canonical name of this provider (e.g. "openai", "anthropic").
+    #[allow(dead_code)]
     fn provider_name(&self) -> &str;
 }

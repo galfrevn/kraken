@@ -171,10 +171,12 @@ struct AnthropicResponseBody {
 
     /// Response type -- always "message" for successful responses.
     #[serde(default, rename = "type")]
+    #[allow(dead_code)]
     response_type: String,
 
     /// Role -- always "assistant" for completions.
     #[serde(default)]
+    #[allow(dead_code)]
     role: String,
 
     /// The model that produced this response.
@@ -302,6 +304,7 @@ enum AnthropicStreamEvent {
     ContentBlockStop {
         /// Zero-based index of the content block that ended.
         #[serde(default)]
+        #[allow(dead_code)]
         index: usize,
     },
 

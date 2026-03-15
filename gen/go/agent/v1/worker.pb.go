@@ -133,6 +133,10 @@ type GetTaskResponse struct {
 	WorkingDir    string                 `protobuf:"bytes,4,opt,name=working_dir,json=workingDir,proto3" json:"working_dir,omitempty"`
 	RetryContext  string                 `protobuf:"bytes,5,opt,name=retry_context,json=retryContext,proto3" json:"retry_context,omitempty"`
 	Attempt       int32                  `protobuf:"varint,6,opt,name=attempt,proto3" json:"attempt,omitempty"`
+	Model         string                 `protobuf:"bytes,7,opt,name=model,proto3" json:"model,omitempty"`
+	Provider      string                 `protobuf:"bytes,8,opt,name=provider,proto3" json:"provider,omitempty"`
+	Temperature   float32                `protobuf:"fixed32,9,opt,name=temperature,proto3" json:"temperature,omitempty"`
+	MaxTokens     int32                  `protobuf:"varint,10,opt,name=max_tokens,json=maxTokens,proto3" json:"max_tokens,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -205,6 +209,34 @@ func (x *GetTaskResponse) GetRetryContext() string {
 func (x *GetTaskResponse) GetAttempt() int32 {
 	if x != nil {
 		return x.Attempt
+	}
+	return 0
+}
+
+func (x *GetTaskResponse) GetModel() string {
+	if x != nil {
+		return x.Model
+	}
+	return ""
+}
+
+func (x *GetTaskResponse) GetProvider() string {
+	if x != nil {
+		return x.Provider
+	}
+	return ""
+}
+
+func (x *GetTaskResponse) GetTemperature() float32 {
+	if x != nil {
+		return x.Temperature
+	}
+	return 0
+}
+
+func (x *GetTaskResponse) GetMaxTokens() int32 {
+	if x != nil {
+		return x.MaxTokens
 	}
 	return 0
 }
@@ -611,7 +643,7 @@ const file_agent_v1_worker_proto_rawDesc = "" +
 	"\x03url\x18\x02 \x01(\tR\x03url\x12\x12\n" +
 	"\x04name\x18\x03 \x01(\tR\x04name\")\n" +
 	"\x0eGetTaskRequest\x12\x17\n" +
-	"\atask_id\x18\x01 \x01(\tR\x06taskId\"\xc0\x01\n" +
+	"\atask_id\x18\x01 \x01(\tR\x06taskId\"\xb3\x02\n" +
 	"\x0fGetTaskResponse\x12\x17\n" +
 	"\atask_id\x18\x01 \x01(\tR\x06taskId\x12\x12\n" +
 	"\x04name\x18\x02 \x01(\tR\x04name\x12 \n" +
@@ -619,7 +651,13 @@ const file_agent_v1_worker_proto_rawDesc = "" +
 	"\vworking_dir\x18\x04 \x01(\tR\n" +
 	"workingDir\x12#\n" +
 	"\rretry_context\x18\x05 \x01(\tR\fretryContext\x12\x18\n" +
-	"\aattempt\x18\x06 \x01(\x05R\aattempt\"o\n" +
+	"\aattempt\x18\x06 \x01(\x05R\aattempt\x12\x14\n" +
+	"\x05model\x18\a \x01(\tR\x05model\x12\x1a\n" +
+	"\bprovider\x18\b \x01(\tR\bprovider\x12 \n" +
+	"\vtemperature\x18\t \x01(\x02R\vtemperature\x12\x1d\n" +
+	"\n" +
+	"max_tokens\x18\n" +
+	" \x01(\x05R\tmaxTokens\"o\n" +
 	"\x15ReportProgressRequest\x12\x17\n" +
 	"\atask_id\x18\x01 \x01(\tR\x06taskId\x12\x1a\n" +
 	"\bactivity\x18\x02 \x01(\tR\bactivity\x12!\n" +

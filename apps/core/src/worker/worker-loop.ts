@@ -32,7 +32,6 @@ export interface WorkerResult {
 }
 
 const MAX_ITERATIONS = 40;
-const DEFAULT_MODEL = "anthropic/claude-sonnet-4-20250514";
 
 export async function runWorkerLoop(
   daemonWorkerClient: DaemonWorkerClient,
@@ -40,6 +39,10 @@ export async function runWorkerLoop(
   toolRegistry: ToolRegistry,
   workingDirectory: string,
 ): Promise<WorkerResult> {
+  const taskModel = taskDetails.model || "deepseek/deepseek-v3.2";
+  const taskTemperature = taskDetails.temperature || 0.7;
+  const taskMaxTokens = taskDetails.maxTokens || 16384;
+
   const availableTools = toolRegistry.listTools();
   const systemPrompt = buildSystemPrompt(availableTools, {
     environmentContext: {
@@ -47,7 +50,7 @@ export async function runWorkerLoop(
       platform: process.platform,
       shell: process.env.SHELL ?? "bash",
       date: new Date().toISOString().slice(0, 10),
-      modelName: DEFAULT_MODEL,
+      modelName: taskModel,
     },
   });
 
@@ -73,6 +76,9 @@ export async function runWorkerLoop(
     const completionResponse = await callLlmViaDaemon(
       daemonWorkerClient,
       conversationHistory,
+      taskModel,
+      taskTemperature,
+      taskMaxTokens,
     );
 
     const assistantResponseText = completionResponse;
@@ -165,6 +171,9 @@ function buildInitialUserMessage(taskDetails: TaskDetails): string {
 async function callLlmViaDaemon(
   daemonWorkerClient: DaemonWorkerClient,
   conversationHistory: ConversationHistory,
+  modelName: string,
+  temperature: number,
+  maxTokens: number,
 ): Promise<string> {
   const allMessages = conversationHistory.getMessagesWithSystemPrompt();
 
@@ -182,12 +191,12 @@ async function callLlmViaDaemon(
   );
 
   const completeResponse = await daemonWorkerClient.complete({
-    model: DEFAULT_MODEL,
+    model: modelName,
     messages: gatewayMessages,
     systemPrompt: systemMessage?.content,
     tools: [],
-    temperature: 0.3,
-    maxTokens: 16384,
+    temperature: temperature,
+    maxTokens: maxTokens,
   });
 
   return completeResponse.message?.content ?? "";

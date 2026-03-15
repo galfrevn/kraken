@@ -50,7 +50,42 @@ pub struct DaemonConfig {
     /// Cost tracking and warning thresholds.
     #[serde(default)]
     pub costs: CostsConfig,
+
+    /// LLM model configuration (read from kraken.yml languageModel section).
+    #[serde(rename = "languageModel", default)]
+    pub language_model: LanguageModelConfig,
 }
+
+#[derive(Debug, Clone, Deserialize)]
+pub struct LanguageModelConfig {
+    #[serde(default = "default_llm_provider")]
+    pub provider: String,
+
+    #[serde(default = "default_llm_model")]
+    pub model: String,
+
+    #[serde(default = "default_llm_temperature")]
+    pub temperature: f32,
+
+    #[serde(rename = "maxTokens", default = "default_llm_max_tokens")]
+    pub max_tokens: i32,
+}
+
+impl Default for LanguageModelConfig {
+    fn default() -> Self {
+        Self {
+            provider: default_llm_provider(),
+            model: default_llm_model(),
+            temperature: default_llm_temperature(),
+            max_tokens: default_llm_max_tokens(),
+        }
+    }
+}
+
+fn default_llm_provider() -> String { "openrouter".into() }
+fn default_llm_model() -> String { "deepseek/deepseek-v3.2".into() }
+fn default_llm_temperature() -> f32 { 0.7 }
+fn default_llm_max_tokens() -> i32 { 16384 }
 
 /// Controls how the orchestrator schedules and monitors worker tasks.
 #[derive(Debug, Clone, Deserialize)]
@@ -164,6 +199,7 @@ pub struct WatcherTriggerYamlConfig {
 #[derive(Debug, Clone, Deserialize)]
 pub struct CiFailureTriggerYamlConfig {
     pub name: String,
+    #[allow(dead_code)]
     pub repo: String,
     #[serde(default)]
     pub branches: Vec<String>,
@@ -173,6 +209,7 @@ pub struct CiFailureTriggerYamlConfig {
 #[derive(Debug, Clone, Deserialize)]
 pub struct PrMentionTriggerYamlConfig {
     pub name: String,
+    #[allow(dead_code)]
     pub repo: String,
     #[serde(default = "default_pr_mention_keyword")]
     pub mention: String,
@@ -600,6 +637,7 @@ impl Default for DaemonConfig {
             triggers: TriggersYamlConfig::default(),
             notifications: NotificationsYamlConfig::default(),
             costs: CostsConfig::default(),
+            language_model: LanguageModelConfig::default(),
         }
     }
 }

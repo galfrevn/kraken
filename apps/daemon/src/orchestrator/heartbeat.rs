@@ -34,6 +34,7 @@ impl HeartbeatTracker {
     /// within the configured timeout window. Returns `false` if the task
     /// has no recorded heartbeat or the last heartbeat is older than the
     /// timeout duration.
+    #[allow(dead_code)]
     pub fn is_worker_alive(&self, task_id: &str) -> bool {
         match self.last_heartbeat_times.get(task_id) {
             Some(last_heartbeat_time) => last_heartbeat_time.elapsed() < self.timeout_duration,

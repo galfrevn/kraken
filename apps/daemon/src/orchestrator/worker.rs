@@ -69,6 +69,7 @@ impl WorkerProcess {
     }
 
     /// Returns the task ID this worker is executing.
+    #[allow(dead_code)]
     pub fn task_id(&self) -> &str {
         &self.task_id
     }
@@ -119,6 +120,7 @@ impl WorkerProcess {
 
     /// Blocks until the worker subprocess exits and returns its exit code.
     /// If the exit code is unavailable (e.g., killed by signal), returns `-1`.
+    #[allow(dead_code)]
     pub fn wait_for_exit(&mut self) -> i32 {
         match self.child_process.wait() {
             Ok(exit_status) => exit_status.code().unwrap_or(-1),

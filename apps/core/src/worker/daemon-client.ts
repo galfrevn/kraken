@@ -17,6 +17,10 @@ export interface TaskDetails {
   workingDirectory: string;
   retryContext: string;
   attempt: number;
+  model: string;
+  provider: string;
+  temperature: number;
+  maxTokens: number;
 }
 
 export async function fetchTaskDetails(
@@ -32,5 +36,9 @@ export async function fetchTaskDetails(
     workingDirectory: response.workingDir,
     retryContext: response.retryContext,
     attempt: response.attempt,
+    model: response.model,
+    provider: response.provider,
+    temperature: response.temperature,
+    maxTokens: response.maxTokens,
   };
 }

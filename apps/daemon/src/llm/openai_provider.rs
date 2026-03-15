@@ -176,6 +176,7 @@ struct OpenAiResponseChoice {
 struct OpenAiResponseMessage {
     /// Role of the message (always "assistant" in responses).
     #[serde(default)]
+    #[allow(dead_code)]
     role: String,
 
     /// Text content of the response (may be null when tool calls are present).

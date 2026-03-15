@@ -26,10 +26,12 @@ impl std::fmt::Display for TriggerType {
 
 #[derive(Debug, Clone)]
 pub struct TriggerEvent {
+    #[allow(dead_code)]
     pub id: String,
     pub trigger_type: TriggerType,
     pub source: String,
     pub payload: Value,
+    #[allow(dead_code)]
     pub fired_at: DateTime<Utc>,
 }
 

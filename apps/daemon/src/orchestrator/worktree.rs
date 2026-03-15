@@ -7,7 +7,9 @@ use tracing::{info, warn};
 
 pub struct WorktreeInfo {
     pub worktree_path: PathBuf,
+    #[allow(dead_code)]
     pub branch_name: String,
+    #[allow(dead_code)]
     pub task_id_short: String,
 }
 

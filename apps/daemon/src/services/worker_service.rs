@@ -45,6 +45,10 @@ pub struct WorkerServiceImplementation {
     heartbeat_tracker: Arc<HeartbeatTracker>,
     llm_provider_router: Arc<LlmProviderRouter>,
     activity_event_sender: broadcast::Sender<WorkerActivityEvent>,
+    configured_model: String,
+    configured_provider: String,
+    configured_temperature: f32,
+    configured_max_tokens: i32,
 }
 
 impl WorkerServiceImplementation {
@@ -59,17 +63,26 @@ impl WorkerServiceImplementation {
         heartbeat_tracker: Arc<HeartbeatTracker>,
         llm_provider_router: Arc<LlmProviderRouter>,
         activity_event_sender: broadcast::Sender<WorkerActivityEvent>,
+        configured_model: String,
+        configured_provider: String,
+        configured_temperature: f32,
+        configured_max_tokens: i32,
     ) -> Self {
         Self {
             task_store,
             heartbeat_tracker,
             llm_provider_router,
             activity_event_sender,
+            configured_model,
+            configured_provider,
+            configured_temperature,
+            configured_max_tokens,
         }
     }
 
     /// Returns a clone of the activity event sender so other services
     /// (e.g. DaemonService) can subscribe to worker activity broadcasts.
+    #[allow(dead_code)]
     pub fn get_activity_event_sender(&self) -> broadcast::Sender<WorkerActivityEvent> {
         self.activity_event_sender.clone()
     }
@@ -301,6 +314,10 @@ impl WorkerService for WorkerServiceImplementation {
             working_dir: task.worker_dir.unwrap_or_default(),
             retry_context: retry_context_for_response,
             attempt: task.attempt,
+            model: self.configured_model.clone(),
+            provider: self.configured_provider.clone(),
+            temperature: self.configured_temperature,
+            max_tokens: self.configured_max_tokens,
         }))
     }
 

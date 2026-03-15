@@ -238,6 +238,7 @@ impl LlmProviderRouter {
     }
 
     /// Returns `true` if a provider with the given `name` is configured.
+    #[allow(dead_code)]
     pub fn has_provider(&self, name: &str) -> bool {
         self.providers.contains_key(name)
     }

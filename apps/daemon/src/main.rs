@@ -18,7 +18,6 @@ use tokio::signal;
 use tonic::transport::Server;
 use tracing::{error, info, warn};
 use tracing_subscriber::EnvFilter;
-use tracing_subscriber::fmt::writer::MakeWriterExt;
 
 use daemon::config::DaemonConfig;
 use daemon::reload::ReloadableNotificationDispatcher;
@@ -420,6 +419,10 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         orchestrator_heartbeat_tracker,
         Arc::clone(&llm_provider_router),
         activity_event_sender.clone(),
+        daemon_config.language_model.model.clone(),
+        daemon_config.language_model.provider.clone(),
+        daemon_config.language_model.temperature,
+        daemon_config.language_model.max_tokens,
     );
 
     // -----------------------------------------------------------------------
