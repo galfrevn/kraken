@@ -14,7 +14,7 @@ import type { Message } from "@bufbuild/protobuf";
  * Describes the file agent/v1/daemon.proto.
  */
 export const file_agent_v1_daemon: GenFile = /*@__PURE__*/
-  fileDesc("ChVhZ2VudC92MS9kYWVtb24ucHJvdG8SCGFnZW50LnYxIhIKEEdldFN0YXR1c1JlcXVlc3QiugEKEUdldFN0YXR1c1Jlc3BvbnNlEg8KB2hlYWx0aHkYASABKAgSFgoOdXB0aW1lX3NlY29uZHMYAiABKAMSFgoOYWN0aXZlX3dvcmtlcnMYAyABKAUSEwoLbWF4X3dvcmtlcnMYBCABKAUSFQoNcGVuZGluZ190YXNrcxgFIAEoBRIdChVjb21wbGV0ZWRfdGFza3NfdG9kYXkYBiABKAUSGQoRZ2F0ZXdheV9jb25uZWN0ZWQYByABKAgiVQoeRGFlbW9uU2VydmljZVN1Ym1pdFRhc2tSZXF1ZXN0EgwKBG5hbWUYASABKAkSEwoLZGVzY3JpcHRpb24YAiABKAkSEAoIcHJpb3JpdHkYAyABKAUiMgofRGFlbW9uU2VydmljZVN1Ym1pdFRhc2tSZXNwb25zZRIPCgd0YXNrX2lkGAEgASgJIkUKHURhZW1vblNlcnZpY2VMaXN0VGFza3NSZXF1ZXN0EhUKDXN0YXR1c19maWx0ZXIYASABKAkSDQoFbGltaXQYAiABKAUiRQoeRGFlbW9uU2VydmljZUxpc3RUYXNrc1Jlc3BvbnNlEiMKBXRhc2tzGAEgAygLMhQuYWdlbnQudjEuRGFlbW9uVGFzayL5AgoKRGFlbW9uVGFzaxIKCgJpZBgBIAEoCRIMCgRuYW1lGAIgASgJEg4KBnN0YXR1cxgDIAEoCRIQCghwcmlvcml0eRgEIAEoBRIUCgx0cmlnZ2VyX3R5cGUYBSABKAkSEgoKd29ya2VyX3BpZBgGIAEoBRIOCgZvdXRwdXQYByABKAkSFQoNZXJyb3JfbWVzc2FnZRgIIAEoCRIVCg1wcm9tcHRfdG9rZW5zGAkgASgDEhkKEWNvbXBsZXRpb25fdG9rZW5zGAogASgDEhoKEmVzdGltYXRlZF9jb3N0X3VzZBgLIAEoARIuCgpjcmVhdGVkX2F0GAwgASgLMhouZ29vZ2xlLnByb3RvYnVmLlRpbWVzdGFtcBIuCgpzdGFydGVkX2F0GA0gASgLMhouZ29vZ2xlLnByb3RvYnVmLlRpbWVzdGFtcBIwCgxjb21wbGV0ZWRfYXQYDiABKAsyGi5nb29nbGUucHJvdG9idWYuVGltZXN0YW1wIicKFEdldFRhc2tEZXRhaWxSZXF1ZXN0Eg8KB3Rhc2tfaWQYASABKAkiiAEKFUdldFRhc2tEZXRhaWxSZXNwb25zZRIiCgR0YXNrGAEgASgLMhQuYWdlbnQudjEuRGFlbW9uVGFzaxIkCgRsb2dzGAIgAygLMhYuYWdlbnQudjEuVGFza0xvZ0VudHJ5EiUKCWFydGlmYWN0cxgDIAMoCzISLmFnZW50LnYxLkFydGlmYWN0IjEKHkRhZW1vblNlcnZpY2VDYW5jZWxUYXNrUmVxdWVzdBIPCgd0YXNrX2lkGAEgASgJIjIKH0RhZW1vblNlcnZpY2VDYW5jZWxUYXNrUmVzcG9uc2USDwoHc3VjY2VzcxgBIAEoCCITChFXYXRjaFRhc2tzUmVxdWVzdCJeChJXYXRjaFRhc2tzUmVzcG9uc2USEgoKZXZlbnRfdHlwZRgBIAEoCRIiCgR0YXNrGAIgASgLMhQuYWdlbnQudjEuRGFlbW9uVGFzaxIQCghhY3Rpdml0eRgDIAEoCSIoChVTdHJlYW1UYXNrTG9nc1JlcXVlc3QSDwoHdGFza19pZBgBIAEoCSI9ChZTdHJlYW1UYXNrTG9nc1Jlc3BvbnNlEiMKA2xvZxgBIAEoCzIWLmFnZW50LnYxLlRhc2tMb2dFbnRyeSJdCgxUYXNrTG9nRW50cnkSDQoFbGV2ZWwYASABKAkSDwoHbWVzc2FnZRgCIAEoCRItCgl0aW1lc3RhbXAYAyABKAsyGi5nb29nbGUucHJvdG9idWYuVGltZXN0YW1wMu8ECg1EYWVtb25TZXJ2aWNlEkQKCUdldFN0YXR1cxIaLmFnZW50LnYxLkdldFN0YXR1c1JlcXVlc3QaGy5hZ2VudC52MS5HZXRTdGF0dXNSZXNwb25zZRJhCgpTdWJtaXRUYXNrEiguYWdlbnQudjEuRGFlbW9uU2VydmljZVN1Ym1pdFRhc2tSZXF1ZXN0GikuYWdlbnQudjEuRGFlbW9uU2VydmljZVN1Ym1pdFRhc2tSZXNwb25zZRJeCglMaXN0VGFza3MSJy5hZ2VudC52MS5EYWVtb25TZXJ2aWNlTGlzdFRhc2tzUmVxdWVzdBooLmFnZW50LnYxLkRhZW1vblNlcnZpY2VMaXN0VGFza3NSZXNwb25zZRJQCg1HZXRUYXNrRGV0YWlsEh4uYWdlbnQudjEuR2V0VGFza0RldGFpbFJlcXVlc3QaHy5hZ2VudC52MS5HZXRUYXNrRGV0YWlsUmVzcG9uc2USYQoKQ2FuY2VsVGFzaxIoLmFnZW50LnYxLkRhZW1vblNlcnZpY2VDYW5jZWxUYXNrUmVxdWVzdBopLmFnZW50LnYxLkRhZW1vblNlcnZpY2VDYW5jZWxUYXNrUmVzcG9uc2USSQoKV2F0Y2hUYXNrcxIbLmFnZW50LnYxLldhdGNoVGFza3NSZXF1ZXN0GhwuYWdlbnQudjEuV2F0Y2hUYXNrc1Jlc3BvbnNlMAESVQoOU3RyZWFtVGFza0xvZ3MSHy5hZ2VudC52MS5TdHJlYW1UYXNrTG9nc1JlcXVlc3QaIC5hZ2VudC52MS5TdHJlYW1UYXNrTG9nc1Jlc3BvbnNlMAFCfAoMY29tLmFnZW50LnYxQgtEYWVtb25Qcm90b1ABWh5rcmFrZW4vZ2VuL2dvL2FnZW50L3YxO2FnZW50djGiAgNBWFiqAghBZ2VudC5WMcoCCEFnZW50XFYx4gIUQWdlbnRcVjFcR1BCTWV0YWRhdGHqAglBZ2VudDo6VjFiBnByb3RvMw", [file_agent_v1_worker, file_google_protobuf_timestamp]);
+  fileDesc("ChVhZ2VudC92MS9kYWVtb24ucHJvdG8SCGFnZW50LnYxIhIKEEdldFN0YXR1c1JlcXVlc3QiugEKEUdldFN0YXR1c1Jlc3BvbnNlEg8KB2hlYWx0aHkYASABKAgSFgoOdXB0aW1lX3NlY29uZHMYAiABKAMSFgoOYWN0aXZlX3dvcmtlcnMYAyABKAUSEwoLbWF4X3dvcmtlcnMYBCABKAUSFQoNcGVuZGluZ190YXNrcxgFIAEoBRIdChVjb21wbGV0ZWRfdGFza3NfdG9kYXkYBiABKAUSGQoRZ2F0ZXdheV9jb25uZWN0ZWQYByABKAgiVQoeRGFlbW9uU2VydmljZVN1Ym1pdFRhc2tSZXF1ZXN0EgwKBG5hbWUYASABKAkSEwoLZGVzY3JpcHRpb24YAiABKAkSEAoIcHJpb3JpdHkYAyABKAUiMgofRGFlbW9uU2VydmljZVN1Ym1pdFRhc2tSZXNwb25zZRIPCgd0YXNrX2lkGAEgASgJIkUKHURhZW1vblNlcnZpY2VMaXN0VGFza3NSZXF1ZXN0EhUKDXN0YXR1c19maWx0ZXIYASABKAkSDQoFbGltaXQYAiABKAUiRQoeRGFlbW9uU2VydmljZUxpc3RUYXNrc1Jlc3BvbnNlEiMKBXRhc2tzGAEgAygLMhQuYWdlbnQudjEuRGFlbW9uVGFzayL5AgoKRGFlbW9uVGFzaxIKCgJpZBgBIAEoCRIMCgRuYW1lGAIgASgJEg4KBnN0YXR1cxgDIAEoCRIQCghwcmlvcml0eRgEIAEoBRIUCgx0cmlnZ2VyX3R5cGUYBSABKAkSEgoKd29ya2VyX3BpZBgGIAEoBRIOCgZvdXRwdXQYByABKAkSFQoNZXJyb3JfbWVzc2FnZRgIIAEoCRIVCg1wcm9tcHRfdG9rZW5zGAkgASgDEhkKEWNvbXBsZXRpb25fdG9rZW5zGAogASgDEhoKEmVzdGltYXRlZF9jb3N0X3VzZBgLIAEoARIuCgpjcmVhdGVkX2F0GAwgASgLMhouZ29vZ2xlLnByb3RvYnVmLlRpbWVzdGFtcBIuCgpzdGFydGVkX2F0GA0gASgLMhouZ29vZ2xlLnByb3RvYnVmLlRpbWVzdGFtcBIwCgxjb21wbGV0ZWRfYXQYDiABKAsyGi5nb29nbGUucHJvdG9idWYuVGltZXN0YW1wIicKFEdldFRhc2tEZXRhaWxSZXF1ZXN0Eg8KB3Rhc2tfaWQYASABKAkiiAEKFUdldFRhc2tEZXRhaWxSZXNwb25zZRIiCgR0YXNrGAEgASgLMhQuYWdlbnQudjEuRGFlbW9uVGFzaxIkCgRsb2dzGAIgAygLMhYuYWdlbnQudjEuVGFza0xvZ0VudHJ5EiUKCWFydGlmYWN0cxgDIAMoCzISLmFnZW50LnYxLkFydGlmYWN0IjEKHkRhZW1vblNlcnZpY2VDYW5jZWxUYXNrUmVxdWVzdBIPCgd0YXNrX2lkGAEgASgJIjIKH0RhZW1vblNlcnZpY2VDYW5jZWxUYXNrUmVzcG9uc2USDwoHc3VjY2VzcxgBIAEoCCITChFXYXRjaFRhc2tzUmVxdWVzdCJeChJXYXRjaFRhc2tzUmVzcG9uc2USEgoKZXZlbnRfdHlwZRgBIAEoCRIiCgR0YXNrGAIgASgLMhQuYWdlbnQudjEuRGFlbW9uVGFzaxIQCghhY3Rpdml0eRgDIAEoCSIoChVTdHJlYW1UYXNrTG9nc1JlcXVlc3QSDwoHdGFza19pZBgBIAEoCSI9ChZTdHJlYW1UYXNrTG9nc1Jlc3BvbnNlEiMKA2xvZxgBIAEoCzIWLmFnZW50LnYxLlRhc2tMb2dFbnRyeSJdCgxUYXNrTG9nRW50cnkSDQoFbGV2ZWwYASABKAkSDwoHbWVzc2FnZRgCIAEoCRItCgl0aW1lc3RhbXAYAyABKAsyGi5nb29nbGUucHJvdG9idWYuVGltZXN0YW1wIl8KCUNoYXRJbnB1dBIWCgx1c2VyX21lc3NhZ2UYASABKAlIABIfChVjb25maXJtYXRpb25fcmVzcG9uc2UYAiABKAlIABIQCgZjYW5jZWwYAyABKAhIAEIHCgVpbnB1dCK+AQoKQ2hhdE91dHB1dBIUCgp0ZXh0X2RlbHRhGAEgASgJSAASEgoIYWN0aXZpdHkYAiABKAlIABIfChV0b29sX2NhbGxfZGVzY3JpcHRpb24YAyABKAlIABIdChN0b29sX3Jlc3VsdF9zdW1tYXJ5GAQgASgJSAASGwoRd2FpdGluZ19mb3JfaW5wdXQYBSABKAhIABIPCgVlcnJvchgGIAEoCUgAEg4KBGRvbmUYByABKAhIAEIICgZvdXRwdXQy7wQKDURhZW1vblNlcnZpY2USRAoJR2V0U3RhdHVzEhouYWdlbnQudjEuR2V0U3RhdHVzUmVxdWVzdBobLmFnZW50LnYxLkdldFN0YXR1c1Jlc3BvbnNlEmEKClN1Ym1pdFRhc2sSKC5hZ2VudC52MS5EYWVtb25TZXJ2aWNlU3VibWl0VGFza1JlcXVlc3QaKS5hZ2VudC52MS5EYWVtb25TZXJ2aWNlU3VibWl0VGFza1Jlc3BvbnNlEl4KCUxpc3RUYXNrcxInLmFnZW50LnYxLkRhZW1vblNlcnZpY2VMaXN0VGFza3NSZXF1ZXN0GiguYWdlbnQudjEuRGFlbW9uU2VydmljZUxpc3RUYXNrc1Jlc3BvbnNlElAKDUdldFRhc2tEZXRhaWwSHi5hZ2VudC52MS5HZXRUYXNrRGV0YWlsUmVxdWVzdBofLmFnZW50LnYxLkdldFRhc2tEZXRhaWxSZXNwb25zZRJhCgpDYW5jZWxUYXNrEiguYWdlbnQudjEuRGFlbW9uU2VydmljZUNhbmNlbFRhc2tSZXF1ZXN0GikuYWdlbnQudjEuRGFlbW9uU2VydmljZUNhbmNlbFRhc2tSZXNwb25zZRJJCgpXYXRjaFRhc2tzEhsuYWdlbnQudjEuV2F0Y2hUYXNrc1JlcXVlc3QaHC5hZ2VudC52MS5XYXRjaFRhc2tzUmVzcG9uc2UwARJVCg5TdHJlYW1UYXNrTG9ncxIfLmFnZW50LnYxLlN0cmVhbVRhc2tMb2dzUmVxdWVzdBogLmFnZW50LnYxLlN0cmVhbVRhc2tMb2dzUmVzcG9uc2UwATJJChBBZ2VudENoYXRTZXJ2aWNlEjUKBENoYXQSEy5hZ2VudC52MS5DaGF0SW5wdXQaFC5hZ2VudC52MS5DaGF0T3V0cHV0KAEwAUJ8Cgxjb20uYWdlbnQudjFCC0RhZW1vblByb3RvUAFaHmtyYWtlbi9nZW4vZ28vYWdlbnQvdjE7YWdlbnR2MaICA0FYWKoCCEFnZW50LlYxygIIQWdlbnRcVjHiAhRBZ2VudFxWMVxHUEJNZXRhZGF0YeoCCUFnZW50OjpWMWIGcHJvdG8z", [file_agent_v1_worker, file_google_protobuf_timestamp]);
 
 /**
  * @generated from message agent.v1.GetStatusRequest
@@ -421,6 +421,100 @@ export const TaskLogEntrySchema: GenMessage<TaskLogEntry> = /*@__PURE__*/
   messageDesc(file_agent_v1_daemon, 15);
 
 /**
+ * @generated from message agent.v1.ChatInput
+ */
+export type ChatInput = Message<"agent.v1.ChatInput"> & {
+  /**
+   * @generated from oneof agent.v1.ChatInput.input
+   */
+  input: {
+    /**
+     * @generated from field: string user_message = 1;
+     */
+    value: string;
+    case: "userMessage";
+  } | {
+    /**
+     * @generated from field: string confirmation_response = 2;
+     */
+    value: string;
+    case: "confirmationResponse";
+  } | {
+    /**
+     * @generated from field: bool cancel = 3;
+     */
+    value: boolean;
+    case: "cancel";
+  } | { case: undefined; value?: undefined };
+};
+
+/**
+ * Describes the message agent.v1.ChatInput.
+ * Use `create(ChatInputSchema)` to create a new message.
+ */
+export const ChatInputSchema: GenMessage<ChatInput> = /*@__PURE__*/
+  messageDesc(file_agent_v1_daemon, 16);
+
+/**
+ * @generated from message agent.v1.ChatOutput
+ */
+export type ChatOutput = Message<"agent.v1.ChatOutput"> & {
+  /**
+   * @generated from oneof agent.v1.ChatOutput.output
+   */
+  output: {
+    /**
+     * @generated from field: string text_delta = 1;
+     */
+    value: string;
+    case: "textDelta";
+  } | {
+    /**
+     * @generated from field: string activity = 2;
+     */
+    value: string;
+    case: "activity";
+  } | {
+    /**
+     * @generated from field: string tool_call_description = 3;
+     */
+    value: string;
+    case: "toolCallDescription";
+  } | {
+    /**
+     * @generated from field: string tool_result_summary = 4;
+     */
+    value: string;
+    case: "toolResultSummary";
+  } | {
+    /**
+     * @generated from field: bool waiting_for_input = 5;
+     */
+    value: boolean;
+    case: "waitingForInput";
+  } | {
+    /**
+     * @generated from field: string error = 6;
+     */
+    value: string;
+    case: "error";
+  } | {
+    /**
+     * @generated from field: bool done = 7;
+     */
+    value: boolean;
+    case: "done";
+  } | { case: undefined; value?: undefined };
+};
+
+/**
+ * Describes the message agent.v1.ChatOutput.
+ * Use `create(ChatOutputSchema)` to create a new message.
+ */
+export const ChatOutputSchema: GenMessage<ChatOutput> = /*@__PURE__*/
+  messageDesc(file_agent_v1_daemon, 17);
+
+/**
  * @generated from service agent.v1.DaemonService
  */
 export const DaemonService: GenService<{
@@ -482,4 +576,19 @@ export const DaemonService: GenService<{
   },
 }> = /*@__PURE__*/
   serviceDesc(file_agent_v1_daemon, 0);
+
+/**
+ * @generated from service agent.v1.AgentChatService
+ */
+export const AgentChatService: GenService<{
+  /**
+   * @generated from rpc agent.v1.AgentChatService.Chat
+   */
+  chat: {
+    methodKind: "bidi_streaming";
+    input: typeof ChatInputSchema;
+    output: typeof ChatOutputSchema;
+  },
+}> = /*@__PURE__*/
+  serviceDesc(file_agent_v1_daemon, 1);
 

@@ -20,6 +20,7 @@ use tracing::{error, info, warn};
 use tracing_subscriber::EnvFilter;
 
 use daemon::config::DaemonConfig;
+use proto::agent::v1::agent_chat_service_server::AgentChatServiceServer;
 use proto::agent::v1::daemon_service_server::DaemonServiceServer;
 use proto::agent::v1::scheduler_service_server::SchedulerServiceServer;
 use proto::agent::v1::worker_service_server::WorkerServiceServer;
@@ -350,7 +351,16 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         );
 
     // -----------------------------------------------------------------------
-    // 14. Build tonic Server with all three services
+    // 14. Create AgentChatServiceImplementation
+    // -----------------------------------------------------------------------
+    let agent_chat_service_implementation =
+        services::chat_service::AgentChatServiceImplementation::new(
+            Arc::clone(&shared_task_store),
+            activity_event_sender.clone(),
+        );
+
+    // -----------------------------------------------------------------------
+    // 15. Build tonic Server with all services
     // -----------------------------------------------------------------------
     let scheduler_grpc_server = grpc::SchedulerServer::new(
         cron_engine.clone(),
@@ -364,12 +374,13 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     );
 
     // -----------------------------------------------------------------------
-    // 15. Serve with shutdown signal (ctrl_c)
+    // 16. Serve with shutdown signal (ctrl_c)
     // -----------------------------------------------------------------------
     Server::builder()
         .add_service(SchedulerServiceServer::new(scheduler_grpc_server))
         .add_service(WorkerServiceServer::new(worker_service_implementation))
         .add_service(DaemonServiceServer::new(daemon_service_implementation))
+        .add_service(AgentChatServiceServer::new(agent_chat_service_implementation))
         .serve_with_shutdown(daemon_listen_address, async {
             signal::ctrl_c().await.ok();
             info!("received shutdown signal (ctrl+c)");
@@ -377,7 +388,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         .await?;
 
     // -----------------------------------------------------------------------
-    // 16. Graceful shutdown sequence
+    // 17. Graceful shutdown sequence
     // -----------------------------------------------------------------------
     info!("beginning graceful shutdown");
 

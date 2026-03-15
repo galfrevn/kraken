@@ -934,6 +934,266 @@ func (x *TaskLogEntry) GetTimestamp() *timestamppb.Timestamp {
 	return nil
 }
 
+type ChatInput struct {
+	state protoimpl.MessageState `protogen:"open.v1"`
+	// Types that are valid to be assigned to Input:
+	//
+	//	*ChatInput_UserMessage
+	//	*ChatInput_ConfirmationResponse
+	//	*ChatInput_Cancel
+	Input         isChatInput_Input `protobuf_oneof:"input"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *ChatInput) Reset() {
+	*x = ChatInput{}
+	mi := &file_agent_v1_daemon_proto_msgTypes[16]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ChatInput) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ChatInput) ProtoMessage() {}
+
+func (x *ChatInput) ProtoReflect() protoreflect.Message {
+	mi := &file_agent_v1_daemon_proto_msgTypes[16]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ChatInput.ProtoReflect.Descriptor instead.
+func (*ChatInput) Descriptor() ([]byte, []int) {
+	return file_agent_v1_daemon_proto_rawDescGZIP(), []int{16}
+}
+
+func (x *ChatInput) GetInput() isChatInput_Input {
+	if x != nil {
+		return x.Input
+	}
+	return nil
+}
+
+func (x *ChatInput) GetUserMessage() string {
+	if x != nil {
+		if x, ok := x.Input.(*ChatInput_UserMessage); ok {
+			return x.UserMessage
+		}
+	}
+	return ""
+}
+
+func (x *ChatInput) GetConfirmationResponse() string {
+	if x != nil {
+		if x, ok := x.Input.(*ChatInput_ConfirmationResponse); ok {
+			return x.ConfirmationResponse
+		}
+	}
+	return ""
+}
+
+func (x *ChatInput) GetCancel() bool {
+	if x != nil {
+		if x, ok := x.Input.(*ChatInput_Cancel); ok {
+			return x.Cancel
+		}
+	}
+	return false
+}
+
+type isChatInput_Input interface {
+	isChatInput_Input()
+}
+
+type ChatInput_UserMessage struct {
+	UserMessage string `protobuf:"bytes,1,opt,name=user_message,json=userMessage,proto3,oneof"`
+}
+
+type ChatInput_ConfirmationResponse struct {
+	ConfirmationResponse string `protobuf:"bytes,2,opt,name=confirmation_response,json=confirmationResponse,proto3,oneof"`
+}
+
+type ChatInput_Cancel struct {
+	Cancel bool `protobuf:"varint,3,opt,name=cancel,proto3,oneof"`
+}
+
+func (*ChatInput_UserMessage) isChatInput_Input() {}
+
+func (*ChatInput_ConfirmationResponse) isChatInput_Input() {}
+
+func (*ChatInput_Cancel) isChatInput_Input() {}
+
+type ChatOutput struct {
+	state protoimpl.MessageState `protogen:"open.v1"`
+	// Types that are valid to be assigned to Output:
+	//
+	//	*ChatOutput_TextDelta
+	//	*ChatOutput_Activity
+	//	*ChatOutput_ToolCallDescription
+	//	*ChatOutput_ToolResultSummary
+	//	*ChatOutput_WaitingForInput
+	//	*ChatOutput_Error
+	//	*ChatOutput_Done
+	Output        isChatOutput_Output `protobuf_oneof:"output"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *ChatOutput) Reset() {
+	*x = ChatOutput{}
+	mi := &file_agent_v1_daemon_proto_msgTypes[17]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ChatOutput) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ChatOutput) ProtoMessage() {}
+
+func (x *ChatOutput) ProtoReflect() protoreflect.Message {
+	mi := &file_agent_v1_daemon_proto_msgTypes[17]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ChatOutput.ProtoReflect.Descriptor instead.
+func (*ChatOutput) Descriptor() ([]byte, []int) {
+	return file_agent_v1_daemon_proto_rawDescGZIP(), []int{17}
+}
+
+func (x *ChatOutput) GetOutput() isChatOutput_Output {
+	if x != nil {
+		return x.Output
+	}
+	return nil
+}
+
+func (x *ChatOutput) GetTextDelta() string {
+	if x != nil {
+		if x, ok := x.Output.(*ChatOutput_TextDelta); ok {
+			return x.TextDelta
+		}
+	}
+	return ""
+}
+
+func (x *ChatOutput) GetActivity() string {
+	if x != nil {
+		if x, ok := x.Output.(*ChatOutput_Activity); ok {
+			return x.Activity
+		}
+	}
+	return ""
+}
+
+func (x *ChatOutput) GetToolCallDescription() string {
+	if x != nil {
+		if x, ok := x.Output.(*ChatOutput_ToolCallDescription); ok {
+			return x.ToolCallDescription
+		}
+	}
+	return ""
+}
+
+func (x *ChatOutput) GetToolResultSummary() string {
+	if x != nil {
+		if x, ok := x.Output.(*ChatOutput_ToolResultSummary); ok {
+			return x.ToolResultSummary
+		}
+	}
+	return ""
+}
+
+func (x *ChatOutput) GetWaitingForInput() bool {
+	if x != nil {
+		if x, ok := x.Output.(*ChatOutput_WaitingForInput); ok {
+			return x.WaitingForInput
+		}
+	}
+	return false
+}
+
+func (x *ChatOutput) GetError() string {
+	if x != nil {
+		if x, ok := x.Output.(*ChatOutput_Error); ok {
+			return x.Error
+		}
+	}
+	return ""
+}
+
+func (x *ChatOutput) GetDone() bool {
+	if x != nil {
+		if x, ok := x.Output.(*ChatOutput_Done); ok {
+			return x.Done
+		}
+	}
+	return false
+}
+
+type isChatOutput_Output interface {
+	isChatOutput_Output()
+}
+
+type ChatOutput_TextDelta struct {
+	TextDelta string `protobuf:"bytes,1,opt,name=text_delta,json=textDelta,proto3,oneof"`
+}
+
+type ChatOutput_Activity struct {
+	Activity string `protobuf:"bytes,2,opt,name=activity,proto3,oneof"`
+}
+
+type ChatOutput_ToolCallDescription struct {
+	ToolCallDescription string `protobuf:"bytes,3,opt,name=tool_call_description,json=toolCallDescription,proto3,oneof"`
+}
+
+type ChatOutput_ToolResultSummary struct {
+	ToolResultSummary string `protobuf:"bytes,4,opt,name=tool_result_summary,json=toolResultSummary,proto3,oneof"`
+}
+
+type ChatOutput_WaitingForInput struct {
+	WaitingForInput bool `protobuf:"varint,5,opt,name=waiting_for_input,json=waitingForInput,proto3,oneof"`
+}
+
+type ChatOutput_Error struct {
+	Error string `protobuf:"bytes,6,opt,name=error,proto3,oneof"`
+}
+
+type ChatOutput_Done struct {
+	Done bool `protobuf:"varint,7,opt,name=done,proto3,oneof"`
+}
+
+func (*ChatOutput_TextDelta) isChatOutput_Output() {}
+
+func (*ChatOutput_Activity) isChatOutput_Output() {}
+
+func (*ChatOutput_ToolCallDescription) isChatOutput_Output() {}
+
+func (*ChatOutput_ToolResultSummary) isChatOutput_Output() {}
+
+func (*ChatOutput_WaitingForInput) isChatOutput_Output() {}
+
+func (*ChatOutput_Error) isChatOutput_Output() {}
+
+func (*ChatOutput_Done) isChatOutput_Output() {}
+
 var File_agent_v1_daemon_proto protoreflect.FileDescriptor
 
 const file_agent_v1_daemon_proto_rawDesc = "" +
@@ -1003,7 +1263,23 @@ const file_agent_v1_daemon_proto_rawDesc = "" +
 	"\fTaskLogEntry\x12\x14\n" +
 	"\x05level\x18\x01 \x01(\tR\x05level\x12\x18\n" +
 	"\amessage\x18\x02 \x01(\tR\amessage\x128\n" +
-	"\ttimestamp\x18\x03 \x01(\v2\x1a.google.protobuf.TimestampR\ttimestamp2\xef\x04\n" +
+	"\ttimestamp\x18\x03 \x01(\v2\x1a.google.protobuf.TimestampR\ttimestamp\"\x8a\x01\n" +
+	"\tChatInput\x12#\n" +
+	"\fuser_message\x18\x01 \x01(\tH\x00R\vuserMessage\x125\n" +
+	"\x15confirmation_response\x18\x02 \x01(\tH\x00R\x14confirmationResponse\x12\x18\n" +
+	"\x06cancel\x18\x03 \x01(\bH\x00R\x06cancelB\a\n" +
+	"\x05input\"\x99\x02\n" +
+	"\n" +
+	"ChatOutput\x12\x1f\n" +
+	"\n" +
+	"text_delta\x18\x01 \x01(\tH\x00R\ttextDelta\x12\x1c\n" +
+	"\bactivity\x18\x02 \x01(\tH\x00R\bactivity\x124\n" +
+	"\x15tool_call_description\x18\x03 \x01(\tH\x00R\x13toolCallDescription\x120\n" +
+	"\x13tool_result_summary\x18\x04 \x01(\tH\x00R\x11toolResultSummary\x12,\n" +
+	"\x11waiting_for_input\x18\x05 \x01(\bH\x00R\x0fwaitingForInput\x12\x16\n" +
+	"\x05error\x18\x06 \x01(\tH\x00R\x05error\x12\x14\n" +
+	"\x04done\x18\a \x01(\bH\x00R\x04doneB\b\n" +
+	"\x06output2\xef\x04\n" +
 	"\rDaemonService\x12D\n" +
 	"\tGetStatus\x12\x1a.agent.v1.GetStatusRequest\x1a\x1b.agent.v1.GetStatusResponse\x12a\n" +
 	"\n" +
@@ -1014,7 +1290,9 @@ const file_agent_v1_daemon_proto_rawDesc = "" +
 	"CancelTask\x12(.agent.v1.DaemonServiceCancelTaskRequest\x1a).agent.v1.DaemonServiceCancelTaskResponse\x12I\n" +
 	"\n" +
 	"WatchTasks\x12\x1b.agent.v1.WatchTasksRequest\x1a\x1c.agent.v1.WatchTasksResponse0\x01\x12U\n" +
-	"\x0eStreamTaskLogs\x12\x1f.agent.v1.StreamTaskLogsRequest\x1a .agent.v1.StreamTaskLogsResponse0\x01B|\n" +
+	"\x0eStreamTaskLogs\x12\x1f.agent.v1.StreamTaskLogsRequest\x1a .agent.v1.StreamTaskLogsResponse0\x012I\n" +
+	"\x10AgentChatService\x125\n" +
+	"\x04Chat\x12\x13.agent.v1.ChatInput\x1a\x14.agent.v1.ChatOutput(\x010\x01B|\n" +
 	"\fcom.agent.v1B\vDaemonProtoP\x01Z\x1ekraken/gen/go/agent/v1;agentv1\xa2\x02\x03AXX\xaa\x02\bAgent.V1\xca\x02\bAgent\\V1\xe2\x02\x14Agent\\V1\\GPBMetadata\xea\x02\tAgent::V1b\x06proto3"
 
 var (
@@ -1029,7 +1307,7 @@ func file_agent_v1_daemon_proto_rawDescGZIP() []byte {
 	return file_agent_v1_daemon_proto_rawDescData
 }
 
-var file_agent_v1_daemon_proto_msgTypes = make([]protoimpl.MessageInfo, 16)
+var file_agent_v1_daemon_proto_msgTypes = make([]protoimpl.MessageInfo, 18)
 var file_agent_v1_daemon_proto_goTypes = []any{
 	(*GetStatusRequest)(nil),                // 0: agent.v1.GetStatusRequest
 	(*GetStatusResponse)(nil),               // 1: agent.v1.GetStatusResponse
@@ -1047,20 +1325,22 @@ var file_agent_v1_daemon_proto_goTypes = []any{
 	(*StreamTaskLogsRequest)(nil),           // 13: agent.v1.StreamTaskLogsRequest
 	(*StreamTaskLogsResponse)(nil),          // 14: agent.v1.StreamTaskLogsResponse
 	(*TaskLogEntry)(nil),                    // 15: agent.v1.TaskLogEntry
-	(*timestamppb.Timestamp)(nil),           // 16: google.protobuf.Timestamp
-	(*Artifact)(nil),                        // 17: agent.v1.Artifact
+	(*ChatInput)(nil),                       // 16: agent.v1.ChatInput
+	(*ChatOutput)(nil),                      // 17: agent.v1.ChatOutput
+	(*timestamppb.Timestamp)(nil),           // 18: google.protobuf.Timestamp
+	(*Artifact)(nil),                        // 19: agent.v1.Artifact
 }
 var file_agent_v1_daemon_proto_depIdxs = []int32{
 	6,  // 0: agent.v1.DaemonServiceListTasksResponse.tasks:type_name -> agent.v1.DaemonTask
-	16, // 1: agent.v1.DaemonTask.created_at:type_name -> google.protobuf.Timestamp
-	16, // 2: agent.v1.DaemonTask.started_at:type_name -> google.protobuf.Timestamp
-	16, // 3: agent.v1.DaemonTask.completed_at:type_name -> google.protobuf.Timestamp
+	18, // 1: agent.v1.DaemonTask.created_at:type_name -> google.protobuf.Timestamp
+	18, // 2: agent.v1.DaemonTask.started_at:type_name -> google.protobuf.Timestamp
+	18, // 3: agent.v1.DaemonTask.completed_at:type_name -> google.protobuf.Timestamp
 	6,  // 4: agent.v1.GetTaskDetailResponse.task:type_name -> agent.v1.DaemonTask
 	15, // 5: agent.v1.GetTaskDetailResponse.logs:type_name -> agent.v1.TaskLogEntry
-	17, // 6: agent.v1.GetTaskDetailResponse.artifacts:type_name -> agent.v1.Artifact
+	19, // 6: agent.v1.GetTaskDetailResponse.artifacts:type_name -> agent.v1.Artifact
 	6,  // 7: agent.v1.WatchTasksResponse.task:type_name -> agent.v1.DaemonTask
 	15, // 8: agent.v1.StreamTaskLogsResponse.log:type_name -> agent.v1.TaskLogEntry
-	16, // 9: agent.v1.TaskLogEntry.timestamp:type_name -> google.protobuf.Timestamp
+	18, // 9: agent.v1.TaskLogEntry.timestamp:type_name -> google.protobuf.Timestamp
 	0,  // 10: agent.v1.DaemonService.GetStatus:input_type -> agent.v1.GetStatusRequest
 	2,  // 11: agent.v1.DaemonService.SubmitTask:input_type -> agent.v1.DaemonServiceSubmitTaskRequest
 	4,  // 12: agent.v1.DaemonService.ListTasks:input_type -> agent.v1.DaemonServiceListTasksRequest
@@ -1068,15 +1348,17 @@ var file_agent_v1_daemon_proto_depIdxs = []int32{
 	9,  // 14: agent.v1.DaemonService.CancelTask:input_type -> agent.v1.DaemonServiceCancelTaskRequest
 	11, // 15: agent.v1.DaemonService.WatchTasks:input_type -> agent.v1.WatchTasksRequest
 	13, // 16: agent.v1.DaemonService.StreamTaskLogs:input_type -> agent.v1.StreamTaskLogsRequest
-	1,  // 17: agent.v1.DaemonService.GetStatus:output_type -> agent.v1.GetStatusResponse
-	3,  // 18: agent.v1.DaemonService.SubmitTask:output_type -> agent.v1.DaemonServiceSubmitTaskResponse
-	5,  // 19: agent.v1.DaemonService.ListTasks:output_type -> agent.v1.DaemonServiceListTasksResponse
-	8,  // 20: agent.v1.DaemonService.GetTaskDetail:output_type -> agent.v1.GetTaskDetailResponse
-	10, // 21: agent.v1.DaemonService.CancelTask:output_type -> agent.v1.DaemonServiceCancelTaskResponse
-	12, // 22: agent.v1.DaemonService.WatchTasks:output_type -> agent.v1.WatchTasksResponse
-	14, // 23: agent.v1.DaemonService.StreamTaskLogs:output_type -> agent.v1.StreamTaskLogsResponse
-	17, // [17:24] is the sub-list for method output_type
-	10, // [10:17] is the sub-list for method input_type
+	16, // 17: agent.v1.AgentChatService.Chat:input_type -> agent.v1.ChatInput
+	1,  // 18: agent.v1.DaemonService.GetStatus:output_type -> agent.v1.GetStatusResponse
+	3,  // 19: agent.v1.DaemonService.SubmitTask:output_type -> agent.v1.DaemonServiceSubmitTaskResponse
+	5,  // 20: agent.v1.DaemonService.ListTasks:output_type -> agent.v1.DaemonServiceListTasksResponse
+	8,  // 21: agent.v1.DaemonService.GetTaskDetail:output_type -> agent.v1.GetTaskDetailResponse
+	10, // 22: agent.v1.DaemonService.CancelTask:output_type -> agent.v1.DaemonServiceCancelTaskResponse
+	12, // 23: agent.v1.DaemonService.WatchTasks:output_type -> agent.v1.WatchTasksResponse
+	14, // 24: agent.v1.DaemonService.StreamTaskLogs:output_type -> agent.v1.StreamTaskLogsResponse
+	17, // 25: agent.v1.AgentChatService.Chat:output_type -> agent.v1.ChatOutput
+	18, // [18:26] is the sub-list for method output_type
+	10, // [10:18] is the sub-list for method input_type
 	10, // [10:10] is the sub-list for extension type_name
 	10, // [10:10] is the sub-list for extension extendee
 	0,  // [0:10] is the sub-list for field type_name
@@ -1088,15 +1370,29 @@ func file_agent_v1_daemon_proto_init() {
 		return
 	}
 	file_agent_v1_worker_proto_init()
+	file_agent_v1_daemon_proto_msgTypes[16].OneofWrappers = []any{
+		(*ChatInput_UserMessage)(nil),
+		(*ChatInput_ConfirmationResponse)(nil),
+		(*ChatInput_Cancel)(nil),
+	}
+	file_agent_v1_daemon_proto_msgTypes[17].OneofWrappers = []any{
+		(*ChatOutput_TextDelta)(nil),
+		(*ChatOutput_Activity)(nil),
+		(*ChatOutput_ToolCallDescription)(nil),
+		(*ChatOutput_ToolResultSummary)(nil),
+		(*ChatOutput_WaitingForInput)(nil),
+		(*ChatOutput_Error)(nil),
+		(*ChatOutput_Done)(nil),
+	}
 	type x struct{}
 	out := protoimpl.TypeBuilder{
 		File: protoimpl.DescBuilder{
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_agent_v1_daemon_proto_rawDesc), len(file_agent_v1_daemon_proto_rawDesc)),
 			NumEnums:      0,
-			NumMessages:   16,
+			NumMessages:   18,
 			NumExtensions: 0,
-			NumServices:   1,
+			NumServices:   2,
 		},
 		GoTypes:           file_agent_v1_daemon_proto_goTypes,
 		DependencyIndexes: file_agent_v1_daemon_proto_depIdxs,

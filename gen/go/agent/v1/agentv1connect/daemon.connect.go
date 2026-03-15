@@ -23,6 +23,8 @@ const _ = connect.IsAtLeastVersion1_13_0
 const (
 	// DaemonServiceName is the fully-qualified name of the DaemonService service.
 	DaemonServiceName = "agent.v1.DaemonService"
+	// AgentChatServiceName is the fully-qualified name of the AgentChatService service.
+	AgentChatServiceName = "agent.v1.AgentChatService"
 )
 
 // These constants are the fully-qualified names of the RPCs defined in this package. They're
@@ -52,6 +54,8 @@ const (
 	// DaemonServiceStreamTaskLogsProcedure is the fully-qualified name of the DaemonService's
 	// StreamTaskLogs RPC.
 	DaemonServiceStreamTaskLogsProcedure = "/agent.v1.DaemonService/StreamTaskLogs"
+	// AgentChatServiceChatProcedure is the fully-qualified name of the AgentChatService's Chat RPC.
+	AgentChatServiceChatProcedure = "/agent.v1.AgentChatService/Chat"
 )
 
 // DaemonServiceClient is a client for the agent.v1.DaemonService service.
@@ -278,4 +282,74 @@ func (UnimplementedDaemonServiceHandler) WatchTasks(context.Context, *connect.Re
 
 func (UnimplementedDaemonServiceHandler) StreamTaskLogs(context.Context, *connect.Request[v1.StreamTaskLogsRequest], *connect.ServerStream[v1.StreamTaskLogsResponse]) error {
 	return connect.NewError(connect.CodeUnimplemented, errors.New("agent.v1.DaemonService.StreamTaskLogs is not implemented"))
+}
+
+// AgentChatServiceClient is a client for the agent.v1.AgentChatService service.
+type AgentChatServiceClient interface {
+	Chat(context.Context) *connect.BidiStreamForClient[v1.ChatInput, v1.ChatOutput]
+}
+
+// NewAgentChatServiceClient constructs a client for the agent.v1.AgentChatService service. By
+// default, it uses the Connect protocol with the binary Protobuf Codec, asks for gzipped responses,
+// and sends uncompressed requests. To use the gRPC or gRPC-Web protocols, supply the
+// connect.WithGRPC() or connect.WithGRPCWeb() options.
+//
+// The URL supplied here should be the base URL for the Connect or gRPC server (for example,
+// http://api.acme.com or https://acme.com/grpc).
+func NewAgentChatServiceClient(httpClient connect.HTTPClient, baseURL string, opts ...connect.ClientOption) AgentChatServiceClient {
+	baseURL = strings.TrimRight(baseURL, "/")
+	agentChatServiceMethods := v1.File_agent_v1_daemon_proto.Services().ByName("AgentChatService").Methods()
+	return &agentChatServiceClient{
+		chat: connect.NewClient[v1.ChatInput, v1.ChatOutput](
+			httpClient,
+			baseURL+AgentChatServiceChatProcedure,
+			connect.WithSchema(agentChatServiceMethods.ByName("Chat")),
+			connect.WithClientOptions(opts...),
+		),
+	}
+}
+
+// agentChatServiceClient implements AgentChatServiceClient.
+type agentChatServiceClient struct {
+	chat *connect.Client[v1.ChatInput, v1.ChatOutput]
+}
+
+// Chat calls agent.v1.AgentChatService.Chat.
+func (c *agentChatServiceClient) Chat(ctx context.Context) *connect.BidiStreamForClient[v1.ChatInput, v1.ChatOutput] {
+	return c.chat.CallBidiStream(ctx)
+}
+
+// AgentChatServiceHandler is an implementation of the agent.v1.AgentChatService service.
+type AgentChatServiceHandler interface {
+	Chat(context.Context, *connect.BidiStream[v1.ChatInput, v1.ChatOutput]) error
+}
+
+// NewAgentChatServiceHandler builds an HTTP handler from the service implementation. It returns the
+// path on which to mount the handler and the handler itself.
+//
+// By default, handlers support the Connect, gRPC, and gRPC-Web protocols with the binary Protobuf
+// and JSON codecs. They also support gzip compression.
+func NewAgentChatServiceHandler(svc AgentChatServiceHandler, opts ...connect.HandlerOption) (string, http.Handler) {
+	agentChatServiceMethods := v1.File_agent_v1_daemon_proto.Services().ByName("AgentChatService").Methods()
+	agentChatServiceChatHandler := connect.NewBidiStreamHandler(
+		AgentChatServiceChatProcedure,
+		svc.Chat,
+		connect.WithSchema(agentChatServiceMethods.ByName("Chat")),
+		connect.WithHandlerOptions(opts...),
+	)
+	return "/agent.v1.AgentChatService/", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		switch r.URL.Path {
+		case AgentChatServiceChatProcedure:
+			agentChatServiceChatHandler.ServeHTTP(w, r)
+		default:
+			http.NotFound(w, r)
+		}
+	})
+}
+
+// UnimplementedAgentChatServiceHandler returns CodeUnimplemented from all methods.
+type UnimplementedAgentChatServiceHandler struct{}
+
+func (UnimplementedAgentChatServiceHandler) Chat(context.Context, *connect.BidiStream[v1.ChatInput, v1.ChatOutput]) error {
+	return connect.NewError(connect.CodeUnimplemented, errors.New("agent.v1.AgentChatService.Chat is not implemented"))
 }

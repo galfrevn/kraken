@@ -102,3 +102,27 @@ service DaemonService {
   rpc WatchTasks(WatchTasksRequest) returns (stream WatchTasksResponse);
   rpc StreamTaskLogs(StreamTaskLogsRequest) returns (stream StreamTaskLogsResponse);
 }
+
+service AgentChatService {
+  rpc Chat(stream ChatInput) returns (stream ChatOutput);
+}
+
+message ChatInput {
+  oneof input {
+    string user_message = 1;
+    string confirmation_response = 2;
+    bool cancel = 3;
+  }
+}
+
+message ChatOutput {
+  oneof output {
+    string text_delta = 1;
+    string activity = 2;
+    string tool_call_description = 3;
+    string tool_result_summary = 4;
+    bool waiting_for_input = 5;
+    string error = 6;
+    bool done = 7;
+  }
+}
