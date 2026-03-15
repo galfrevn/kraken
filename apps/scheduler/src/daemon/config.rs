@@ -104,6 +104,10 @@ pub struct TriggersYamlConfig {
     pub webhooks: Vec<WebhookTriggerYamlConfig>,
     #[serde(default)]
     pub watchers: Vec<WatcherTriggerYamlConfig>,
+    #[serde(default)]
+    pub ci_failures: Vec<CiFailureTriggerYamlConfig>,
+    #[serde(default)]
+    pub pr_mentions: Vec<PrMentionTriggerYamlConfig>,
 }
 
 #[derive(Debug, Clone, Deserialize)]
@@ -141,6 +145,28 @@ pub struct WatcherTriggerYamlConfig {
     #[serde(default = "default_debounce_ms", rename = "debounceMs")]
     pub debounce_ms: u32,
     pub task: String,
+}
+
+#[derive(Debug, Clone, Deserialize)]
+pub struct CiFailureTriggerYamlConfig {
+    pub name: String,
+    pub repo: String,
+    #[serde(default)]
+    pub branches: Vec<String>,
+    pub task: String,
+}
+
+#[derive(Debug, Clone, Deserialize)]
+pub struct PrMentionTriggerYamlConfig {
+    pub name: String,
+    pub repo: String,
+    #[serde(default = "default_pr_mention_keyword")]
+    pub mention: String,
+    pub task: String,
+}
+
+fn default_pr_mention_keyword() -> String {
+    "@kraken".to_string()
 }
 
 // ---------------------------------------------------------------------------
@@ -334,10 +360,66 @@ fn substitute_environment_variables(input: &str) -> String {
 // ---------------------------------------------------------------------------
 
 impl TriggersYamlConfig {
+    pub fn expand_sugar_triggers(&self) -> Vec<WebhookTriggerYamlConfig> {
+        let mut expanded_webhook_configs = Vec::new();
+
+        for ci_failure_config in &self.ci_failures {
+            let mut event_filters: Vec<String> =
+                vec!["conclusion equals 'failure'".to_string()];
+
+            if !ci_failure_config.branches.is_empty() {
+                let branch_filter_pattern = ci_failure_config
+                    .branches
+                    .iter()
+                    .map(|branch_name| format!("head_branch equals '{branch_name}'"))
+                    .collect::<Vec<_>>();
+
+                for branch_filter in branch_filter_pattern {
+                    event_filters.push(branch_filter);
+                }
+            }
+
+            expanded_webhook_configs.push(WebhookTriggerYamlConfig {
+                name: ci_failure_config.name.clone(),
+                provider: "github".to_string(),
+                secret: String::new(),
+                events: vec![WebhookEventYamlConfig {
+                    event_type: "check_suite.completed".to_string(),
+                    filter: event_filters,
+                    task: ci_failure_config.task.clone(),
+                }],
+            });
+        }
+
+        for pr_mention_config in &self.pr_mentions {
+            let mention_filter =
+                format!("body contains '{}'", pr_mention_config.mention);
+
+            expanded_webhook_configs.push(WebhookTriggerYamlConfig {
+                name: pr_mention_config.name.clone(),
+                provider: "github".to_string(),
+                secret: String::new(),
+                events: vec![WebhookEventYamlConfig {
+                    event_type: "pull_request_review_comment.created".to_string(),
+                    filter: vec![mention_filter],
+                    task: pr_mention_config.task.clone(),
+                }],
+            });
+        }
+
+        expanded_webhook_configs
+    }
+
     pub fn into_parsed_webhook_trigger_configs(&self) -> Vec<WebhookTriggerConfig> {
         let mut parsed_webhook_configs = Vec::new();
 
-        for yaml_webhook in &self.webhooks {
+        let sugar_expanded_webhooks = self.expand_sugar_triggers();
+        let all_webhook_yaml_configs = self
+            .webhooks
+            .iter()
+            .chain(sugar_expanded_webhooks.iter());
+
+        for yaml_webhook in all_webhook_yaml_configs {
             let resolved_secret = substitute_environment_variables(&yaml_webhook.secret);
 
             let mut parsed_event_configs = Vec::new();
@@ -714,6 +796,8 @@ triggers:
         assert!(config.triggers.crons.is_empty());
         assert!(config.triggers.webhooks.is_empty());
         assert!(config.triggers.watchers.is_empty());
+        assert!(config.triggers.ci_failures.is_empty());
+        assert!(config.triggers.pr_mentions.is_empty());
     }
 
     #[test]
@@ -727,6 +811,8 @@ triggers:
             }],
             webhooks: vec![],
             watchers: vec![],
+            ci_failures: vec![],
+            pr_mentions: vec![],
         };
 
         let parsed_crons = triggers_config.into_parsed_cron_trigger_configs();
@@ -752,6 +838,8 @@ triggers:
                 }],
             }],
             watchers: vec![],
+            ci_failures: vec![],
+            pr_mentions: vec![],
         };
 
         let parsed_webhooks = triggers_config.into_parsed_webhook_trigger_configs();
@@ -776,6 +864,8 @@ triggers:
                 }],
             }],
             watchers: vec![],
+            ci_failures: vec![],
+            pr_mentions: vec![],
         };
 
         let parsed_webhooks = triggers_config.into_parsed_webhook_trigger_configs();
@@ -795,6 +885,8 @@ triggers:
                 debounce_ms: 2000,
                 task: "Config changed".to_string(),
             }],
+            ci_failures: vec![],
+            pr_mentions: vec![],
         };
 
         let parsed_watchers = triggers_config.into_parsed_watcher_trigger_configs();
@@ -1188,6 +1280,222 @@ notifications:
         assert_eq!(config.notifications.channels[0].events.len(), 2);
         assert_eq!(config.notifications.channels[1].name, "desktop");
         assert_eq!(config.notifications.channels[1].provider, "system");
+
+        let _ = std::fs::remove_file(&config_file_path);
+    }
+
+    // -- Sugar trigger expansion tests ----------------------------------------
+
+    #[test]
+    fn test_expand_ci_failure_without_branches_produces_single_conclusion_filter() {
+        let triggers_config = TriggersYamlConfig {
+            crons: vec![],
+            webhooks: vec![],
+            watchers: vec![],
+            ci_failures: vec![CiFailureTriggerYamlConfig {
+                name: "ci-fail-all-branches".to_string(),
+                repo: "owner/repo".to_string(),
+                branches: vec![],
+                task: "Fix CI failure on {{event.head_branch}}".to_string(),
+            }],
+            pr_mentions: vec![],
+        };
+
+        let expanded_webhooks = triggers_config.expand_sugar_triggers();
+        assert_eq!(expanded_webhooks.len(), 1);
+        assert_eq!(expanded_webhooks[0].name, "ci-fail-all-branches");
+        assert_eq!(expanded_webhooks[0].provider, "github");
+        assert_eq!(expanded_webhooks[0].events.len(), 1);
+        assert_eq!(
+            expanded_webhooks[0].events[0].event_type,
+            "check_suite.completed"
+        );
+        assert_eq!(expanded_webhooks[0].events[0].filter.len(), 1);
+        assert_eq!(
+            expanded_webhooks[0].events[0].filter[0],
+            "conclusion equals 'failure'"
+        );
+        assert_eq!(
+            expanded_webhooks[0].events[0].task,
+            "Fix CI failure on {{event.head_branch}}"
+        );
+    }
+
+    #[test]
+    fn test_expand_ci_failure_with_branches_adds_branch_filters() {
+        let triggers_config = TriggersYamlConfig {
+            crons: vec![],
+            webhooks: vec![],
+            watchers: vec![],
+            ci_failures: vec![CiFailureTriggerYamlConfig {
+                name: "ci-fail-main-develop".to_string(),
+                repo: "owner/repo".to_string(),
+                branches: vec!["main".to_string(), "develop".to_string()],
+                task: "Investigate CI failure".to_string(),
+            }],
+            pr_mentions: vec![],
+        };
+
+        let expanded_webhooks = triggers_config.expand_sugar_triggers();
+        assert_eq!(expanded_webhooks.len(), 1);
+        assert_eq!(expanded_webhooks[0].events[0].filter.len(), 3);
+        assert_eq!(
+            expanded_webhooks[0].events[0].filter[0],
+            "conclusion equals 'failure'"
+        );
+        assert_eq!(
+            expanded_webhooks[0].events[0].filter[1],
+            "head_branch equals 'main'"
+        );
+        assert_eq!(
+            expanded_webhooks[0].events[0].filter[2],
+            "head_branch equals 'develop'"
+        );
+    }
+
+    #[test]
+    fn test_expand_pr_mention_with_default_mention_keyword() {
+        let triggers_config = TriggersYamlConfig {
+            crons: vec![],
+            webhooks: vec![],
+            watchers: vec![],
+            ci_failures: vec![],
+            pr_mentions: vec![PrMentionTriggerYamlConfig {
+                name: "pr-mention-default".to_string(),
+                repo: "owner/repo".to_string(),
+                mention: default_pr_mention_keyword(),
+                task: "Respond to PR mention".to_string(),
+            }],
+        };
+
+        let expanded_webhooks = triggers_config.expand_sugar_triggers();
+        assert_eq!(expanded_webhooks.len(), 1);
+        assert_eq!(expanded_webhooks[0].name, "pr-mention-default");
+        assert_eq!(expanded_webhooks[0].provider, "github");
+        assert_eq!(expanded_webhooks[0].events.len(), 1);
+        assert_eq!(
+            expanded_webhooks[0].events[0].event_type,
+            "pull_request_review_comment.created"
+        );
+        assert_eq!(expanded_webhooks[0].events[0].filter.len(), 1);
+        assert_eq!(
+            expanded_webhooks[0].events[0].filter[0],
+            "body contains '@kraken'"
+        );
+        assert_eq!(
+            expanded_webhooks[0].events[0].task,
+            "Respond to PR mention"
+        );
+    }
+
+    #[test]
+    fn test_expand_pr_mention_with_custom_mention_keyword() {
+        let triggers_config = TriggersYamlConfig {
+            crons: vec![],
+            webhooks: vec![],
+            watchers: vec![],
+            ci_failures: vec![],
+            pr_mentions: vec![PrMentionTriggerYamlConfig {
+                name: "pr-mention-custom".to_string(),
+                repo: "owner/repo".to_string(),
+                mention: "@mybot".to_string(),
+                task: "Handle custom mention".to_string(),
+            }],
+        };
+
+        let expanded_webhooks = triggers_config.expand_sugar_triggers();
+        assert_eq!(expanded_webhooks.len(), 1);
+        assert_eq!(
+            expanded_webhooks[0].events[0].filter[0],
+            "body contains '@mybot'"
+        );
+    }
+
+    #[test]
+    fn test_sugar_triggers_merge_with_explicit_webhooks() {
+        let triggers_config = TriggersYamlConfig {
+            crons: vec![],
+            webhooks: vec![WebhookTriggerYamlConfig {
+                name: "explicit-webhook".to_string(),
+                provider: "github".to_string(),
+                secret: "my-secret".to_string(),
+                events: vec![WebhookEventYamlConfig {
+                    event_type: "push".to_string(),
+                    filter: vec![],
+                    task: "Deploy on push".to_string(),
+                }],
+            }],
+            watchers: vec![],
+            ci_failures: vec![CiFailureTriggerYamlConfig {
+                name: "ci-sugar".to_string(),
+                repo: "owner/repo".to_string(),
+                branches: vec![],
+                task: "Fix CI".to_string(),
+            }],
+            pr_mentions: vec![PrMentionTriggerYamlConfig {
+                name: "pr-sugar".to_string(),
+                repo: "owner/repo".to_string(),
+                mention: "@kraken".to_string(),
+                task: "Handle mention".to_string(),
+            }],
+        };
+
+        let parsed_webhooks = triggers_config.into_parsed_webhook_trigger_configs();
+        assert_eq!(parsed_webhooks.len(), 3);
+        assert_eq!(parsed_webhooks[0].name, "explicit-webhook");
+        assert_eq!(parsed_webhooks[1].name, "ci-sugar");
+        assert_eq!(parsed_webhooks[2].name, "pr-sugar");
+    }
+
+    #[test]
+    fn test_load_config_with_ci_failures_and_pr_mentions_yaml() {
+        let temporary_directory = std::env::temp_dir();
+        let config_file_path =
+            temporary_directory.join("kraken_test_sugar_triggers_config.yml");
+
+        let yaml_content = r#"
+repo: "/home/user/project"
+triggers:
+  ci_failures:
+    - name: ci-watch
+      repo: "owner/repo"
+      branches:
+        - main
+      task: "Fix CI on {{event.head_branch}}"
+  pr_mentions:
+    - name: pr-watch
+      repo: "owner/repo"
+      mention: "@helper"
+      task: "Review PR comment"
+"#;
+
+        let mut config_file = std::fs::File::create(&config_file_path)
+            .expect("should create test config file");
+        config_file
+            .write_all(yaml_content.as_bytes())
+            .expect("should write test config");
+
+        let config = DaemonConfig::load(Some(&config_file_path))
+            .expect("should parse config with sugar triggers");
+
+        assert_eq!(config.triggers.ci_failures.len(), 1);
+        assert_eq!(config.triggers.ci_failures[0].name, "ci-watch");
+        assert_eq!(config.triggers.ci_failures[0].repo, "owner/repo");
+        assert_eq!(config.triggers.ci_failures[0].branches, vec!["main"]);
+
+        assert_eq!(config.triggers.pr_mentions.len(), 1);
+        assert_eq!(config.triggers.pr_mentions[0].name, "pr-watch");
+        assert_eq!(config.triggers.pr_mentions[0].mention, "@helper");
+
+        let parsed_webhooks = config.triggers.into_parsed_webhook_trigger_configs();
+        assert_eq!(parsed_webhooks.len(), 2);
+        assert_eq!(parsed_webhooks[0].name, "ci-watch");
+        assert_eq!(parsed_webhooks[0].events[0].event_type, "check_suite.completed");
+        assert_eq!(parsed_webhooks[1].name, "pr-watch");
+        assert_eq!(
+            parsed_webhooks[1].events[0].event_type,
+            "pull_request_review_comment.created"
+        );
 
         let _ = std::fs::remove_file(&config_file_path);
     }
