@@ -221,10 +221,12 @@ async function startDaemon(args: string[]): Promise<void> {
     });
   }
 
-  // Wait for the daemon to start and write its PID file
-  await sleep(2000);
-
-  const daemonPid = readDaemonPid();
+  let daemonPid: number | null = null;
+  for (let waitAttempt = 0; waitAttempt < 6; waitAttempt++) {
+    await sleep(1000);
+    daemonPid = readDaemonPid();
+    if (daemonPid !== null && isProcessAlive(daemonPid)) break;
+  }
 
   if (daemonPid !== null && isProcessAlive(daemonPid)) {
     success(`Daemon started (PID ${daemonPid})`);
