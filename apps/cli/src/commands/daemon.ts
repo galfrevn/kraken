@@ -177,19 +177,30 @@ async function startDaemon(args: string[]): Promise<void> {
     mkdirSync(KRAKEN_HOME_DIRECTORY, { recursive: true });
   }
 
-  // Truncate log file on each start so it doesn't grow forever
+  // Truncate log file on each start
   writeFileSync(DAEMON_LOG_FILE_PATH, `--- daemon starting at ${new Date().toISOString()} ---\n`);
-  const logFileDescriptor = openSync(DAEMON_LOG_FILE_PATH, "a");
 
-  spawn({
-    cmd: daemonCommand,
-    cwd: daemonDirectory,
-    stdout: logFileDescriptor,
-    stderr: logFileDescriptor,
-  });
-
-  // Unref so the CLI process can exit without waiting for the daemon child
-  // (Bun doesn't support unref, but the process.exit() at the end handles it)
+  if (process.platform === "win32") {
+    // Bun spawn doesn't detach on Windows — child dies when parent exits.
+    // Use cmd /c start /b to create a truly independent process.
+    const binaryPath = daemonCommand[0]!;
+    const binaryArgs = daemonCommand.slice(1).join(" ");
+    const commandLine = binaryArgs
+      ? `"${binaryPath}" ${binaryArgs}`
+      : `"${binaryPath}"`;
+    Bun.spawnSync(
+      ["cmd", "/c", `start /b ${commandLine} >> "${DAEMON_LOG_FILE_PATH}" 2>&1`],
+      { cwd: daemonDirectory, stdio: ["ignore", "ignore", "ignore"] },
+    );
+  } else {
+    const logFileDescriptor = openSync(DAEMON_LOG_FILE_PATH, "a");
+    spawn({
+      cmd: daemonCommand,
+      cwd: daemonDirectory,
+      stdout: logFileDescriptor,
+      stderr: logFileDescriptor,
+    });
+  }
 
   // Wait for the daemon to start and write its PID file
   await sleep(2000);
