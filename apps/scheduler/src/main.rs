@@ -9,7 +9,6 @@ mod orchestrator;
 mod services;
 
 use std::path::PathBuf;
-use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
 
 use tokio::sync::broadcast;
@@ -19,7 +18,6 @@ use tracing::{error, info, warn};
 use tracing_subscriber::EnvFilter;
 
 use daemon::config::DaemonConfig;
-use daemon::process::ChildProcessManager;
 use proto::agent::v1::daemon_service_server::DaemonServiceServer;
 use proto::agent::v1::scheduler_service_server::SchedulerServiceServer;
 use proto::agent::v1::worker_service_server::WorkerServiceServer;
@@ -118,58 +116,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     );
 
     // -----------------------------------------------------------------------
-    // 10. Spawn Go gateway as a child process
-    // -----------------------------------------------------------------------
-    let gateway_is_connected = Arc::new(AtomicBool::new(false));
-    let mut child_process_manager = ChildProcessManager::new();
-
-    let gateway_binary_candidates = vec![
-        "apps/gateway/bin/gateway",
-        "../gateway/bin/gateway",
-    ];
-
-    let gateway_binary_path = gateway_binary_candidates
-        .iter()
-        .find(|candidate_path| std::path::Path::new(candidate_path).exists());
-
-    if let Some(found_gateway_binary_path) = gateway_binary_path {
-        let dotenv_file_path = dirs_next::home_dir()
-            .unwrap_or_else(|| PathBuf::from("."))
-            .join(".kraken")
-            .join(".env");
-
-        let dotenv_path_string = dotenv_file_path.to_string_lossy().to_string();
-        let gateway_port = daemon_config.services.webhook_port;
-
-        match child_process_manager.spawn_gateway(
-            found_gateway_binary_path,
-            gateway_port,
-            &dotenv_path_string,
-        ) {
-            Ok(()) => {
-                gateway_is_connected.store(true, Ordering::Relaxed);
-                info!(
-                    binary = found_gateway_binary_path,
-                    port = gateway_port,
-                    "gateway child process started"
-                );
-            }
-            Err(gateway_spawn_error) => {
-                warn!(
-                    error = %gateway_spawn_error,
-                    "failed to spawn gateway (daemon will run without gateway)"
-                );
-            }
-        }
-    } else {
-        warn!(
-            candidates = ?gateway_binary_candidates,
-            "gateway binary not found (daemon will run without gateway)"
-        );
-    }
-
-    // -----------------------------------------------------------------------
-    // 11. Find the worker script path
+    // 10. Find the worker script path
     // -----------------------------------------------------------------------
     let worker_script_candidates = vec![
         "apps/core/src/worker/index.ts",
@@ -191,7 +138,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     info!(worker_script_path = %worker_script_path, "worker script resolved");
 
     // -----------------------------------------------------------------------
-    // 12. Create Orchestrator and spawn it in a tokio task
+    // 11. Create Orchestrator and spawn it in a tokio task
     // -----------------------------------------------------------------------
     let daemon_grpc_url = format!("http://localhost:{daemon_port}");
 
@@ -221,19 +168,28 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     });
 
     // -----------------------------------------------------------------------
-    // 13. Initialize LLM provider router and create WorkerServiceImplementation
+    // 12. Initialize LLM provider router and create WorkerServiceImplementation
     // -----------------------------------------------------------------------
     let llm_provider_router = Arc::new(
-        llm::router::LlmProviderRouter::from_environment().map_err(|llm_router_error| {
-            error!(error = %llm_router_error, "failed to initialize LLM provider router");
-            llm_router_error
-        })?,
-    );
-
-    info!(
-        default_provider = %llm_provider_router.default_provider_name(),
-        available_providers = ?llm_provider_router.available_providers(),
-        "LLM provider router initialized for worker service"
+        match llm::router::LlmProviderRouter::from_environment() {
+            Ok(router) => {
+                info!(
+                    default_provider = %router.default_provider_name(),
+                    available_providers = ?router.available_providers(),
+                    "LLM provider router initialized"
+                );
+                router
+            }
+            Err(no_providers_error) => {
+                warn!(
+                    error = %no_providers_error,
+                    "no LLM providers configured -- daemon will start but \
+                     workers will fail on completion requests until API keys \
+                     are set and the daemon is restarted"
+                );
+                llm::router::LlmProviderRouter::empty()
+            }
+        },
     );
 
     let worker_service_implementation = services::worker_service::WorkerServiceImplementation::new(
@@ -244,7 +200,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     );
 
     // -----------------------------------------------------------------------
-    // 14. Create DaemonServiceImplementation
+    // 13. Create DaemonServiceImplementation
     // -----------------------------------------------------------------------
     // DaemonServiceImplementation requires Arc<Orchestrator> for querying
     // active_worker_count. Since the real orchestrator is behind a Mutex in
@@ -261,6 +217,8 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         daemon_state.shutdown_receiver.clone(),
     ));
 
+    let llm_providers_are_configured = llm_provider_router.has_any_providers();
+
     let daemon_service_implementation =
         services::daemon_service::DaemonServiceImplementation::new(
             Arc::clone(&shared_task_store),
@@ -268,11 +226,11 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             daemon_state.start_time,
             daemon_config.orchestrator.max_concurrent_tasks,
             activity_event_sender.clone(),
-            Arc::clone(&gateway_is_connected),
+            llm_providers_are_configured,
         );
 
     // -----------------------------------------------------------------------
-    // 15. Build tonic Server with all three services
+    // 14. Build tonic Server with all three services
     // -----------------------------------------------------------------------
     let scheduler_grpc_server = grpc::SchedulerServer::new(
         cron_engine.clone(),
@@ -286,7 +244,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     );
 
     // -----------------------------------------------------------------------
-    // 16. Serve with shutdown signal (ctrl_c)
+    // 15. Serve with shutdown signal (ctrl_c)
     // -----------------------------------------------------------------------
     Server::builder()
         .add_service(SchedulerServiceServer::new(scheduler_grpc_server))
@@ -299,7 +257,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         .await?;
 
     // -----------------------------------------------------------------------
-    // 17. Graceful shutdown sequence
+    // 16. Graceful shutdown sequence
     // -----------------------------------------------------------------------
     info!("beginning graceful shutdown");
 
@@ -313,9 +271,6 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             "orchestrator task panicked during shutdown"
         );
     }
-
-    // Kill gateway subprocess
-    child_process_manager.kill_all_children();
 
     // Shutdown cron engine
     cron_engine.shutdown();

@@ -1,5 +1,4 @@
 use std::pin::Pin;
-use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
 use std::time::Instant;
 
@@ -43,7 +42,11 @@ pub struct DaemonServiceImplementation {
     uptime_start_time: Instant,
     max_concurrent_workers: u32,
     activity_event_sender: broadcast::Sender<WorkerActivityEvent>,
-    gateway_is_connected: Arc<AtomicBool>,
+    /// Whether the daemon has at least one LLM provider configured.
+    /// The daemon itself IS the LLM gateway now (no separate Go process),
+    /// so `gateway_connected` in the status response is always `true`.
+    /// This field tracks whether workers will be able to make LLM calls.
+    llm_providers_are_configured: bool,
 }
 
 impl DaemonServiceImplementation {
@@ -54,14 +57,14 @@ impl DaemonServiceImplementation {
     /// - `uptime_start_time`: the instant the daemon started, used to compute uptime.
     /// - `max_concurrent_workers`: the configured concurrency limit for workers.
     /// - `activity_event_sender`: broadcast channel for worker activity events.
-    /// - `gateway_is_connected`: atomic flag indicating whether the Go gateway is reachable.
+    /// - `llm_providers_are_configured`: whether the LLM provider router has any providers.
     pub fn new(
         task_store: Arc<TaskStore>,
         orchestrator: Arc<Orchestrator>,
         uptime_start_time: Instant,
         max_concurrent_workers: u32,
         activity_event_sender: broadcast::Sender<WorkerActivityEvent>,
-        gateway_is_connected: Arc<AtomicBool>,
+        llm_providers_are_configured: bool,
     ) -> Self {
         Self {
             task_store,
@@ -69,7 +72,7 @@ impl DaemonServiceImplementation {
             uptime_start_time,
             max_concurrent_workers,
             activity_event_sender,
-            gateway_is_connected,
+            llm_providers_are_configured,
         }
     }
 }
@@ -125,7 +128,10 @@ impl DaemonService for DaemonServiceImplementation {
     /// Returns the current health and status of the daemon.
     ///
     /// Includes uptime, worker counts, pending/completed task counts,
-    /// and whether the Go gateway is reachable.
+    /// and LLM gateway status. The daemon itself handles LLM requests
+    /// directly (no separate Go gateway process), so `gateway_connected`
+    /// is always `true`. The `llm_providers_are_configured` field tracks
+    /// whether workers will actually be able to make LLM completion calls.
     async fn get_status(
         &self,
         _request: Request<GetStatusRequest>,
@@ -134,7 +140,16 @@ impl DaemonService for DaemonServiceImplementation {
         let active_workers = self.orchestrator.active_worker_count() as i32;
         let pending_tasks = self.task_store.count_by_status("pending").await;
         let completed_tasks_today = self.task_store.count_completed_today().await;
-        let gateway_connected = self.gateway_is_connected.load(Ordering::Relaxed);
+
+        // The daemon IS the LLM gateway now — gateway_connected is always true.
+        // Whether LLM calls will succeed depends on llm_providers_are_configured.
+        let gateway_connected = true;
+
+        if !self.llm_providers_are_configured {
+            warn!(
+                "no LLM providers configured -- workers will fail on completion requests"
+            );
+        }
 
         info!(
             uptime_seconds = uptime_seconds,
@@ -142,6 +157,7 @@ impl DaemonService for DaemonServiceImplementation {
             pending_tasks = pending_tasks,
             completed_tasks_today = completed_tasks_today,
             gateway_connected = gateway_connected,
+            llm_providers_configured = self.llm_providers_are_configured,
             "status requested"
         );
 

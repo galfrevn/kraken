@@ -53,6 +53,25 @@ impl LlmProviderRouter {
     // Construction
     // -----------------------------------------------------------------------
 
+    /// Creates an empty router with no providers configured.
+    ///
+    /// Any `complete` or `stream_complete` call will fail with a
+    /// `configuration` error explaining that no providers are available.
+    /// This is used when the daemon starts without any API keys — it
+    /// stays alive and serves other RPCs, but LLM requests will fail
+    /// until the environment is reconfigured and the daemon restarted.
+    pub fn empty() -> Self {
+        Self {
+            providers: HashMap::new(),
+            default_provider_name: String::new(),
+        }
+    }
+
+    /// Returns `true` if at least one LLM provider is configured.
+    pub fn has_any_providers(&self) -> bool {
+        !self.providers.is_empty()
+    }
+
     /// Create a router by reading environment variables to discover which
     /// providers have credentials configured.
     ///
@@ -411,5 +430,42 @@ mod tests {
         assert_eq!(router.default_provider_name(), "openrouter");
 
         unsafe { std::env::remove_var("KRAKEN_OPENROUTER_API_KEY") };
+    }
+
+    /// An empty router should have no providers and report so via
+    /// `has_any_providers()`.
+    #[test]
+    fn empty_router_has_no_providers() {
+        let empty_router = LlmProviderRouter::empty();
+        assert!(!empty_router.has_any_providers());
+        assert!(empty_router.available_providers().is_empty());
+        assert_eq!(empty_router.default_provider_name(), "");
+    }
+
+    /// An empty router should fail gracefully when `resolve_provider` is called.
+    #[test]
+    fn empty_router_resolve_provider_returns_configuration_error() {
+        let empty_router = LlmProviderRouter::empty();
+        match empty_router.resolve_provider("openai") {
+            Ok(_) => panic!("expected error for unconfigured provider on empty router"),
+            Err(error) => {
+                assert_eq!(error.error_type, "configuration");
+                assert!(error.message.contains("not configured"));
+            }
+        }
+    }
+
+    /// A router created from the environment with providers should report
+    /// `has_any_providers() == true`.
+    #[test]
+    #[serial]
+    fn from_environment_has_any_providers_returns_true() {
+        unsafe { clear_provider_env_vars() };
+        unsafe { std::env::set_var("OPENAI_API_KEY", "sk-test-key") };
+
+        let router = LlmProviderRouter::from_environment().expect("should succeed");
+        assert!(router.has_any_providers());
+
+        unsafe { std::env::remove_var("OPENAI_API_KEY") };
     }
 }
