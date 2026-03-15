@@ -250,6 +250,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         daemon_grpc_url,
         worker_script_path,
         daemon_config.repo.clone(),
+        daemon_config.git.branch_prefix.clone(),
         shutdown_receiver_for_orchestrator,
     );
 
@@ -315,6 +316,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         format!("http://localhost:{daemon_port}"),
         String::new(),
         daemon_config.repo.clone(),
+        daemon_config.git.branch_prefix.clone(),
         daemon_state.shutdown_receiver.clone(),
     ));
 
