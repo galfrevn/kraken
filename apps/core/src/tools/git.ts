@@ -212,3 +212,54 @@ export const gitLogTool: Tool = {
     }
   },
 };
+
+export const createPullRequestTool: Tool = {
+  definition: {
+    name: "create_pull_request",
+    description:
+      "Push the current branch and create a GitHub pull request. Requires the GitHub CLI (gh) to be installed and authenticated.",
+    parameters: [
+      { name: "title", type: "string", description: "Pull request title", required: true },
+      { name: "body", type: "string", description: "Pull request body/description in markdown", required: true },
+      { name: "base", type: "string", description: "Base branch to merge into (default: main)", required: false },
+    ],
+  },
+
+  async execute(
+    parameters: Record<string, unknown>,
+    context: ToolExecutionContext,
+  ): Promise<ToolResult> {
+    const pullRequestTitle = parameters["title"] as string;
+    const pullRequestBody = parameters["body"] as string;
+    const baseBranch = (parameters["base"] as string) || "main";
+    const workingDirectory = context.workingDirectory || process.cwd();
+
+    if (!pullRequestTitle) {
+      return { success: false, output: "", error: "title is required" };
+    }
+
+    try {
+      const pushResult = await spawnCommand("git", ["push", "-u", "origin", "HEAD"], workingDirectory);
+
+      if (pushResult.exitCode !== 0) {
+        return { success: false, output: "", error: `git push failed: ${pushResult.stderr || "unknown error"}` };
+      }
+
+      const ghCreatePullRequestResult = await spawnCommand(
+        "gh",
+        ["pr", "create", "--title", pullRequestTitle, "--body", pullRequestBody, "--base", baseBranch],
+        workingDirectory,
+      );
+
+      if (ghCreatePullRequestResult.exitCode !== 0) {
+        return { success: false, output: "", error: `gh pr create failed: ${ghCreatePullRequestResult.stderr || "unknown error"}` };
+      }
+
+      const pullRequestUrl = ghCreatePullRequestResult.stdout.trim();
+      return { success: true, output: `Pull request created: ${pullRequestUrl}` };
+    } catch (executionError) {
+      const errorDescription = executionError instanceof Error ? executionError.message : String(executionError);
+      return { success: false, output: "", error: errorDescription };
+    }
+  },
+};

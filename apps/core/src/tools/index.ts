@@ -16,7 +16,7 @@ export {
   moveFileTool,
   replaceInFilesTool,
 } from "@/tools/filesystem.ts";
-export { gitStatusTool, gitDiffTool, gitCommitTool, gitLogTool } from "@/tools/git.ts";
+export { gitStatusTool, gitDiffTool, gitCommitTool, gitLogTool, createPullRequestTool } from "@/tools/git.ts";
 export { webSearchTool, fetchUrlTool } from "@/tools/browser.ts";
 export { httpRequestTool } from "@/tools/http.ts";
 export { diffFilesTool } from "@/tools/diff.ts";
@@ -79,7 +79,7 @@ import {
   moveFileTool,
   replaceInFilesTool,
 } from "@/tools/filesystem.ts";
-import { gitStatusTool, gitDiffTool, gitCommitTool, gitLogTool } from "@/tools/git.ts";
+import { gitStatusTool, gitDiffTool, gitCommitTool, gitLogTool, createPullRequestTool } from "@/tools/git.ts";
 import { webSearchTool, fetchUrlTool } from "@/tools/browser.ts";
 import { httpRequestTool } from "@/tools/http.ts";
 import { diffFilesTool } from "@/tools/diff.ts";
@@ -149,6 +149,7 @@ export function createDefaultToolRegistry(options?: ToolRegistryOptions): ToolRe
   registry.register(gitDiffTool);
   registry.register(gitCommitTool);
   registry.register(gitLogTool);
+  registry.register(createPullRequestTool);
   registry.register(webSearchTool);
   registry.register(fetchUrlTool);
   registry.register(httpRequestTool);
