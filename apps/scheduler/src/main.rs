@@ -4,6 +4,7 @@ mod watcher;
 mod grpc;
 mod db;
 mod daemon;
+mod llm;
 mod orchestrator;
 mod services;
 

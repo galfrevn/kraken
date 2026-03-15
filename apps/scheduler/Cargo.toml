@@ -28,6 +28,8 @@ serde_yml = "0.0.12"
 dirs-next = "2"
 sysinfo = "0.33"
 reqwest = { version = "0.12", features = ["json"] }
+async-trait = "0.1"
+futures = "0.3"
 
 [build-dependencies]
 tonic-build = "0.13"
