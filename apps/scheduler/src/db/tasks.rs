@@ -63,6 +63,15 @@ fn row_to_daemon_task(row: &Row<'_>) -> rusqlite::Result<DaemonTask> {
     })
 }
 
+#[derive(Debug, Clone, Default)]
+pub struct DailyStatistics {
+    pub completed_task_count: i32,
+    pub failed_task_count: i32,
+    pub total_cost_usd: f64,
+    pub total_prompt_tokens: i64,
+    pub total_completion_tokens: i64,
+}
+
 /// Provides CRUD operations for the `daemon_tasks` and `task_logs` tables.
 /// The daemon is the sole writer; all mutations go through this store.
 #[derive(Clone)]
@@ -453,6 +462,59 @@ impl TaskStore {
             )
             .unwrap_or(0)
     }
+
+    /// Aggregates task statistics for the current UTC day: completed/failed counts,
+    /// total cost, and total token usage. Uses completed_at for terminal tasks and
+    /// created_at as fallback for tasks without a completion timestamp.
+    pub async fn get_daily_statistics(&self) -> DailyStatistics {
+        let connection = self.database_pool.lock().await;
+
+        let completed_task_count = connection
+            .query_row(
+                "SELECT COUNT(*) FROM daemon_tasks
+                 WHERE status = 'completed'
+                   AND date(COALESCE(completed_at, created_at)) = date('now')",
+                [],
+                |row| row.get::<_, i32>(0),
+            )
+            .unwrap_or(0);
+
+        let failed_task_count = connection
+            .query_row(
+                "SELECT COUNT(*) FROM daemon_tasks
+                 WHERE status = 'failed'
+                   AND date(COALESCE(completed_at, created_at)) = date('now')",
+                [],
+                |row| row.get::<_, i32>(0),
+            )
+            .unwrap_or(0);
+
+        let (total_cost_usd, total_prompt_tokens, total_completion_tokens) = connection
+            .query_row(
+                "SELECT COALESCE(SUM(estimated_cost_usd), 0.0),
+                        COALESCE(SUM(prompt_tokens), 0),
+                        COALESCE(SUM(completion_tokens), 0)
+                 FROM daemon_tasks
+                 WHERE date(COALESCE(completed_at, created_at)) = date('now')",
+                [],
+                |row| {
+                    Ok((
+                        row.get::<_, f64>(0)?,
+                        row.get::<_, i64>(1)?,
+                        row.get::<_, i64>(2)?,
+                    ))
+                },
+            )
+            .unwrap_or((0.0, 0, 0));
+
+        DailyStatistics {
+            completed_task_count,
+            failed_task_count,
+            total_cost_usd,
+            total_prompt_tokens,
+            total_completion_tokens,
+        }
+    }
 }
 
 #[cfg(test)]
@@ -667,6 +729,96 @@ mod tests {
             .await;
         assert!(result.is_err());
         assert!(result.unwrap_err().contains("no task found"));
+
+        let _ = std::fs::remove_file(&database_path);
+    }
+
+    #[tokio::test]
+    async fn test_get_daily_statistics_with_no_tasks() {
+        let (task_store, database_path) = create_test_store().await;
+
+        let daily_statistics = task_store.get_daily_statistics().await;
+
+        assert_eq!(daily_statistics.completed_task_count, 0);
+        assert_eq!(daily_statistics.failed_task_count, 0);
+        assert!((daily_statistics.total_cost_usd - 0.0).abs() < 1e-9);
+        assert_eq!(daily_statistics.total_prompt_tokens, 0);
+        assert_eq!(daily_statistics.total_completion_tokens, 0);
+
+        let _ = std::fs::remove_file(&database_path);
+    }
+
+    #[tokio::test]
+    async fn test_get_daily_statistics_counts_completed_and_failed_tasks() {
+        let (task_store, database_path) = create_test_store().await;
+
+        let completed_task = task_store
+            .create_task("completed-task", "desc", 5)
+            .await
+            .unwrap();
+        task_store
+            .update_status(&completed_task.id, "running")
+            .await
+            .unwrap();
+        task_store
+            .update_status(&completed_task.id, "completed")
+            .await
+            .unwrap();
+
+        let failed_task = task_store
+            .create_task("failed-task", "desc", 5)
+            .await
+            .unwrap();
+        task_store
+            .update_status(&failed_task.id, "running")
+            .await
+            .unwrap();
+        task_store
+            .update_status(&failed_task.id, "failed")
+            .await
+            .unwrap();
+
+        let pending_task = task_store
+            .create_task("pending-task", "desc", 5)
+            .await
+            .unwrap();
+        let _ = &pending_task;
+
+        let daily_statistics = task_store.get_daily_statistics().await;
+
+        assert_eq!(daily_statistics.completed_task_count, 1);
+        assert_eq!(daily_statistics.failed_task_count, 1);
+
+        let _ = std::fs::remove_file(&database_path);
+    }
+
+    #[tokio::test]
+    async fn test_get_daily_statistics_aggregates_token_usage_and_cost() {
+        let (task_store, database_path) = create_test_store().await;
+
+        let first_task = task_store
+            .create_task("first-task", "desc", 5)
+            .await
+            .unwrap();
+        task_store
+            .add_token_usage(&first_task.id, 100, 50, 0.005)
+            .await
+            .unwrap();
+
+        let second_task = task_store
+            .create_task("second-task", "desc", 5)
+            .await
+            .unwrap();
+        task_store
+            .add_token_usage(&second_task.id, 200, 100, 0.010)
+            .await
+            .unwrap();
+
+        let daily_statistics = task_store.get_daily_statistics().await;
+
+        assert_eq!(daily_statistics.total_prompt_tokens, 300);
+        assert_eq!(daily_statistics.total_completion_tokens, 150);
+        assert!((daily_statistics.total_cost_usd - 0.015).abs() < 1e-9);
 
         let _ = std::fs::remove_file(&database_path);
     }

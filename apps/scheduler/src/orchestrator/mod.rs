@@ -29,6 +29,10 @@ const STALE_WORKTREE_CLEANUP_INTERVAL_TICKS: u64 = 21600;
 /// Maximum age in days before a worktree is considered stale and eligible for cleanup.
 const STALE_WORKTREE_MAXIMUM_AGE_DAYS: u32 = 7;
 
+/// Number of tick cycles (each ~1 second) between daily digest notification dispatches.
+/// 24 hours = 24 * 60 * 60 = 86400 ticks.
+const DAILY_DIGEST_INTERVAL_TICKS: u64 = 86400;
+
 pub struct Orchestrator {
     task_store: Arc<TaskStore>,
     heartbeat_tracker: Arc<HeartbeatTracker>,
@@ -42,6 +46,7 @@ pub struct Orchestrator {
     worktree_manager: Arc<WorktreeManager>,
     shutdown_receiver: watch::Receiver<bool>,
     ticks_since_last_stale_worktree_cleanup: u64,
+    ticks_since_last_daily_digest: u64,
     notification_dispatcher: Arc<NotificationDispatcher>,
 }
 
@@ -89,6 +94,7 @@ impl Orchestrator {
             worktree_manager,
             shutdown_receiver,
             ticks_since_last_stale_worktree_cleanup: 0,
+            ticks_since_last_daily_digest: 0,
             notification_dispatcher,
         }
     }
@@ -222,6 +228,62 @@ impl Orchestrator {
                 }
             });
         }
+
+        self.ticks_since_last_daily_digest += 1;
+        if self.ticks_since_last_daily_digest >= DAILY_DIGEST_INTERVAL_TICKS {
+            self.ticks_since_last_daily_digest = 0;
+            self.fire_daily_digest_notification().await;
+        }
+    }
+
+    async fn fire_daily_digest_notification(&self) {
+        let daily_statistics = self.task_store.get_daily_statistics().await;
+
+        let total_token_count =
+            daily_statistics.total_prompt_tokens + daily_statistics.total_completion_tokens;
+
+        let mut daily_digest_details = HashMap::new();
+        daily_digest_details.insert(
+            "completed".to_string(),
+            daily_statistics.completed_task_count.to_string(),
+        );
+        daily_digest_details.insert(
+            "failed".to_string(),
+            daily_statistics.failed_task_count.to_string(),
+        );
+        daily_digest_details.insert(
+            "total_cost_usd".to_string(),
+            format!("${:.4}", daily_statistics.total_cost_usd),
+        );
+        daily_digest_details.insert(
+            "total_tokens".to_string(),
+            total_token_count.to_string(),
+        );
+
+        let digest_summary = format!(
+            "Daily digest: {} completed, {} failed, {} tokens, ${:.4} cost",
+            daily_statistics.completed_task_count,
+            daily_statistics.failed_task_count,
+            total_token_count,
+            daily_statistics.total_cost_usd,
+        );
+
+        info!(
+            completed = daily_statistics.completed_task_count,
+            failed = daily_statistics.failed_task_count,
+            total_tokens = total_token_count,
+            total_cost_usd = daily_statistics.total_cost_usd,
+            "firing daily digest notification"
+        );
+
+        self.fire_notification(NotificationEvent {
+            event_type: NotificationEventType::DailyDigest,
+            task_name: "daily-digest".to_string(),
+            task_id: "daily-digest".to_string(),
+            summary: digest_summary,
+            details: daily_digest_details,
+            timestamp: chrono::Utc::now(),
+        });
     }
 
     fn is_retryable_exit_code(exit_code: i32) -> bool {
@@ -1336,5 +1398,179 @@ mod tests {
         assert_eq!(unchanged_task.attempt, 1);
 
         let _ = std::fs::remove_file(&database_path);
+    }
+
+    #[tokio::test]
+    async fn test_daily_digest_notification_fires_with_statistics() {
+        let (task_store, database_path) = create_test_task_store().await;
+        let (_shutdown_sender, shutdown_receiver) = watch::channel(false);
+
+        let completed_task = task_store
+            .create_task("digest-completed", "desc", 5)
+            .await
+            .unwrap();
+        task_store
+            .update_status(&completed_task.id, "running")
+            .await
+            .unwrap();
+        task_store
+            .add_token_usage(&completed_task.id, 500, 200, 0.025)
+            .await
+            .unwrap();
+        task_store
+            .update_status(&completed_task.id, "completed")
+            .await
+            .unwrap();
+
+        let failed_task = task_store
+            .create_task("digest-failed", "desc", 5)
+            .await
+            .unwrap();
+        task_store
+            .update_status(&failed_task.id, "running")
+            .await
+            .unwrap();
+        task_store
+            .add_token_usage(&failed_task.id, 100, 50, 0.005)
+            .await
+            .unwrap();
+        task_store
+            .update_status(&failed_task.id, "failed")
+            .await
+            .unwrap();
+
+        let orchestrator = Orchestrator::new(
+            task_store.clone(),
+            3,
+            300,
+            2,
+            30,
+            "http://localhost:50051".to_string(),
+            "worker.ts".to_string(),
+            "/tmp/test-repo".to_string(),
+            "kraken/".to_string(),
+            shutdown_receiver,
+            create_empty_notification_dispatcher(),
+        );
+
+        orchestrator.fire_daily_digest_notification().await;
+
+        let _ = std::fs::remove_file(&database_path);
+    }
+
+    #[tokio::test]
+    async fn test_daily_digest_notification_fires_with_zero_statistics() {
+        let (task_store, database_path) = create_test_task_store().await;
+        let (_shutdown_sender, shutdown_receiver) = watch::channel(false);
+
+        let orchestrator = Orchestrator::new(
+            task_store,
+            3,
+            300,
+            2,
+            30,
+            "http://localhost:50051".to_string(),
+            "worker.ts".to_string(),
+            "/tmp/test-repo".to_string(),
+            "kraken/".to_string(),
+            shutdown_receiver,
+            create_empty_notification_dispatcher(),
+        );
+
+        orchestrator.fire_daily_digest_notification().await;
+
+        let _ = std::fs::remove_file(&database_path);
+    }
+
+    #[tokio::test]
+    async fn test_daily_digest_tick_counter_increments_and_resets() {
+        let (task_store, database_path) = create_test_task_store().await;
+        let (_shutdown_sender, shutdown_receiver) = watch::channel(false);
+
+        let mut orchestrator = Orchestrator::new(
+            task_store,
+            3,
+            300,
+            2,
+            30,
+            "http://localhost:50051".to_string(),
+            "worker.ts".to_string(),
+            "/tmp/test-repo".to_string(),
+            "kraken/".to_string(),
+            shutdown_receiver,
+            create_empty_notification_dispatcher(),
+        );
+
+        assert_eq!(orchestrator.ticks_since_last_daily_digest, 0);
+
+        orchestrator.ticks_since_last_daily_digest = DAILY_DIGEST_INTERVAL_TICKS - 2;
+        orchestrator.tick().await;
+        assert_eq!(
+            orchestrator.ticks_since_last_daily_digest,
+            DAILY_DIGEST_INTERVAL_TICKS - 1
+        );
+
+        orchestrator.tick().await;
+        assert_eq!(orchestrator.ticks_since_last_daily_digest, 0);
+
+        let _ = std::fs::remove_file(&database_path);
+    }
+
+    #[tokio::test]
+    async fn test_daily_digest_event_format_contains_expected_details() {
+        use crate::db::tasks::DailyStatistics;
+
+        let daily_statistics = DailyStatistics {
+            completed_task_count: 5,
+            failed_task_count: 2,
+            total_cost_usd: 1.2345,
+            total_prompt_tokens: 10000,
+            total_completion_tokens: 5000,
+        };
+
+        let total_token_count =
+            daily_statistics.total_prompt_tokens + daily_statistics.total_completion_tokens;
+
+        let mut daily_digest_details = HashMap::new();
+        daily_digest_details.insert(
+            "completed".to_string(),
+            daily_statistics.completed_task_count.to_string(),
+        );
+        daily_digest_details.insert(
+            "failed".to_string(),
+            daily_statistics.failed_task_count.to_string(),
+        );
+        daily_digest_details.insert(
+            "total_cost_usd".to_string(),
+            format!("${:.4}", daily_statistics.total_cost_usd),
+        );
+        daily_digest_details.insert(
+            "total_tokens".to_string(),
+            total_token_count.to_string(),
+        );
+
+        let digest_event = NotificationEvent {
+            event_type: NotificationEventType::DailyDigest,
+            task_name: "daily-digest".to_string(),
+            task_id: "daily-digest".to_string(),
+            summary: format!(
+                "Daily digest: {} completed, {} failed, {} tokens, ${:.4} cost",
+                daily_statistics.completed_task_count,
+                daily_statistics.failed_task_count,
+                total_token_count,
+                daily_statistics.total_cost_usd,
+            ),
+            details: daily_digest_details,
+            timestamp: chrono::Utc::now(),
+        };
+
+        let formatted_text = digest_event.format_as_plain_text();
+
+        assert!(formatted_text.contains("DailyDigest"));
+        assert!(formatted_text.contains("5 completed, 2 failed, 15000 tokens, $1.2345 cost"));
+        assert!(formatted_text.contains("completed: 5"));
+        assert!(formatted_text.contains("failed: 2"));
+        assert!(formatted_text.contains("total_cost_usd: $1.2345"));
+        assert!(formatted_text.contains("total_tokens: 15000"));
     }
 }
