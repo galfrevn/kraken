@@ -6,6 +6,7 @@ use tracing::{info, warn};
 use crate::notifications::dispatcher::NotificationDispatcher;
 use crate::notifications::discord::DiscordNotificationChannel;
 use crate::notifications::email::EmailNotificationChannel;
+use crate::notifications::github::GitHubNotificationChannel;
 use crate::notifications::slack::SlackNotificationChannel;
 use crate::notifications::system::SystemNotificationChannel;
 use crate::notifications::types::NotificationEventType;
@@ -256,6 +257,10 @@ pub struct NotificationChannelYamlConfig {
     #[serde(default, rename = "apiKey")]
     pub api_key: Option<String>,
     #[serde(default)]
+    pub token: Option<String>,
+    #[serde(default)]
+    pub repo: Option<String>,
+    #[serde(default)]
     pub from: Option<String>,
     #[serde(default)]
     pub to: Option<String>,
@@ -367,6 +372,41 @@ impl NotificationsYamlConfig {
                         parsed_subscribed_event_types,
                     );
                     notification_dispatcher.add_channel(Box::new(email_channel));
+                }
+                "github" => {
+                    let Some(raw_token) = &channel_yaml_config.token else {
+                        warn!(
+                            channel_name = %channel_yaml_config.name,
+                            "github channel missing token, skipping"
+                        );
+                        continue;
+                    };
+                    let Some(raw_repo) = &channel_yaml_config.repo else {
+                        warn!(
+                            channel_name = %channel_yaml_config.name,
+                            "github channel missing repo, skipping"
+                        );
+                        continue;
+                    };
+                    let resolved_token =
+                        substitute_environment_variables(raw_token);
+                    let repo_parts: Vec<&str> = raw_repo.split('/').collect();
+                    if repo_parts.len() != 2 {
+                        warn!(
+                            channel_name = %channel_yaml_config.name,
+                            repo = %raw_repo,
+                            "github channel repo must be in owner/name format, skipping"
+                        );
+                        continue;
+                    }
+                    let github_channel = GitHubNotificationChannel::new(
+                        channel_yaml_config.name.clone(),
+                        resolved_token,
+                        repo_parts[0].to_string(),
+                        repo_parts[1].to_string(),
+                        parsed_subscribed_event_types,
+                    );
+                    notification_dispatcher.add_channel(Box::new(github_channel));
                 }
                 "system" => {
                     let system_channel = SystemNotificationChannel::new(
@@ -1092,6 +1132,8 @@ triggers:
                 provider: "slack".to_string(),
                 webhook_url: Some("https://hooks.slack.com/services/T00/B00/xxx".to_string()),
                 api_key: None,
+                token: None,
+                repo: None,
                 from: None,
                 to: None,
                 events: vec![
@@ -1113,6 +1155,8 @@ triggers:
                 provider: "discord".to_string(),
                 webhook_url: Some("https://discord.com/api/webhooks/123/abc".to_string()),
                 api_key: None,
+                token: None,
+                repo: None,
                 from: None,
                 to: None,
                 events: vec!["task.completed".to_string()],
@@ -1131,6 +1175,8 @@ triggers:
                 provider: "email".to_string(),
                 webhook_url: None,
                 api_key: Some("re_test_key".to_string()),
+                token: None,
+                repo: None,
                 from: Some("Kraken <noreply@kraken.dev>".to_string()),
                 to: Some("dev@company.com".to_string()),
                 events: vec!["task.failed".to_string(), "daily_digest".to_string()],
@@ -1149,6 +1195,8 @@ triggers:
                 provider: "system".to_string(),
                 webhook_url: None,
                 api_key: None,
+                token: None,
+                repo: None,
                 from: None,
                 to: None,
                 events: vec!["task.completed".to_string(), "task.failed".to_string()],
@@ -1167,6 +1215,8 @@ triggers:
                 provider: "slack".to_string(),
                 webhook_url: None,
                 api_key: None,
+                token: None,
+                repo: None,
                 from: None,
                 to: None,
                 events: vec!["task.completed".to_string()],
@@ -1185,6 +1235,8 @@ triggers:
                 provider: "discord".to_string(),
                 webhook_url: None,
                 api_key: None,
+                token: None,
+                repo: None,
                 from: None,
                 to: None,
                 events: vec!["task.completed".to_string()],
@@ -1203,6 +1255,8 @@ triggers:
                 provider: "email".to_string(),
                 webhook_url: None,
                 api_key: None,
+                token: None,
+                repo: None,
                 from: Some("from@test.com".to_string()),
                 to: Some("to@test.com".to_string()),
                 events: vec!["task.completed".to_string()],
@@ -1221,6 +1275,8 @@ triggers:
                 provider: "email".to_string(),
                 webhook_url: None,
                 api_key: Some("re_key".to_string()),
+                token: None,
+                repo: None,
                 from: None,
                 to: Some("to@test.com".to_string()),
                 events: vec!["task.completed".to_string()],
@@ -1239,6 +1295,8 @@ triggers:
                 provider: "email".to_string(),
                 webhook_url: None,
                 api_key: Some("re_key".to_string()),
+                token: None,
+                repo: None,
                 from: Some("from@test.com".to_string()),
                 to: None,
                 events: vec!["task.completed".to_string()],
@@ -1257,6 +1315,8 @@ triggers:
                 provider: "telegram".to_string(),
                 webhook_url: Some("https://t.me/webhook".to_string()),
                 api_key: None,
+                token: None,
+                repo: None,
                 from: None,
                 to: None,
                 events: vec!["task.completed".to_string()],
@@ -1276,6 +1336,8 @@ triggers:
                     provider: "slack".to_string(),
                     webhook_url: Some("https://hooks.slack.com/services/T00/B00/xxx".to_string()),
                     api_key: None,
+                    token: None,
+                    repo: None,
                     from: None,
                     to: None,
                     events: vec!["task.completed".to_string()],
@@ -1285,6 +1347,8 @@ triggers:
                     provider: "system".to_string(),
                     webhook_url: None,
                     api_key: None,
+                    token: None,
+                    repo: None,
                     from: None,
                     to: None,
                     events: vec!["task.failed".to_string()],
@@ -1304,6 +1368,8 @@ triggers:
                 provider: "system".to_string(),
                 webhook_url: None,
                 api_key: None,
+                token: None,
+                repo: None,
                 from: None,
                 to: None,
                 events: vec![
@@ -1333,6 +1399,8 @@ triggers:
                 provider: "slack".to_string(),
                 webhook_url: Some("${KRAKEN_TEST_SLACK_WEBHOOK}".to_string()),
                 api_key: None,
+                token: None,
+                repo: None,
                 from: None,
                 to: None,
                 events: vec!["task.completed".to_string()],

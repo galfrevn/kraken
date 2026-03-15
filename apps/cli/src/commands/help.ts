@@ -32,5 +32,6 @@ export async function execute(_args: string[]): Promise<void> {
   console.log(`    ${colorize("kraken config validate", "cyan")}          validate configuration`);
   console.log(`    ${colorize("kraken config get", "cyan")} languageModel.model`);
   console.log(`    ${colorize("kraken plugins create", "cyan")} my-plugin`);
+  console.log(`    ${colorize("kraken watch", "cyan")} src/ apps/          watch files and auto-submit reviews`);
   console.log();
 }

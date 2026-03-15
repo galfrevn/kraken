@@ -9,6 +9,7 @@ const COMMANDS: Record<string, { description: string; module: string }> = {
   chat: { description: "One-shot task submission to the daemon (pipe-friendly)", module: "@/commands/chat.ts" },
   daemon: { description: "Manage the kraken daemon (start/stop/status/restart/reload)", module: "@/commands/daemon.ts" },
   task: { description: "Manage tasks (list/submit/cancel/retry/cleanup)", module: "@/commands/task.ts" },
+  watch: { description: "Watch files and auto-submit review tasks (companion mode)", module: "@/commands/watch.ts" },
   trigger: { description: "Manage triggers (list/add/remove/test/status)", module: "@/commands/trigger.ts" },
   provider: { description: "Switch LLM provider, model, or API key", module: "@/commands/provider.ts" },
   notification: { description: "Manage notification channels (list/add/remove/test)", module: "@/commands/notification.ts" },

@@ -167,9 +167,38 @@ impl Orchestrator {
                 task_name: task_from_store.name.clone(),
                 task_id: task_id.to_string(),
                 summary: format!("Task '{}' completed successfully", task_from_store.name),
-                details: completed_task_details,
+                details: completed_task_details.clone(),
                 timestamp: chrono::Utc::now(),
             });
+
+            let extracted_pull_request_url = completed_task_details
+                .get("pr_url")
+                .cloned()
+                .or_else(|| {
+                    if let Some(task_output) = &task_from_store.output {
+                        Self::extract_github_pull_request_url_from_text(task_output)
+                    } else {
+                        None
+                    }
+                });
+
+            if let Some(pull_request_url) = extracted_pull_request_url {
+                let mut pull_request_notification_details = HashMap::new();
+                pull_request_notification_details
+                    .insert("pr_url".to_string(), pull_request_url);
+
+                self.fire_notification(NotificationEvent {
+                    event_type: NotificationEventType::PullRequestCreated,
+                    task_name: task_from_store.name.clone(),
+                    task_id: task_id.to_string(),
+                    summary: format!(
+                        "Task '{}' created a pull request",
+                        task_from_store.name
+                    ),
+                    details: pull_request_notification_details,
+                    timestamp: chrono::Utc::now(),
+                });
+            }
         } else {
             let mut failed_task_details = HashMap::new();
 
@@ -359,6 +388,20 @@ impl Orchestrator {
             details: cost_warning_details,
             timestamp: chrono::Utc::now(),
         });
+    }
+
+    fn extract_github_pull_request_url_from_text(text: &str) -> Option<String> {
+        for word in text.split_whitespace() {
+            if word.contains("https://github.com/") && word.contains("/pull/") {
+                let trimmed_url = word.trim_matches(|character: char| {
+                    !character.is_alphanumeric() && character != ':' && character != '/' && character != '.' && character != '-' && character != '_'
+                });
+                if trimmed_url.contains("https://github.com/") && trimmed_url.contains("/pull/") {
+                    return Some(trimmed_url.to_string());
+                }
+            }
+        }
+        None
     }
 
     fn is_retryable_exit_code(exit_code: i32) -> bool {
