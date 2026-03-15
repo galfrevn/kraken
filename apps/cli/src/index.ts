@@ -6,6 +6,7 @@ type CommandModule = { execute: (args: string[]) => Promise<void> };
 
 const COMMANDS: Record<string, { description: string; module: string }> = {
   start: { description: "Start the TUI with scheduler and gateway", module: "@/commands/start.ts" },
+  chat: { description: "One-shot task submission to the daemon (pipe-friendly)", module: "@/commands/chat.ts" },
   daemon: { description: "Manage the kraken daemon (start/stop/status/restart/reload)", module: "@/commands/daemon.ts" },
   trigger: { description: "List and test configured triggers", module: "@/commands/trigger.ts" },
   init: { description: "Initialize kraken in the current project", module: "@/commands/init.ts" },
