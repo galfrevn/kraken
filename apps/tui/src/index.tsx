@@ -102,9 +102,14 @@ export async function main(): Promise<void> {
   const database = new AgentDatabase(configuration.databasePath);
   const taskQueueManager = new TaskQueueManager(database);
   const schedulerClient = createSchedulerClient(configuration.services.schedulerUrl);
-  const gatewayClient = createGatewayClient(configuration.services.gatewayUrl);
 
   const timerManager = new TimerManager(taskQueueManager);
+
+  // In daemon mode, skip creating the gateway client — the daemon handles LLM directly.
+  // The gateway client is only needed in local mode for the in-process agent loop.
+  const gatewayClient = daemonStore
+    ? null
+    : createGatewayClient(configuration.services.gatewayUrl);
 
   const store = new TuiStore(
     database,
@@ -148,38 +153,56 @@ export async function main(): Promise<void> {
   registerPluginsCommand(pluginRegistry);
   registerToolDisplayNames(pluginRegistry.getToolDisplayNames());
 
-  const languageModelClient = new LanguageModelClient(
-    configuration.services.gatewayUrl,
-    configuration.languageModel,
-  );
-  const toolRegistry = createDefaultToolRegistry({
-    languageModelClient,
-    schedulerClient,
-    taskQueueManager,
-    timerManager,
-    database,
-    commandPolicy: configuration.commands,
-    workingDirectory: configuration.repo,
-    pluginTools: pluginRegistry.getTools(),
-    profile: "chat",
-  });
+  // In daemon mode, the daemon handles all LLM calls, tool execution, and task running.
+  // We only create the local agent stack when NOT connected to a daemon.
+  const languageModelClient = daemonStore
+    ? null
+    : new LanguageModelClient(configuration.services.gatewayUrl, configuration.languageModel);
 
-  const executionLoop = new AgentExecutionLoop(
-    languageModelClient,
-    taskQueueManager,
-    toolRegistry,
-    database,
-    { workingDirectory: configuration.repo },
-  );
+  const toolRegistry = daemonStore
+    ? createDefaultToolRegistry({
+        languageModelClient: null as any,
+        schedulerClient,
+        taskQueueManager,
+        timerManager,
+        database,
+        commandPolicy: configuration.commands,
+        workingDirectory: configuration.repo,
+        pluginTools: pluginRegistry.getTools(),
+        profile: "chat",
+      })
+    : createDefaultToolRegistry({
+        languageModelClient: languageModelClient!,
+        schedulerClient,
+        taskQueueManager,
+        timerManager,
+        database,
+        commandPolicy: configuration.commands,
+        workingDirectory: configuration.repo,
+        pluginTools: pluginRegistry.getTools(),
+        profile: "chat",
+      });
 
-  const hookDispatcher = pluginRegistry.getHookDispatcher();
-  executionLoop.setHookDispatcher(hookDispatcher);
+  let localTaskRunnerDaemon: TaskRunnerDaemon | null = null;
 
-  const daemon = new TaskRunnerDaemon(executionLoop, taskQueueManager, { silent: true });
-  daemon.start();
+  if (!daemonStore && languageModelClient) {
+    const executionLoop = new AgentExecutionLoop(
+      languageModelClient,
+      taskQueueManager,
+      toolRegistry,
+      database,
+      { workingDirectory: configuration.repo },
+    );
+
+    const hookDispatcher = pluginRegistry.getHookDispatcher();
+    executionLoop.setHookDispatcher(hookDispatcher);
+
+    localTaskRunnerDaemon = new TaskRunnerDaemon(executionLoop, taskQueueManager, { silent: true });
+    localTaskRunnerDaemon.start();
+  }
 
   const threadManager = new ThreadManager(
-    languageModelClient,
+    languageModelClient as any,
     toolRegistry,
     configuration.repo,
     database,
@@ -248,7 +271,7 @@ export async function main(): Promise<void> {
 
   const shutdown = async () => {
     process.stdout.write("\x1B]0;\x07");
-    daemon.stop();
+    if (localTaskRunnerDaemon) localTaskRunnerDaemon.stop();
     timerManager.cancelAll();
     threadManager.saveNow();
     await pluginRegistry.shutdownAll();

@@ -31,14 +31,14 @@ export interface ScheduledItem {
 export class TuiStore {
   readonly database: AgentDatabase;
   readonly taskQueueManager: TaskQueueManager;
-  private gatewayClient: GatewayClient;
+  private gatewayClient: GatewayClient | null;
   private schedulerClient: SchedulerClient;
   private timerManager: TimerManager;
 
   constructor(
     database: AgentDatabase,
     taskQueueManager: TaskQueueManager,
-    gatewayClient: GatewayClient,
+    gatewayClient: GatewayClient | null,
     schedulerClient: SchedulerClient,
     timerManager: TimerManager,
   ) {
@@ -56,12 +56,14 @@ export class TuiStore {
       gatewayVersion: "",
     };
 
-    try {
-      const response = await this.gatewayClient.healthCheck({});
-      health.gateway = response.healthy;
-      health.gatewayVersion = response.version;
-    } catch {
-      health.gateway = false;
+    if (this.gatewayClient) {
+      try {
+        const response = await this.gatewayClient.healthCheck({});
+        health.gateway = response.healthy;
+        health.gatewayVersion = response.version;
+      } catch {
+        health.gateway = false;
+      }
     }
 
     try {
