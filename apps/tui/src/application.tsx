@@ -1,318 +1,91 @@
 import { useState, useCallback, useEffect } from "react";
 import { useKeyboard, useTerminalDimensions } from "@opentui/react";
-import { DialogProvider } from "@opentui-ui/dialog/react";
-import { Toaster, toast } from "@opentui-ui/toast/react";
 import { COLORS } from "@/theme.ts";
-import type { TuiStore } from "@/store.ts";
-import type { DaemonStore } from "@/daemon-store.ts";
 import type { ThreadManager } from "@/threads.ts";
 import type { ChatMessage } from "@/engine.ts";
-import type { PluginRegistry } from "@core/plugins/registry.ts";
-import { ChatView } from "@/views/chat.tsx";
-import { DashboardView } from "@/views/dashboard.tsx";
-import { TasksView } from "@/views/tasks.tsx";
-import { ReviewsView } from "@/views/reviews.tsx";
-import { TriggersView } from "@/views/triggers.tsx";
-import { LogsView } from "@/views/logs.tsx";
-import { ThreadSidebar } from "@/views/sidebar.tsx";
-import { SetupPanel, type SetupField } from "@/views/setup.tsx";
+import type { LanguageModelClient } from "@core/language/client.ts";
+import { StatusBar } from "@/components/statusbar.tsx";
+import { MessageList } from "@/components/messagelist.tsx";
+import { InputBar } from "@/components/inputbar.tsx";
+import { handleSlashCommand } from "@/commands.ts";
 
-const SIDEBAR_MIN_TERMINAL_WIDTH = 100;
-const SIDEBAR_WIDTH = 28;
-
-type ViewName = "chat" | "dashboard" | "tasks" | "reviews" | "logs";
-const VIEWS: ViewName[] = ["chat", "dashboard", "tasks", "reviews", "logs"];
-
-const TAB_LABELS: Record<ViewName, string> = {
-  chat: "chat",
-  dashboard: "dashboard",
-  tasks: "tasks",
-  reviews: "reviews",
-  logs: "logs",
-};
-
-const VIEW_BY_NUMBER: Record<string, ViewName> = {
-  "1": "chat",
-  "2": "dashboard",
-  "3": "tasks",
-  "4": "reviews",
-  "5": "logs",
-};
-
-export interface PluginLoadFailure {
-  entry: string;
-  error: string;
-}
-
-interface ApplicationProps {
-  store: TuiStore;
-  daemonStore?: DaemonStore | null;
+interface ApplicationProperties {
   threadManager: ThreadManager;
-  pluginRegistry: PluginRegistry;
-  pluginFailures?: PluginLoadFailure[];
-  pendingSetup?: SetupField[];
-  onSetupComplete?: () => void;
+  languageModelClient: LanguageModelClient;
+  daemonConnected: boolean;
 }
 
-export function Application({
-  store,
-  daemonStore,
-  threadManager,
-  pluginRegistry,
-  pluginFailures,
-  pendingSetup,
-  onSetupComplete,
-}: ApplicationProps) {
-  const [activeView, setActiveView] = useState<ViewName>("chat");
-  const [chatInputFocused, setChatInputFocused] = useState(true);
-  const [hasQuestions, setHasQuestions] = useState(false);
-  const [setupDone, setSetupDone] = useState(!pendingSetup || pendingSetup.length === 0);
-  const [daemonChatMessages, setDaemonChatMessages] = useState<ChatMessage[]>([]);
+export function Application({ threadManager, languageModelClient, daemonConnected }: ApplicationProperties) {
+  const [chatMessages, setChatMessages] = useState<ChatMessage[]>([]);
+  const [isEngineProcessing, setIsEngineProcessing] = useState(false);
+  const [inputFocused] = useState(true);
   const { width, height } = useTerminalDimensions();
 
   useEffect(() => {
-    if (pluginFailures && pluginFailures.length > 0) {
-      for (const failure of pluginFailures) {
-        toast.error(`plugin "${failure.entry}": ${failure.error}`);
+    const updateMessagesFromEngine = () => {
+      const activeEngine = threadManager.getActiveEngine();
+      setChatMessages([...activeEngine.getMessages()]);
+      setIsEngineProcessing(activeEngine.isProcessing());
+    };
+
+    const activeEngine = threadManager.getActiveEngine();
+    activeEngine.addEventListener(updateMessagesFromEngine);
+    updateMessagesFromEngine();
+
+    const handleThreadChange = () => {
+      const currentEngine = threadManager.getActiveEngine();
+      currentEngine.addEventListener(updateMessagesFromEngine);
+      updateMessagesFromEngine();
+    };
+
+    threadManager.onThreadChange(handleThreadChange);
+
+    return () => {
+      activeEngine.removeEventListener(updateMessagesFromEngine);
+      threadManager.offThreadChange(handleThreadChange);
+    };
+  }, [threadManager]);
+
+  const handleUserInputSubmit = useCallback(async (inputText: string) => {
+    if (inputText.startsWith("/")) {
+      const commandResult = await handleSlashCommand(inputText, threadManager);
+      if (commandResult) {
+        if (commandResult.switchedThread) {
+          const currentEngine = threadManager.getActiveEngine();
+          setChatMessages([...currentEngine.getMessages()]);
+        }
+        return;
       }
     }
-  }, []);
 
-  const navigateToView = useCallback((view: ViewName) => {
-    setActiveView(view);
-    setChatInputFocused(false);
-  }, []);
+    const activeEngine = threadManager.getActiveEngine();
+    activeEngine.sendMessage(inputText);
+    threadManager.generateActiveThreadTitle();
+  }, [threadManager]);
 
-  const requestChatFocus = useCallback(() => {
-    setChatInputFocused(true);
-  }, []);
-
-  const requestChatBlur = useCallback(() => {
-    setChatInputFocused(false);
-  }, []);
+  const handleCancelCurrentResponse = useCallback(() => {
+    const activeEngine = threadManager.getActiveEngine();
+    activeEngine.cancelCurrentResponse();
+  }, [threadManager]);
 
   useKeyboard((key) => {
     if (key.ctrl && key.name === "q") {
       process.exit(0);
     }
-
-    // When question panel is active, block all navigation — QuestionPanel handles its own keys
-    if (hasQuestions && activeView === "chat") {
-      return;
-    }
-
-    if (key.name === "tab") {
-      if (activeView === "chat") {
-        setChatInputFocused((previous) => !previous);
-      }
-      return;
-    }
-
-    if (key.name === "escape" && activeView === "chat" && chatInputFocused) {
-      setChatInputFocused(false);
-      return;
-    }
-
-    if (activeView === "chat" && (chatInputFocused || hasQuestions)) {
-      return;
-    }
-
-    if (key.name === "left" || key.name === "right") {
-      const currentIndex = VIEWS.indexOf(activeView);
-      const nextIndex =
-        key.name === "right"
-          ? (currentIndex + 1) % VIEWS.length
-          : (currentIndex - 1 + VIEWS.length) % VIEWS.length;
-      navigateToView(VIEWS[nextIndex]!);
-      return;
-    }
-
-    const targetView = VIEW_BY_NUMBER[key.name ?? ""];
-    if (targetView) {
-      navigateToView(targetView);
-    }
   });
 
   return (
-    <DialogProvider
-      size="medium"
-      backdropColor={COLORS.background}
-      backdropOpacity={0.8}
-      dialogOptions={{
-        style: {
-          backgroundColor: COLORS.card,
-          border: false,
-          padding: 1,
-        },
-      }}
-    >
-      <Toaster
-        position="top-right"
-        stackingMode="stack"
-        visibleToasts={4}
-        maxWidth={50}
-        offset={{ top: 2, right: 2 }}
-        icons={false}
-        toastOptions={{
-          style: {
-            backgroundColor: COLORS.surface,
-            foregroundColor: COLORS.text,
-            border: ["left"],
-            borderColor: COLORS.textMuted,
-            mutedColor: COLORS.textMuted,
-            paddingX: 1,
-            paddingY: 1,
-            minHeight: 3,
-          },
-          duration: 3000,
-          success: {
-            style: { borderColor: COLORS.green },
-          },
-          info: {
-            style: { borderColor: COLORS.blue },
-          },
-          warning: {
-            style: { borderColor: COLORS.yellow },
-            duration: 4000,
-          },
-          error: {
-            style: { borderColor: COLORS.red },
-            duration: 5000,
-          },
-        }}
-      />
-
-      <box flexDirection="column" width={width} height={height} backgroundColor={COLORS.background}>
-        {!setupDone && pendingSetup && pendingSetup.length > 0 ? (
-          <SetupPanel
-            fields={pendingSetup}
-            onComplete={() => {
-              setSetupDone(true);
-              onSetupComplete?.();
-            }}
-          />
-        ) : (
-          <>
-            <Header activeView={activeView} chatInputFocused={chatInputFocused} isDaemonMode={!!daemonStore} />
-
-            <box flexGrow={1} padding={1} gap={1} flexDirection="row">
-              {activeView === "chat" && width >= SIDEBAR_MIN_TERMINAL_WIDTH && (
-                <ThreadSidebar
-                  threadManager={threadManager}
-                  width={SIDEBAR_WIDTH}
-                  onSelectThread={(identifier) => threadManager.switchThread(identifier)}
-                />
-              )}
-              <box flexGrow={1} flexDirection="column">
-                {activeView === "chat" && (
-                  <ChatView
-                    threadManager={threadManager}
-                    daemonStore={daemonStore}
-                    focused={chatInputFocused}
-                    onRequestFocus={requestChatFocus}
-                    onRequestBlur={requestChatBlur}
-                    onQuestionStateChange={setHasQuestions}
-                    daemonChatMessages={daemonChatMessages}
-                    onDaemonChatMessagesChange={setDaemonChatMessages}
-                  />
-                )}
-                {activeView === "dashboard" && (
-                  <DashboardView store={store} daemonStore={daemonStore} pluginRegistry={pluginRegistry} />
-                )}
-                {activeView === "tasks" && (
-                  <TasksView store={store} daemonStore={daemonStore} focused={activeView === "tasks"} />
-                )}
-                {activeView === "reviews" && (
-                  daemonStore ? (
-                    <TriggersView focused={activeView === "reviews"} />
-                  ) : (
-                    <ReviewsView store={store} focused={activeView === "reviews"} />
-                  )
-                )}
-                {activeView === "logs" && (
-                  <LogsView store={store} focused={activeView === "logs"} />
-                )}
-              </box>
-            </box>
-
-            <Footer activeView={activeView} chatInputFocused={chatInputFocused} />
-          </>
-        )}
+    <box flexDirection="column" width={width} height={height} backgroundColor={COLORS.background}>
+      <StatusBar languageModelClient={languageModelClient} daemonConnected={daemonConnected} />
+      <box flexGrow={1} flexDirection="column" paddingLeft={1} paddingRight={1} paddingTop={1}>
+        <MessageList chatMessages={chatMessages} inputFocused={inputFocused} />
       </box>
-    </DialogProvider>
-  );
-}
-
-function Header({
-  activeView,
-  chatInputFocused,
-  isDaemonMode,
-}: {
-  activeView: ViewName;
-  chatInputFocused: boolean;
-  isDaemonMode: boolean;
-}) {
-  const modeIndicator = activeView === "chat" && chatInputFocused ? "input" : "nav";
-
-  const daemonModeTabLabels: Record<ViewName, string> = {
-    ...TAB_LABELS,
-    reviews: "triggers",
-  };
-  const effectiveTabLabels = isDaemonMode ? daemonModeTabLabels : TAB_LABELS;
-
-  return (
-    <box
-      flexDirection="row"
-      backgroundColor={COLORS.surface}
-      paddingLeft={1}
-      paddingRight={1}
-      height={1}
-      width="100%"
-    >
-      <text fg={COLORS.blue}>{"kraken"}</text>
-      <text fg={COLORS.textMuted}>{"  │  "}</text>
-      {VIEWS.map((view) => {
-        const isActive = view === activeView;
-        const label = effectiveTabLabels[view];
-        return (
-          <box flexDirection="row" paddingRight={1}>
-            <text fg={isActive ? COLORS.text : COLORS.textMuted}>{" " + label + " "}</text>
-          </box>
-        );
-      })}
-      <box flexGrow={1} />
-      <text fg={COLORS.textMuted}>{"[" + modeIndicator + "]"}</text>
-    </box>
-  );
-}
-
-function Footer({
-  activeView,
-  chatInputFocused,
-}: {
-  activeView: ViewName;
-  chatInputFocused: boolean;
-}) {
-  let hint: string;
-
-  if (activeView === "chat" && chatInputFocused) {
-    hint = "tab/esc nav mode  ·  esc×2 cancel  ·  ctrl+q quit";
-  } else if (activeView === "chat") {
-    hint = "←→ switch view  ·  h commands  ·  tab input  ·  ctrl+q quit";
-  } else {
-    hint = "←→ switch view  ·  ctrl+q quit";
-  }
-
-  return (
-    <box
-      flexDirection="row"
-      backgroundColor={COLORS.surface}
-      paddingLeft={1}
-      paddingRight={1}
-      height={1}
-      width="100%"
-    >
-      <text fg={COLORS.textMuted}>{hint}</text>
+      <InputBar
+        onSubmit={handleUserInputSubmit}
+        onCancel={handleCancelCurrentResponse}
+        isProcessing={isEngineProcessing}
+        focused={inputFocused}
+      />
     </box>
   );
 }

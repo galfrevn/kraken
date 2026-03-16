@@ -57,7 +57,12 @@ export function createDelegateTool(
 
       const subagent = new SubagentRunner(languageModelClient, childRegistry, workingDirectory);
 
-      const result = await subagent.execute({ task, model, context });
+      const result = await subagent.execute({
+        task,
+        model,
+        context,
+        onProgress: executionContext.onProgress,
+      });
 
       const summary = result.success ? result.output : `subagent failed: ${result.output}`;
 

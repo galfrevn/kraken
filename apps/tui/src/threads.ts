@@ -4,8 +4,6 @@ import { AgentDatabase } from "@core/storage/database.ts";
 import type { ThreadMessageRow, ThreadConversationRow } from "@core/storage/database.ts";
 import { ChatEngine, type SerializedChatEngine } from "@/engine.ts";
 import type { MemoryContext, PromptOptions, EnvironmentContext } from "@core/agent/prompt.ts";
-import type { HookDispatcher } from "@core/plugins/hooks.ts";
-import type { PluginContext } from "@kraken/sdk";
 
 const SAVE_DEBOUNCE_MILLISECONDS = 1500;
 
@@ -64,10 +62,8 @@ export class ThreadManager {
   private changeListeners: Set<ThreadChangeListener> = new Set();
   private savedMessageCounts: Map<string, number> = new Map();
   private saveTimeout: ReturnType<typeof setTimeout> | null = null;
-  private promptExtensionsGetter: (() => string[]) | null = null;
-  private hookDispatcher?: HookDispatcher;
-  private pluginContext?: PluginContext;
   private logPersister?: (level: string, source: string, message: string) => void;
+
   constructor(
     languageModelClient: LanguageModelClient,
     toolRegistry: ToolRegistry,
@@ -78,29 +74,6 @@ export class ThreadManager {
     this.toolRegistry = toolRegistry;
     this.workingDirectory = workingDirectory;
     this.database = database;
-  }
-
-  setPluginPromptExtensions(getter: () => string[]): void {
-    this.promptExtensionsGetter = getter;
-  }
-
-  refreshPluginPromptExtensions(): void {
-    const extensions = this.promptExtensionsGetter?.() ?? [];
-    try {
-      const engine = this.getActiveEngine();
-      engine.updatePluginPromptExtensions(extensions);
-    } catch {
-      /* no active thread yet */
-    }
-  }
-
-  setPluginHooks(dispatcher: HookDispatcher, context: PluginContext): void {
-    this.hookDispatcher = dispatcher;
-    this.pluginContext = context;
-
-    for (const engine of this.threads.values()) {
-      engine.setHookDispatcher(dispatcher, context);
-    }
   }
 
   setLogPersister(persister: (level: string, source: string, message: string) => void): void {
@@ -146,10 +119,8 @@ export class ThreadManager {
   }
 
   private buildPromptOptions(): PromptOptions {
-    const extensions = this.promptExtensionsGetter?.();
     return {
       memoryContext: this.loadMemoryContext(),
-      pluginPromptExtensions: extensions && extensions.length > 0 ? extensions : undefined,
       environmentContext: this.buildEnvironmentContext(),
     };
   }
@@ -174,10 +145,6 @@ export class ThreadManager {
       this.workingDirectory,
       this.buildPromptOptions(),
     );
-
-    if (this.hookDispatcher && this.pluginContext) {
-      engine.setHookDispatcher(this.hookDispatcher, this.pluginContext);
-    }
 
     if (this.logPersister) {
       engine.setLogPersister(this.logPersister);
@@ -260,16 +227,14 @@ export class ThreadManager {
     const isUntitled = metadata.title === UNTITLED_THREAD_PREFIX;
     if (!isUntitled) return;
 
-    // Wait until the agent has responded at least once
     const userMessages = messages.filter((message) => message.role === "user");
     const hasAssistantResponse = messages.some(
       (message) => message.role === "assistant" && message.content.trim().length > 0,
     );
     if (userMessages.length === 0 || !hasAssistantResponse) return;
 
-    // Pick the first substantive user message (skip short greetings like "hola", "hi", "hey")
     const substantiveMessage =
-      userMessages.find((m) => m.content.trim().length > 10) ?? userMessages[0]!;
+      userMessages.find((message) => message.content.trim().length > 10) ?? userMessages[0]!;
     const titleInput = substantiveMessage.content.slice(0, 300);
 
     const truncatedFallback =
@@ -309,7 +274,7 @@ export class ThreadManager {
     if (!engine || !metadata) return;
 
     const messages = engine.getMessages();
-    const userMessages = messages.filter((m) => m.role === "user");
+    const userMessages = messages.filter((message) => message.role === "user");
     if (userMessages.length < MINIMUM_MESSAGES_FOR_SUMMARY) return;
 
     const existingSummaries = this.database.searchFacts(identifier, "context", 1);
@@ -341,7 +306,7 @@ export class ThreadManager {
 
       const toolNames = [
         ...new Set(
-          messages.filter((m) => m.role === "tool_call" && m.toolName).map((m) => m.toolName!),
+          messages.filter((message) => message.role === "tool_call" && message.toolName).map((message) => message.toolName!),
         ),
       ];
       if (toolNames.length > 0) {
@@ -355,7 +320,7 @@ export class ThreadManager {
   }
 
   private buildCondensedTranscript(messages: Array<{ role: string; content: string }>): string {
-    const relevantMessages = messages.filter((m) => m.role === "user" || m.role === "assistant");
+    const relevantMessages = messages.filter((message) => message.role === "user" || message.role === "assistant");
 
     const lines: string[] = [];
     let totalLength = 0;
@@ -417,7 +382,7 @@ export class ThreadManager {
       const metadata = this.threadMetadata.get(identifier);
       const messages = engine.getMessages();
       const conversationCount = messages.filter(
-        (m) => m.role === "user" || m.role === "assistant",
+        (message) => message.role === "user" || message.role === "assistant",
       ).length;
 
       summaries.push({
@@ -539,24 +504,6 @@ export class ThreadManager {
           }),
         );
 
-        // Persist pending questions as a special conversation row
-        if (state.pendingQuestions) {
-          conversationRows.push({
-            role: "__pending_questions__",
-            content: JSON.stringify(state.pendingQuestions),
-            position: conversationRows.length,
-          });
-        }
-
-        // Persist plan as a special conversation row
-        if (state.plan) {
-          conversationRows.push({
-            role: "__plan__",
-            content: JSON.stringify({ ...state.plan, planMode: state.planMode }),
-            position: conversationRows.length,
-          });
-        }
-
         this.database.replaceThreadConversation(identifier, conversationRows);
       }
     } catch (saveError) {
@@ -585,10 +532,6 @@ export class ThreadManager {
           this.buildPromptOptions(),
         );
 
-        if (this.hookDispatcher && this.pluginContext) {
-          engine.setHookDispatcher(this.hookDispatcher, this.pluginContext);
-        }
-
         if (this.logPersister) {
           engine.setLogPersister(this.logPersister);
         }
@@ -600,7 +543,6 @@ export class ThreadManager {
           messages: messageRows.map((messageRow) => {
             let rawContent = messageRow.raw_content ?? undefined;
             let attachments: import("@/engine.ts").FileAttachment[] | undefined;
-            // For user messages, raw_content may store attachments JSON
             if (messageRow.role === "user" && rawContent) {
               try {
                 const parsed = JSON.parse(rawContent);
@@ -624,31 +566,10 @@ export class ThreadManager {
             };
           }),
           conversationMessages: conversationRows
-            .filter((r) => r.role !== "__pending_questions__" && r.role !== "__plan__")
             .map((conversationRow) => ({
               role: conversationRow.role,
               content: conversationRow.content,
             })),
-          pendingQuestions: (() => {
-            const pqRow = conversationRows.find((r) => r.role === "__pending_questions__");
-            if (!pqRow) return undefined;
-            try {
-              return JSON.parse(pqRow.content);
-            } catch {
-              return undefined;
-            }
-          })(),
-          ...(() => {
-            const planRow = conversationRows.find((r) => r.role === "__plan__");
-            if (!planRow) return {};
-            try {
-              const parsed = JSON.parse(planRow.content);
-              const { planMode: pm, ...plan } = parsed;
-              return { plan, planMode: pm ?? undefined };
-            } catch {
-              return {};
-            }
-          })(),
         };
 
         engine.importState(serializedState);

@@ -5,10 +5,8 @@ import { z } from "zod";
 const KRAKEN_HOME = resolve(homedir(), ".kraken");
 
 const languageModelConfigurationSchema = z.object({
-  provider: z.enum(["openrouter", "openai", "anthropic", "ollama"]).default("openrouter"),
   model: z.string().default("deepseek/deepseek-v3.2"),
   apiKey: z.string().optional(),
-  baseUrl: z.string().optional(),
   temperature: z.number().min(0).max(2).default(0.7),
   maxTokens: z.number().positive().default(16384),
 });
@@ -76,6 +74,13 @@ const servicesConfigurationSchema = z.object({
   llmProxyUrl: z.string().default("http://localhost:50052"),
 });
 
+const mcpServerConfigurationSchema = z.object({
+  name: z.string(),
+  command: z.string(),
+  args: z.array(z.string()).default([]),
+  env: z.record(z.string(), z.string()).optional(),
+});
+
 export const agentConfigurationSchema = z
   .object({
     repo: z.string().default("."),
@@ -90,17 +95,7 @@ export const agentConfigurationSchema = z
     git: gitConfigurationSchema.optional(),
     services: servicesConfigurationSchema.optional(),
     subagent: subagentConfigurationSchema.optional(),
-    plugins: z
-      .array(
-        z.union([
-          z.string().transform((path) => ({ path, config: {} as Record<string, unknown> })),
-          z.object({
-            path: z.string(),
-            config: z.record(z.string(), z.unknown()).default({}),
-          }),
-        ]),
-      )
-      .default([]),
+    mcpServers: z.array(mcpServerConfigurationSchema).default([]),
   })
   .transform((data) => ({
     repo: data.repo,
@@ -112,7 +107,7 @@ export const agentConfigurationSchema = z
     git: gitConfigurationSchema.parse(data.git ?? {}),
     services: servicesConfigurationSchema.parse(data.services ?? {}),
     subagent: subagentConfigurationSchema.parse(data.subagent ?? {}),
-    plugins: data.plugins,
+    mcpServers: data.mcpServers,
   }));
 
 export type AgentConfiguration = z.output<typeof agentConfigurationSchema>;
@@ -124,3 +119,4 @@ export type CommandPolicyConfiguration = z.infer<typeof commandPolicySchema>;
 export type SubagentConfiguration = z.infer<typeof subagentConfigurationSchema>;
 export type CronJobConfiguration = z.infer<typeof cronJobConfigurationSchema>;
 export type WatcherConfiguration = z.infer<typeof watcherConfigurationSchema>;
+export type McpServerConfiguration = z.infer<typeof mcpServerConfigurationSchema>;

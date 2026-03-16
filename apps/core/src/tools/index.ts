@@ -31,22 +31,8 @@ export {
 export { createDelegateTool } from "@/tools/delegate.ts";
 export { createRememberTool, createRecallTool, createIndexProjectTool } from "@/tools/memory.ts";
 export { createTaskListTool, createTaskSubmitTool } from "@/tools/tasks.ts";
-export {
-  createScheduleCronTool,
-  createListSchedulesTool,
-  createDeleteScheduleTool,
-  createListWatchersTool,
-  createScheduleWatcherTool,
-  createDeleteWatcherTool,
-} from "@/tools/scheduler.ts";
-export {
-  createScheduleOnceTool,
-  createListTimersTool,
-  createCancelTimerTool,
-} from "@/tools/timers.ts";
 export { createSessionCommandTool } from "@/tools/session.ts";
 export type { SessionCommandExecutor, SessionCommandDefinition } from "@/tools/session.ts";
-export { createPluginManagerTool, type PluginManagerDependencies } from "@/tools/plugins.ts";
 export {
   createAskQuestionTool,
   type PendingQuestions,
@@ -63,6 +49,8 @@ export type {
   ToolParameterDefinition,
   ToolExecutionContext,
   ToolResult,
+  ToolProgressEvent,
+  ToolProgressCallback,
 } from "@/tools/schema.ts";
 
 import { ToolRegistry } from "@/tools/registry.ts";
@@ -92,39 +80,22 @@ import {
   createModelListTool,
 } from "@/tools/model.ts";
 import { createTaskListTool, createTaskSubmitTool } from "@/tools/tasks.ts";
-import {
-  createScheduleCronTool,
-  createListSchedulesTool,
-  createDeleteScheduleTool,
-  createListWatchersTool,
-  createScheduleWatcherTool,
-  createDeleteWatcherTool,
-} from "@/tools/scheduler.ts";
-import {
-  createScheduleOnceTool,
-  createListTimersTool,
-  createCancelTimerTool,
-} from "@/tools/timers.ts";
 import { createDelegateTool } from "@/tools/delegate.ts";
 import { createRememberTool, createRecallTool, createIndexProjectTool } from "@/tools/memory.ts";
 import { viewImageTool } from "@/tools/vision.ts";
 import type { LanguageModelClient } from "@/language/client.ts";
-import type { SchedulerClient } from "@/clients/scheduler.ts";
 import type { TaskQueueManager } from "@/queue/manager.ts";
-import type { TimerManager } from "@/scheduling/timers.ts";
 import type { AgentDatabase } from "@/storage/database.ts";
 import type { CommandPolicyConfiguration } from "@/configuration/schema.ts";
 import type { Tool } from "@/tools/schema.ts";
 
 export interface ToolRegistryOptions {
   languageModelClient?: LanguageModelClient;
-  schedulerClient?: SchedulerClient;
   taskQueueManager?: TaskQueueManager;
-  timerManager?: TimerManager;
   database?: AgentDatabase;
   commandPolicy?: CommandPolicyConfiguration;
   workingDirectory?: string;
-  pluginTools?: Tool[];
+  mcpTools?: Tool[];
   profile?: "chat" | "daemon" | "cli";
 }
 
@@ -183,28 +154,9 @@ export function createDefaultToolRegistry(options?: ToolRegistryOptions): ToolRe
     }
   }
 
-  if (options?.timerManager) {
-    if (profile !== "chat" && profile !== "cli") {
-      registry.register(createScheduleOnceTool(options.timerManager));
-      registry.register(createListTimersTool(options.timerManager));
-      registry.register(createCancelTimerTool(options.timerManager));
-    }
-  }
-
-  if (options?.schedulerClient) {
-    if (profile !== "chat" && profile !== "cli") {
-      registry.register(createScheduleCronTool(options.schedulerClient));
-      registry.register(createListSchedulesTool(options.schedulerClient));
-      registry.register(createDeleteScheduleTool(options.schedulerClient));
-      registry.register(createListWatchersTool(options.schedulerClient));
-      registry.register(createScheduleWatcherTool(options.schedulerClient));
-      registry.register(createDeleteWatcherTool(options.schedulerClient));
-    }
-  }
-
-  if (options?.pluginTools) {
-    for (const tool of options.pluginTools) {
-      registry.register(tool);
+  if (options?.mcpTools) {
+    for (const mcpTool of options.mcpTools) {
+      registry.register(mcpTool);
     }
   }
 

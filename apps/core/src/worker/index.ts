@@ -12,6 +12,8 @@
 import { createDaemonWorkerClient, fetchTaskDetails } from "@/worker/daemon-client.ts";
 import { runWorkerLoop, WORKER_EXIT_CODE } from "@/worker/worker-loop.ts";
 import { createDefaultToolRegistry } from "@/tools/index.ts";
+import { McpToolRegistry } from "@/mcp/registry.ts";
+import { loadConfiguration } from "@/configuration/loader.ts";
 
 const HEARTBEAT_INTERVAL_MS = 30_000;
 
@@ -68,13 +70,28 @@ async function main(): Promise<void> {
 
   console.error(`[worker] Task loaded: "${taskDetails.name}" (attempt ${taskDetails.attempt})`);
 
-  // Determine working directory
   const workingDirectory = taskDetails.workingDirectory || process.cwd();
 
-  // Create tool registry with daemon profile
+  const mcpToolRegistry = new McpToolRegistry();
+  try {
+    const workerConfiguration = await loadConfiguration();
+    if (workerConfiguration.mcpServers.length > 0) {
+      const mcpConnectionResult = await mcpToolRegistry.connectToAllServers(workerConfiguration.mcpServers);
+      if (mcpConnectionResult.connected.length > 0) {
+        console.error(`[worker] MCP servers connected: ${mcpConnectionResult.connected.join(", ")}`);
+      }
+      for (const mcpFailure of mcpConnectionResult.failed) {
+        console.error(`[worker] MCP server "${mcpFailure.name}" failed: ${mcpFailure.error}`);
+      }
+    }
+  } catch {
+    console.error("[worker] Failed to load MCP configuration, continuing without MCP tools");
+  }
+
   const toolRegistry = createDefaultToolRegistry({
     workingDirectory,
     profile: "daemon",
+    mcpTools: mcpToolRegistry.getTools(),
   });
 
   // Start heartbeat interval
@@ -147,6 +164,8 @@ async function main(): Promise<void> {
       `[worker] Failed to report result: ${reportError instanceof Error ? reportError.message : String(reportError)}`,
     );
   }
+
+  await mcpToolRegistry.disconnectAllServers();
 
   console.error(`[worker] Exiting with code ${workerResult.exitCode}`);
   process.exit(workerResult.exitCode);

@@ -50,28 +50,6 @@ export async function persistModelToConfiguration(newModel: string): Promise<str
   return configurationPath;
 }
 
-export async function persistProviderAndModel(provider: string, newModel: string): Promise<string> {
-  const configurationPath = getGlobalConfigPath();
-
-  if (!(await Bun.file(configurationPath).exists())) {
-    const minimal = { languageModel: { provider, model: newModel } };
-    await Bun.write(configurationPath, stringifyYaml(minimal));
-    return configurationPath;
-  }
-
-  const fileContents = await Bun.file(configurationPath).text();
-  const parsed = parseYaml(fileContents) ?? {};
-
-  if (!parsed.languageModel || typeof parsed.languageModel !== "object") {
-    parsed.languageModel = {};
-  }
-  parsed.languageModel.provider = provider;
-  parsed.languageModel.model = newModel;
-
-  await Bun.write(configurationPath, stringifyYaml(parsed));
-  return configurationPath;
-}
-
 function resolveOpenRouterApiKey(): string | undefined {
   return Bun.env["OPENROUTER_API_KEY"] ?? Bun.env["KRAKEN_OPENROUTER_API_KEY"] ?? undefined;
 }

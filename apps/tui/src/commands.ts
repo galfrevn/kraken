@@ -1,18 +1,10 @@
 import type { ThreadManager } from "@/threads.ts";
-import type { PluginRegistry } from "@core/plugins/registry.ts";
-import { fetchRegistry } from "@core/plugins/installer.ts";
-import { persistModelToConfiguration, persistProviderAndModel } from "@core/tools/model.ts";
-
-let pendingProviderSwitch: string | null = null;
-
-export function setPendingProviderSwitch(provider: string | null): void {
-  pendingProviderSwitch = provider;
-}
+import { persistModelToConfiguration } from "@core/tools/model.ts";
 
 export interface CommandResult {
   output: string;
   switchedThread?: boolean;
-  displayMode?: "toast" | "dialog" | "plugin-browser" | "plugin-store" | "provider-setup";
+  displayMode?: "toast" | "dialog";
   data?: unknown;
 }
 
@@ -198,63 +190,42 @@ const modelCommand: SlashCommand = {
   description: "Show or switch the active LLM model",
   usage: "/model [model-id]",
   async execute(args, threadManager) {
-    const client = threadManager.getLanguageModelClient();
-    const trimmed = args.trim();
+    const languageModelClient = threadManager.getLanguageModelClient();
+    const trimmedModelName = args.trim();
 
-    if (!trimmed) {
-      return { output: `active model: ${client.getModel()}` };
+    if (!trimmedModelName) {
+      return { output: `active model: ${languageModelClient.getModel()}` };
     }
 
-    const previous = client.getModel();
-    client.setModel(trimmed);
-
-    const provider = pendingProviderSwitch;
-    pendingProviderSwitch = null;
+    const previousModelName = languageModelClient.getModel();
+    languageModelClient.setModel(trimmedModelName);
 
     try {
-      if (provider) {
-        client.setProvider(provider);
-        await persistProviderAndModel(provider, trimmed);
-        return {
-          output: `model switched: ${previous} → ${trimmed}\nprovider: ${provider}\nsaved to ~/.kraken/kraken.yml`,
-        };
-      } else {
-        await persistModelToConfiguration(trimmed);
-        return {
-          output: `model switched: ${previous} → ${trimmed}\nsaved to ~/.kraken/kraken.yml`,
-        };
-      }
+      await persistModelToConfiguration(trimmedModelName);
+      return {
+        output: `model switched: ${previousModelName} → ${trimmedModelName}\nsaved to ~/.kraken/kraken.yml`,
+      };
     } catch {
       return {
-        output: `model switched: ${previous} → ${trimmed} (runtime only, config save failed)`,
+        output: `model switched: ${previousModelName} → ${trimmedModelName} (runtime only, config save failed)`,
       };
     }
   },
 };
 
-const KNOWN_PROVIDERS: { name: string; envVar: string; label: string }[] = [
-  { name: "openrouter", envVar: "OPENROUTER_API_KEY", label: "OpenRouter" },
-  { name: "anthropic", envVar: "ANTHROPIC_API_KEY", label: "Anthropic" },
-  { name: "openai", envVar: "OPENAI_API_KEY", label: "OpenAI" },
-];
-
-const setupCommand: SlashCommand = {
-  name: "setup-provider",
-  aliases: ["setup"],
-  description: "Configure LLM providers and API keys",
-  usage: "/setup-provider",
-  execute() {
+const compactCommand: SlashCommand = {
+  name: "compact",
+  aliases: [],
+  description: "Trigger context compaction for the current thread",
+  usage: "/compact",
+  async execute(_args, threadManager) {
+    const activeEngine = threadManager.getActiveEngine();
+    const compactionResult = await activeEngine.triggerCompaction();
+    if (compactionResult.tier === "none") {
+      return { output: "no compaction needed — context utilization is low" };
+    }
     return {
-      output: "",
-      displayMode: "provider-setup",
-      data: KNOWN_PROVIDERS.map((p) => ({
-        name: p.name,
-        label: p.label,
-        description: process.env[p.envVar]
-          ? `${p.label} (configured)`
-          : `Configure ${p.label} API key`,
-        envVar: p.envVar,
-      })),
+      output: `compacted (${compactionResult.tier}): ${compactionResult.tokensBeforeCompaction.toLocaleString()} → ${compactionResult.tokensAfterCompaction.toLocaleString()} tokens, ${compactionResult.messagesRemoved} messages removed`,
     };
   },
 };
@@ -293,126 +264,10 @@ export const ALL_COMMANDS: SlashCommand[] = [
   renameCommand,
   continueCommand,
   modelCommand,
-  setupCommand,
+  compactCommand,
   purgeCommand,
   exitCommand,
 ];
-
-export function registerPluginsCommand(pluginRegistry: PluginRegistry): void {
-  const pluginsCommand: SlashCommand = {
-    name: "plugins",
-    aliases: ["p", "plugin"],
-    description: "Manage installed plugins",
-    usage: "/plugins [list|store|inspect|enable|disable] [name]",
-    async execute(args) {
-      const parts = args.trim().split(/\s+/);
-      const subcommand = parts[0]?.toLowerCase() || "list";
-      const pluginName = parts.slice(1).join(" ");
-
-      if (subcommand === "list" || subcommand === "") {
-        return { output: "", displayMode: "plugin-browser", data: pluginRegistry };
-      }
-
-      if (subcommand === "store" || subcommand === "browse") {
-        try {
-          const registry = await fetchRegistry();
-          return { output: "", displayMode: "plugin-store", data: { registry, pluginRegistry } };
-        } catch (error) {
-          const message = error instanceof Error ? error.message : String(error);
-          return { output: `Failed to fetch plugin store: ${message}` };
-        }
-      }
-
-      if (subcommand === "inspect" || subcommand === "info") {
-        if (!pluginName) return { output: "usage: /plugins inspect <name>" };
-        return { ...formatPluginInspection(pluginRegistry, pluginName), displayMode: "dialog" };
-      }
-
-      if (subcommand === "enable") {
-        if (!pluginName) return { output: "usage: /plugins enable <name>" };
-        const enabled = await pluginRegistry.enablePlugin(pluginName);
-        return enabled
-          ? { output: `plugin "${pluginName}" enabled` }
-          : { output: `could not enable "${pluginName}" — not found or already active` };
-      }
-
-      if (subcommand === "disable") {
-        if (!pluginName) return { output: "usage: /plugins disable <name>" };
-        const disabled = await pluginRegistry.disablePlugin(pluginName);
-        return disabled
-          ? { output: `plugin "${pluginName}" disabled` }
-          : { output: `could not disable "${pluginName}" — not found or already inactive` };
-      }
-
-      return {
-        output: `unknown subcommand: ${subcommand}\nusage: /plugins [list|store|inspect|enable|disable] [name]`,
-      };
-    },
-  };
-
-  ALL_COMMANDS.push(pluginsCommand);
-}
-
-function formatPluginInspection(registry: PluginRegistry, name: string): CommandResult {
-  const entry = registry.getPluginByName(name);
-  if (!entry) {
-    return { output: `plugin "${name}" not found` };
-  }
-
-  const { plugin, source, enabled, pluginContext } = entry;
-  const lines: string[] = [`${plugin.name} v${plugin.version}`];
-
-  if (plugin.description) {
-    lines.push(plugin.description);
-  }
-
-  if (plugin.author) {
-    lines.push(`author: ${plugin.author}`);
-  }
-
-  lines.push(`status: ${enabled ? "active" : "disabled"}`);
-  lines.push(`source: ${source}`);
-
-  const configKeys = Object.keys(pluginContext.config);
-  if (configKeys.length > 0) {
-    lines.push("");
-    lines.push("config:");
-    for (const key of configKeys) {
-      lines.push(`  ${key}: ${JSON.stringify(pluginContext.config[key])}`);
-    }
-  }
-
-  if (plugin.tools && plugin.tools.length > 0) {
-    lines.push("");
-    lines.push("tools:");
-    for (const tool of plugin.tools) {
-      const paramList = tool.definition.parameters
-        .map((p) => `${p.name}${p.required ? "" : "?"}`)
-        .join(", ");
-      lines.push(`  → ${tool.definition.name}(${paramList})`);
-      lines.push(`    ${tool.definition.description}`);
-    }
-  }
-
-  if (plugin.hooks) {
-    const hookNames = Object.keys(plugin.hooks).filter(
-      (key) => typeof (plugin.hooks as Record<string, unknown>)[key] === "function",
-    );
-    if (hookNames.length > 0) {
-      lines.push("");
-      lines.push(`hooks: ${hookNames.join(", ")}`);
-    }
-  }
-
-  if (plugin.promptExtension) {
-    lines.push("");
-    lines.push(
-      `prompt extension: "${plugin.promptExtension.slice(0, 80)}${plugin.promptExtension.length > 80 ? "..." : ""}"`,
-    );
-  }
-
-  return { output: lines.join("\n") };
-}
 
 function findCommand(name: string): SlashCommand | undefined {
   return ALL_COMMANDS.find((command) => command.name === name || command.aliases.includes(name));

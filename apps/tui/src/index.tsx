@@ -1,231 +1,60 @@
 import { createCliRenderer } from "@opentui/core";
 import { createRoot } from "@opentui/react";
-import { readdirSync, existsSync } from "node:fs";
-import { join, resolve } from "node:path";
-import { homedir } from "node:os";
 import { AgentDatabase } from "@core/storage/database.ts";
-import { TaskQueueManager } from "@core/queue/manager.ts";
 import { loadConfiguration } from "@core/configuration/loader.ts";
-import { createSchedulerClient } from "@core/clients/scheduler.ts";
 import { LanguageModelClient } from "@core/language/client.ts";
-import {
-  createDefaultToolRegistry,
-  createSessionCommandTool,
-  createPluginManagerTool,
-  createAskQuestionTool,
-} from "@core/tools/index.ts";
-import { AgentExecutionLoop } from "@core/agent/loop.ts";
-import { TaskRunnerDaemon } from "@core/agent/daemon.ts";
-import { TimerManager } from "@core/scheduling/timers.ts";
+import { createDefaultToolRegistry, createSessionCommandTool, createAskQuestionTool } from "@core/tools/index.ts";
+import { McpToolRegistry } from "@core/mcp/registry.ts";
 import { ProjectIndexer } from "@core/memory/indexer.ts";
-import { PluginRegistry, type PluginEntry } from "@core/plugins/index.ts";
-import type { SetupField } from "@/views/setup.tsx";
-import { TuiStore } from "@/store.ts";
-import { DaemonConnection } from "@/daemon-connection.ts";
-import { DaemonStore } from "@/daemon-store.ts";
 import { ThreadManager } from "@/threads.ts";
 import { createSessionExecutor } from "@/executor.ts";
-import { registerPluginsCommand } from "@/commands.ts";
-import { registerToolDisplayNames } from "@/views/chat.tsx";
 import { Application } from "@/application.tsx";
-
-function discoverPluginsInDirectory(pluginsDirectory: string): PluginEntry[] {
-  if (!existsSync(pluginsDirectory)) return [];
-
-  const discovered: PluginEntry[] = [];
-  try {
-    const entries = readdirSync(pluginsDirectory, { withFileTypes: true });
-    for (const entry of entries) {
-      if (!entry.isDirectory()) continue;
-      const pluginPath = resolve(pluginsDirectory, entry.name);
-      const hasIndex =
-        existsSync(join(pluginPath, "index.ts")) || existsSync(join(pluginPath, "index.js"));
-      if (hasIndex) {
-        discovered.push({ path: pluginPath, config: {} });
-      }
-    }
-  } catch {
-    /* directory not readable */
-  }
-  return discovered;
-}
-
-function discoverAllPlugins(): PluginEntry[] {
-  const globalPluginsDirectory = join(homedir(), ".kraken", "plugins");
-  return discoverPluginsInDirectory(globalPluginsDirectory);
-}
-
-function mergePluginEntries(
-  configured: PluginEntry[],
-  discovered: PluginEntry[],
-  repoDirectory: string,
-): PluginEntry[] {
-  const configuredAbsolutePaths = new Set(
-    configured.map((entry) => resolve(repoDirectory, entry.path)),
-  );
-
-  const merged = [...configured];
-  for (const entry of discovered) {
-    const absolutePath = resolve(repoDirectory, entry.path);
-    if (!configuredAbsolutePaths.has(absolutePath)) {
-      merged.push(entry);
-    }
-  }
-  return merged;
-}
-
-async function attemptDaemonConnection(daemonUrl: string): Promise<DaemonConnection | null> {
-  const daemonConnection = new DaemonConnection(daemonUrl);
-  const daemonIsReachable = await daemonConnection.connect();
-  if (daemonIsReachable) {
-    return daemonConnection;
-  }
-  return null;
-}
 
 export async function main(): Promise<void> {
   const configuration = await loadConfiguration();
-
-  const daemonUrl = process.env["KRAKEN_DAEMON_URL"] ?? "http://localhost:50051";
-  const activeDaemonConnection = await attemptDaemonConnection(daemonUrl);
-  const daemonStore = activeDaemonConnection
-    ? new DaemonStore(activeDaemonConnection)
-    : null;
-
-  if (daemonStore) {
-    console.log(`[tui] daemon mode: connected to ${daemonUrl}`);
-  } else {
-    console.log("[tui] local mode: daemon not available, running standalone");
-  }
-
   const database = new AgentDatabase(configuration.databasePath);
-  const taskQueueManager = new TaskQueueManager(database);
-  const schedulerClient = createSchedulerClient(configuration.services.schedulerUrl);
 
-  const timerManager = new TimerManager(taskQueueManager);
-
-  const store = new TuiStore(
-    database,
-    taskQueueManager,
-    schedulerClient,
-    timerManager,
-  );
-
-  const pluginRegistry = new PluginRegistry();
-  const basePluginContext = {
-    workingDirectory: configuration.repo,
-    databasePath: configuration.databasePath,
-  };
-
-  const discoveredPlugins = discoverAllPlugins();
-  const allPluginEntries = mergePluginEntries(
-    configuration.plugins,
-    discoveredPlugins,
-    configuration.repo,
-  );
-
-  const pluginResult = await pluginRegistry.loadAll(
-    allPluginEntries,
-    configuration.repo,
-    basePluginContext,
-    true,
-  );
-
-  if (pluginResult.loaded.length > 0) {
-    console.log(`[plugins] loaded: ${pluginResult.loaded.join(", ")}`);
-  }
-  for (const failure of pluginResult.failed) {
-    console.error(`[plugins] failed to load "${failure.entry}": ${failure.error}`);
+  const daemonUrl = process.env["KRAKEN_DAEMON_URL"] ?? configuration.services.schedulerUrl;
+  let daemonConnected = false;
+  try {
+    const healthCheckResponse = await fetch(`${daemonUrl}/health`, { signal: AbortSignal.timeout(2000) });
+    daemonConnected = healthCheckResponse.ok;
+  } catch {
+    daemonConnected = false;
   }
 
-  const pendingSetupFields: SetupField[] = pluginResult.deferred.flatMap((d) =>
-    d.missing.map((m) => ({ pluginName: d.name, fieldName: m.fieldName, field: m.field })),
-  );
-
-  registerPluginsCommand(pluginRegistry);
-  registerToolDisplayNames(pluginRegistry.getToolDisplayNames());
-
-  // LanguageModelClient is always created so ThreadManager/ChatEngine can initialize
-  // without null checks. In daemon mode, actual LLM calls go through DaemonStore, not this client.
   const languageModelClient = new LanguageModelClient(
-    daemonStore ? daemonUrl : configuration.services.llmProxyUrl,
+    daemonConnected ? daemonUrl : configuration.services.llmProxyUrl,
     configuration.languageModel,
   );
 
+  const mcpToolRegistry = new McpToolRegistry();
+  if (configuration.mcpServers.length > 0) {
+    const mcpConnectionResult = await mcpToolRegistry.connectToAllServers(configuration.mcpServers);
+    if (mcpConnectionResult.connected.length > 0) {
+      console.log(`[mcp] connected: ${mcpConnectionResult.connected.join(", ")}`);
+    }
+    for (const mcpFailure of mcpConnectionResult.failed) {
+      console.error(`[mcp] "${mcpFailure.name}" failed: ${mcpFailure.error}`);
+    }
+  }
+
   const toolRegistry = createDefaultToolRegistry({
     languageModelClient,
-    schedulerClient,
-    taskQueueManager,
-    timerManager,
     database,
     commandPolicy: configuration.commands,
     workingDirectory: configuration.repo,
-    pluginTools: pluginRegistry.getTools(),
+    mcpTools: mcpToolRegistry.getTools(),
     profile: "chat",
   });
 
-  const hookDispatcher = pluginRegistry.getHookDispatcher();
-  let localTaskRunnerDaemon: TaskRunnerDaemon | null = null;
-
-  if (!daemonStore && languageModelClient) {
-    const executionLoop = new AgentExecutionLoop(
-      languageModelClient,
-      taskQueueManager,
-      toolRegistry,
-      database,
-      { workingDirectory: configuration.repo },
-    );
-
-    executionLoop.setHookDispatcher(hookDispatcher);
-
-    localTaskRunnerDaemon = new TaskRunnerDaemon(executionLoop, taskQueueManager, { silent: true });
-    localTaskRunnerDaemon.start();
-  }
-
-  const threadManager = new ThreadManager(
-    languageModelClient,
-    toolRegistry,
-    configuration.repo,
-    database,
-  );
-
-  threadManager.setLogPersister((level, source, message) => {
-    database.addEngineLog(level, source, message);
-  });
-  threadManager.setPluginPromptExtensions(() => pluginRegistry.getPromptExtensions());
-  threadManager.setPluginHooks(hookDispatcher, { ...basePluginContext, config: {} });
+  const threadManager = new ThreadManager(languageModelClient, toolRegistry, configuration.repo, database);
 
   const sessionExecutor = createSessionExecutor(threadManager);
   toolRegistry.register(createSessionCommandTool(sessionExecutor));
   toolRegistry.register(
-    createPluginManagerTool({
-      pluginRegistry,
-      toolRegistry,
-      workingDirectory: configuration.repo,
-      baseContext: basePluginContext,
-      onToolDisplayNamesChanged: (names) => {
-        registerToolDisplayNames(names);
-        threadManager.refreshPluginPromptExtensions();
-      },
-      onSetupRequired: (fields) => {
-        return new Promise<void>((resolve) => {
-          const engine = threadManager.getActiveEngine();
-          engine.handleSetupRequired({
-            id: Date.now().toString(36) + Math.random().toString(36).slice(2, 6),
-            fields: fields.map((f) => ({
-              pluginName: f.pluginName,
-              fieldName: f.fieldName,
-              field: f.field,
-            })),
-            resolve,
-          });
-        });
-      },
-    }),
-  );
-  toolRegistry.register(
-    createAskQuestionTool((pending) => {
-      threadManager.getActiveEngine().handleQuestionsAsked(pending);
+    createAskQuestionTool((pendingQuestions) => {
+      pendingQuestions.resolve([]);
     }),
   );
 
@@ -237,80 +66,37 @@ export async function main(): Promise<void> {
     indexer.indexProject(configuration.repo).catch(() => {});
   }
 
-  setInterval(
-    () => {
-      database.pruneEngineLogs(5000);
-    },
-    10 * 60 * 1000,
-  );
-
   process.stdout.write("\x1B]0;Kraken\x07");
 
-  const renderer = await createCliRenderer({
-    exitOnCtrlC: false,
-  });
+  const renderer = await createCliRenderer({ exitOnCtrlC: false });
 
   const shutdown = async () => {
     process.stdout.write("\x1B]0;\x07");
-    if (localTaskRunnerDaemon) localTaskRunnerDaemon.stop();
-    timerManager.cancelAll();
     threadManager.saveNow();
-    await pluginRegistry.shutdownAll();
+    await mcpToolRegistry.disconnectAllServers();
     database.close();
     process.exit(0);
   };
 
-  process.on("SIGINT", () => {
-    shutdown();
-  });
-  process.on("SIGTERM", () => {
-    shutdown();
-  });
-
-  const handleSetupComplete = async () => {
-    const deferredResult = await pluginRegistry.activateDeferred();
-    if (deferredResult.loaded.length > 0) {
-      console.log(`[plugins] activated after setup: ${deferredResult.loaded.join(", ")}`);
-    }
-    for (const failure of deferredResult.failed) {
-      console.error(`[plugins] deferred activation failed "${failure.name}": ${failure.error}`);
-    }
-    // Register newly activated plugin tools (skip already-registered ones)
-    for (const tool of pluginRegistry.getTools()) {
-      if (!toolRegistry.getTool(tool.definition.name)) {
-        toolRegistry.register(tool);
-      }
-    }
-    registerToolDisplayNames(pluginRegistry.getToolDisplayNames());
-    threadManager.refreshPluginPromptExtensions();
-  };
+  process.on("SIGINT", () => { shutdown(); });
+  process.on("SIGTERM", () => { shutdown(); });
 
   createRoot(renderer).render(
     <Application
-      store={store}
-      daemonStore={daemonStore}
       threadManager={threadManager}
-      pluginRegistry={pluginRegistry}
-      pluginFailures={pluginResult.failed}
-      pendingSetup={pendingSetupFields.length > 0 ? pendingSetupFields : undefined}
-      onSetupComplete={handleSetupComplete}
+      languageModelClient={languageModelClient}
+      daemonConnected={daemonConnected}
     />,
   );
 
-  // Force SIGWINCH pulses so OpenTUI re-reads the real terminal dimensions.
-  // On Windows the initial stdout.columns/rows can be stale, causing a
-  // broken layout until the user manually resizes the window.
-  // Multiple pulses ensure the React tree is fully mounted before the fix.
   for (const delay of [50, 150, 300]) {
-    setTimeout(() => {
-      process.emit("SIGWINCH");
-    }, delay);
+    setTimeout(() => { process.emit("SIGWINCH"); }, delay);
   }
 }
 
 if (import.meta.main) {
-  main().catch((error) => {
-    console.error("fatal:", error);
+  main().catch((fatalError) => {
+    console.error("fatal:", fatalError);
     process.exit(1);
   });
 }

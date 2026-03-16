@@ -3,21 +3,9 @@ import { ConversationHistory } from "@core/language/conversation.ts";
 import { ToolRegistry } from "@core/tools/registry.ts";
 import { buildSystemPrompt, type PromptOptions } from "@core/agent/prompt.ts";
 import { toolsToNativeFormat } from "@core/tools/schema.ts";
+import { performTieredCompaction, type CompactionResult } from "@core/language/compaction.ts";
 import type { ToolExecutionContext } from "@core/tools/schema.ts";
 import type { CompletionResult, ToolCallEntry, TokenUsageSummary } from "@core/language/schema.ts";
-import type { HookDispatcher } from "@core/plugins/hooks.ts";
-import type { PluginContext } from "@kraken/sdk";
-import type { PendingQuestions } from "@core/tools/question.ts";
-import type { ConfirmationDecision, PendingConfirmation } from "@core/tools/confirmation.ts";
-import type { SetupField } from "@/views/setup.tsx";
-
-export interface PendingSetup {
-  id: string;
-  fields: SetupField[];
-  resolve: () => void;
-}
-
-export type SetupHandler = (pending: PendingSetup) => void;
 
 const MAX_ITERATIONS_PER_MESSAGE = 40;
 const CONTINUE_PROMPT =
@@ -55,21 +43,6 @@ export interface DebugLogEntry {
   message: string;
 }
 
-export interface PlanStep {
-  id: number;
-  description: string;
-  status: "pending" | "in_progress" | "completed" | "failed";
-}
-
-export interface Plan {
-  goal: string;
-  steps: PlanStep[];
-  status: "draft" | "approved" | "executing" | "completed" | "failed";
-  feedback: string[];
-}
-
-export type PlanListener = (plan: Plan | null) => void;
-
 export interface SerializedChatMessage {
   role: ChatMessageRole;
   content: string;
@@ -88,47 +61,12 @@ export interface SerializedConversationMessage {
   name?: string;
 }
 
-export interface SerializedPendingQuestions {
-  id: string;
-  items: import("@core/tools/question.ts").QuestionItem[];
-}
-
-export interface SerializedPendingConfirmation {
-  id: string;
-  toolName: string;
-  parameters: Record<string, unknown>;
-}
-
-export interface SerializedPlan {
-  goal: string;
-  steps: PlanStep[];
-  status: Plan["status"];
-  feedback: string[];
-}
-
 export interface SerializedChatEngine {
   messages: SerializedChatMessage[];
   conversationMessages: SerializedConversationMessage[];
-  pendingQuestions?: SerializedPendingQuestions;
-  pendingConfirmation?: SerializedPendingConfirmation;
-  plan?: SerializedPlan;
-  planMode?: boolean;
 }
 
 export type ChatEventListener = (messages: ChatMessage[]) => void;
-
-function parsePlanFromContent(content: string): { goal: string; steps: string[] } | null {
-  const planMatch = content.match(/<plan>([\s\S]*?)<\/plan>/);
-  if (!planMatch) return null;
-  const planContent = planMatch[1]!;
-  const goalMatch = planContent.match(/<goal>([\s\S]*?)<\/goal>/);
-  const steps = [...planContent.matchAll(/<step>([\s\S]*?)<\/step>/g)].map((m) => m[1]!.trim());
-  if (steps.length === 0) return null;
-  return {
-    goal: goalMatch ? goalMatch[1]!.trim() : "",
-    steps,
-  };
-}
 
 class CancelledError extends Error {
   constructor() {
@@ -151,18 +89,6 @@ export class ChatEngine {
   private pendingAttachments: (FileAttachment[] | undefined)[] = [];
   private processingQueue: boolean = false;
   private reachedIterationLimit: boolean = false;
-  private pendingPlanFeedback: string | null = null;
-  private hookDispatcher?: HookDispatcher;
-  private pluginContext?: PluginContext;
-  private planMode: boolean = false;
-  private currentPlan: Plan | null = null;
-  private planListeners: Set<PlanListener> = new Set();
-  private pendingQuestions: PendingQuestions | null = null;
-  private questionListeners: Set<(q: PendingQuestions | null) => void> = new Set();
-  private pendingConfirmation: PendingConfirmation | null = null;
-  private confirmationListeners: Set<(c: PendingConfirmation | null) => void> = new Set();
-  private pendingSetup: PendingSetup | null = null;
-  private setupListeners: Set<(s: PendingSetup | null) => void> = new Set();
   private promptOptions: PromptOptions;
   private tokenUsage: TokenUsageSummary = {
     totalPromptTokens: 0,
@@ -208,11 +134,6 @@ export class ChatEngine {
     this.logPersister = persister;
   }
 
-  setHookDispatcher(dispatcher: HookDispatcher, context: PluginContext): void {
-    this.hookDispatcher = dispatcher;
-    this.pluginContext = context;
-  }
-
   isProcessing(): boolean {
     return this.processing;
   }
@@ -241,172 +162,7 @@ export class ChatEngine {
     this.listeners.clear();
   }
 
-  setPlanMode(enabled: boolean): void {
-    this.planMode = enabled;
-    this.rebuildSystemPrompt();
-  }
-
-  updatePluginPromptExtensions(extensions: string[]): void {
-    this.promptOptions = {
-      ...this.promptOptions,
-      pluginPromptExtensions: extensions.length > 0 ? extensions : undefined,
-    };
-    this.rebuildSystemPrompt();
-  }
-
-  private rebuildSystemPrompt(): void {
-    const updatedOptions: PromptOptions = { ...this.promptOptions, planMode: this.planMode };
-    const systemPrompt = buildSystemPrompt(this.toolRegistry.listTools(), updatedOptions);
-    this.conversation.setSystemPrompt(systemPrompt);
-  }
-
-  isPlanMode(): boolean {
-    return this.planMode;
-  }
-
-  getPlan(): Plan | null {
-    return this.currentPlan;
-  }
-
-  addPlanListener(listener: PlanListener): void {
-    this.planListeners.add(listener);
-  }
-
-  removePlanListener(listener: PlanListener): void {
-    this.planListeners.delete(listener);
-  }
-
-  getPendingQuestions(): PendingQuestions | null {
-    return this.pendingQuestions;
-  }
-
-  addQuestionListener(listener: (q: PendingQuestions | null) => void): void {
-    this.questionListeners.add(listener);
-  }
-
-  removeQuestionListener(listener: (q: PendingQuestions | null) => void): void {
-    this.questionListeners.delete(listener);
-  }
-
-  private notifyQuestionListeners(): void {
-    for (const listener of this.questionListeners) {
-      listener(this.pendingQuestions);
-    }
-  }
-
-  handleQuestionsAsked(pending: PendingQuestions): void {
-    const originalResolve = pending.resolve;
-    this.pendingQuestions = {
-      ...pending,
-      resolve: (answers) => {
-        this.pendingQuestions = null;
-        this.notifyQuestionListeners();
-        originalResolve(answers);
-      },
-    };
-    this.notifyQuestionListeners();
-  }
-
-  resolveQuestions(answers: import("@core/tools/question.ts").QuestionAnswer[]): void {
-    if (!this.pendingQuestions) return;
-    this.pendingQuestions.resolve(answers);
-  }
-
-  getPendingConfirmation(): PendingConfirmation | null {
-    return this.pendingConfirmation;
-  }
-
-  addConfirmationListener(listener: (c: PendingConfirmation | null) => void): void {
-    this.confirmationListeners.add(listener);
-  }
-
-  removeConfirmationListener(listener: (c: PendingConfirmation | null) => void): void {
-    this.confirmationListeners.delete(listener);
-  }
-
-  private notifyConfirmationListeners(): void {
-    for (const listener of this.confirmationListeners) {
-      listener(this.pendingConfirmation);
-    }
-  }
-
-  resolveConfirmation(decision: ConfirmationDecision): void {
-    if (!this.pendingConfirmation) return;
-    this.pendingConfirmation.resolve(decision);
-  }
-
-  private requestConfirmation(
-    toolName: string,
-    parameters: Record<string, unknown>,
-  ): Promise<ConfirmationDecision> {
-    return new Promise<ConfirmationDecision>((resolve, reject) => {
-      const id = Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
-
-      const onAbort = () => {
-        this.pendingConfirmation = null;
-        this.notifyConfirmationListeners();
-        reject(new CancelledError());
-      };
-
-      if (this.abortController?.signal.aborted) {
-        reject(new CancelledError());
-        return;
-      }
-
-      this.abortController?.signal.addEventListener("abort", onAbort, { once: true });
-
-      this.pendingConfirmation = {
-        id,
-        toolName,
-        parameters,
-        resolve: (decision) => {
-          this.abortController?.signal.removeEventListener("abort", onAbort);
-          this.pendingConfirmation = null;
-          this.notifyConfirmationListeners();
-          resolve(decision);
-        },
-      };
-      this.notifyConfirmationListeners();
-    });
-  }
-
-  getPendingSetup(): PendingSetup | null {
-    return this.pendingSetup;
-  }
-
-  addSetupListener(listener: (s: PendingSetup | null) => void): void {
-    this.setupListeners.add(listener);
-  }
-
-  removeSetupListener(listener: (s: PendingSetup | null) => void): void {
-    this.setupListeners.delete(listener);
-  }
-
-  private notifySetupListeners(): void {
-    for (const listener of this.setupListeners) {
-      listener(this.pendingSetup);
-    }
-  }
-
-  handleSetupRequired(pending: PendingSetup): void {
-    const originalResolve = pending.resolve;
-    this.pendingSetup = {
-      ...pending,
-      resolve: () => {
-        this.pendingSetup = null;
-        this.notifySetupListeners();
-        originalResolve();
-      },
-    };
-    this.notifySetupListeners();
-  }
-
-  resolveSetup(): void {
-    if (!this.pendingSetup) return;
-    this.pendingSetup.resolve();
-  }
-
-  private async executeToolWithConfirmation(
+  private async executeToolCall(
     toolCall: ToolCallEntry,
     parameters: Record<string, unknown>,
     toolContext: ToolExecutionContext,
@@ -416,32 +172,32 @@ export class ChatEngine {
     toolResult: import("@core/tools/schema.ts").ToolResult | null;
     error: string | null;
   }> {
-    const tool = this.toolRegistry.getTool(toolCall.function.name);
-    if (tool?.definition.requiresConfirmation) {
-      const decision = await this.requestConfirmation(toolCall.function.name, parameters);
-      if (!decision.approved) {
-        const reason = decision.reason ? `: ${decision.reason}` : "";
-        return {
-          toolCall,
-          parameters,
-          toolResult: { success: false, output: "", error: `rejected by user${reason}` },
-          error: null,
-        };
-      }
-    }
+    const isDelegateToolCall = toolCall.function.name === "delegate";
+    const contextWithProgress: ToolExecutionContext = isDelegateToolCall
+      ? {
+          ...toolContext,
+          onProgress: (progressEvent) => {
+            if (progressEvent.type === "start") {
+              this.pushMessage({
+                role: "status",
+                content: `subagent: ${progressEvent.message ?? "starting"}`,
+                timestamp: new Date(),
+              });
+            } else if (progressEvent.type === "tool_call" && progressEvent.toolName) {
+              this.updateLastStatusMessage(`subagent: calling ${progressEvent.toolName}`);
+            } else if (progressEvent.type === "iteration" && progressEvent.iterationNumber) {
+              this.updateLastStatusMessage(`subagent: iteration ${progressEvent.iterationNumber}`);
+            } else if (progressEvent.type === "complete") {
+              this.updateLastStatusMessage(`subagent: ${progressEvent.message ?? "done"}`);
+            }
+          },
+        }
+      : toolContext;
 
     try {
       const toolResult = await this.raceWithAbort(
-        this.toolRegistry.executeTool(toolCall.function.name, parameters, toolContext),
+        this.toolRegistry.executeTool(toolCall.function.name, parameters, contextWithProgress),
       );
-
-      if (this.hookDispatcher) {
-        await this.hookDispatcher.dispatchAfterToolCall(
-          toolCall.function.name,
-          parameters,
-          toolResult,
-        );
-      }
 
       return { toolCall, parameters, toolResult, error: null };
     } catch (toolError) {
@@ -451,240 +207,15 @@ export class ChatEngine {
     }
   }
 
-  private notifyPlanListeners(): void {
-    for (const listener of this.planListeners) {
-      listener(this.currentPlan);
-    }
-  }
-
-  addPlanFeedback(feedback: string): void {
-    if (!this.currentPlan || this.currentPlan.status !== "draft") return;
-    this.currentPlan.feedback.push(feedback);
-    this.notifyPlanListeners();
-    // Ensure plan mode is on for feedback (it's inherently a plan operation)
-    this.planMode = true;
-    // Show only the user's feedback in chat, but send the full prompt to the LLM
-    this.pendingPlanFeedback = feedback;
-    this.enqueueMessage(feedback);
-  }
-
-  approvePlan(): void {
-    if (!this.currentPlan || this.currentPlan.status !== "draft") return;
-    this.currentPlan.status = "approved";
-    this.notifyPlanListeners();
-    this.processMessageWithPlanExecution();
-  }
-
-  private async processMessageWithPlanExecution(): Promise<void> {
-    const plan = this.currentPlan;
-    if (!plan) return;
-    if (this.processing) return;
-
-    this.processing = true;
-    this.abortController = new AbortController();
-    this.emitImmediate();
-
-    plan.status = "executing";
-    this.notifyPlanListeners();
-    this.log("info", "plan", `executing plan: ${plan.goal} (${plan.steps.length} steps)`);
-
-    try {
-      for (const step of plan.steps) {
-        if (this.abortController?.signal.aborted) {
-          step.status = "failed";
-          this.log("warn", "plan", `step ${step.id} skipped (cancelled)`);
-          this.notifyPlanListeners();
-          continue;
-        }
-
-        step.status = "in_progress";
-        this.notifyPlanListeners();
-
-        const stepPrompt = `Execute step ${step.id} of the approved plan: ${step.description}\n\nOnly do this specific step. When done, confirm what was accomplished.`;
-        const stepLabel = `Step ${step.id}/${plan.steps.length}: ${step.description}`;
-
-        try {
-          await this.executeSingleStep(stepPrompt, stepLabel);
-          step.status = "completed";
-          this.log("info", "plan", `step ${step.id} completed`);
-        } catch (err) {
-          if (err instanceof CancelledError) {
-            step.status = "failed";
-            this.log("warn", "plan", `step ${step.id} cancelled`);
-            this.notifyPlanListeners();
-            break;
-          }
-          const stepError = err instanceof Error ? err.message : String(err);
-          step.status = "failed";
-          this.pushMessage({
-            role: "error",
-            content: `plan step ${step.id} failed: ${stepError}`,
-            timestamp: new Date(),
-          });
-          this.log("error", "plan", `step ${step.id} failed: ${stepError}`);
-        }
-
-        this.notifyPlanListeners();
-      }
-
-      plan.status = plan.steps.some((s) => s.status === "failed") ? "failed" : "completed";
-      this.notifyPlanListeners();
-      this.log(
-        "info",
-        "plan",
-        `plan ${plan.status}: ${plan.steps.filter((s) => s.status === "completed").length}/${plan.steps.length} steps completed`,
-      );
-    } finally {
-      this.processing = false;
-      this.abortController = null;
-      this.emitImmediate();
-
-      if (this.messageQueue.length > 0) {
-        queueMicrotask(() => this.processNextInQueue());
+  private updateLastStatusMessage(content: string): void {
+    for (let messageIndex = this.messages.length - 1; messageIndex >= 0; messageIndex--) {
+      if (this.messages[messageIndex]!.role === "status") {
+        this.messages[messageIndex] = { ...this.messages[messageIndex]!, content };
+        this.emit();
+        return;
       }
     }
-  }
-
-  private async executeSingleStep(prompt: string, stepLabel?: string): Promise<void> {
-    // This is a sub-routine of executePlan that reuses the agent loop
-    // without setting this.processing (which is managed by the outer processMessage call)
-
-    if (stepLabel) {
-      this.pushMessage({
-        role: "status",
-        content: stepLabel,
-        timestamp: new Date(),
-      });
-    }
-
-    this.log("info", "plan", `starting step: ${stepLabel ?? prompt.slice(0, 80)}`);
-
-    const toolContext: ToolExecutionContext = {
-      workingDirectory: this.workingDirectory,
-    };
-
-    let completionResult = await this.getResponse(prompt);
-    let iterations = 0;
-
-    while (iterations < MAX_ITERATIONS_PER_MESSAGE) {
-      this.checkCancelled();
-      iterations += 1;
-
-      if (
-        completionResult.finishReason !== "tool_calls" ||
-        completionResult.toolCalls.length === 0
-      ) {
-        this.log(
-          "info",
-          "plan",
-          `step loop exiting: finishReason=${completionResult.finishReason}, toolCalls=${completionResult.toolCalls.length}, iterations=${iterations}`,
-        );
-        break;
-      }
-
-      const lastMsg = this.messages[this.messages.length - 1];
-      if (lastMsg && lastMsg.role === "assistant" && !lastMsg.content.trim()) {
-        this.removeLastMessage();
-      }
-
-      const preparedCalls = await Promise.all(
-        completionResult.toolCalls.map(async (toolCall) => {
-          let parameters: Record<string, unknown>;
-          try {
-            parameters = JSON.parse(toolCall.function.arguments);
-          } catch (parseError) {
-            this.log(
-              "warn",
-              "plan",
-              `failed to parse tool parameters for ${toolCall.function.name}: ${parseError instanceof Error ? parseError.message : String(parseError)}, raw: ${toolCall.function.arguments.slice(0, 200)}`,
-            );
-            parameters = {};
-          }
-
-          if (this.hookDispatcher) {
-            parameters = await this.hookDispatcher.dispatchBeforeToolCall(
-              toolCall.function.name,
-              parameters,
-            );
-          }
-
-          this.pushMessage({
-            role: "tool_call",
-            content: JSON.stringify(parameters, null, 2),
-            toolName: toolCall.function.name,
-            timestamp: new Date(),
-          });
-
-          return { toolCall, parameters };
-        }),
-      );
-
-      this.checkCancelled();
-
-      const results = await Promise.all(
-        preparedCalls.map(({ toolCall, parameters }) =>
-          this.executeToolWithConfirmation(toolCall, parameters, toolContext),
-        ),
-      );
-
-      for (const { toolCall, toolResult, error } of results) {
-        if (toolResult) {
-          const resultText = toolResult.success
-            ? toolResult.output
-            : (toolResult.error ?? toolResult.output);
-          const resultPreview =
-            resultText.length > 3000 ? resultText.slice(0, 3000) + "..." : resultText;
-
-          this.pushMessage({
-            role: "tool_result",
-            content: resultPreview,
-            rawContent: resultText,
-            toolName: toolCall.function.name,
-            toolSuccess: toolResult.success,
-            timestamp: new Date(),
-          });
-
-          this.conversation.addToolResultMessage(toolCall.id, toolCall.function.name, resultText);
-
-          if (!toolResult.success) {
-            this.log("error", "plan", `${toolCall.function.name}: ${resultText.slice(0, 200)}`);
-          }
-        } else {
-          this.pushMessage({
-            role: "tool_result",
-            content: error!,
-            rawContent: error!,
-            toolName: toolCall.function.name,
-            toolSuccess: false,
-            timestamp: new Date(),
-          });
-
-          this.log("error", "plan", `${toolCall.function.name} execution failed: ${error}`);
-          this.conversation.addToolResultMessage(toolCall.id, toolCall.function.name, error!);
-        }
-      }
-
-      try {
-        completionResult = await this.getResponseContinuation();
-      } catch (followUpError) {
-        if (followUpError instanceof CancelledError) throw followUpError;
-        const errorDetail =
-          followUpError instanceof Error ? followUpError.message : String(followUpError);
-        this.pushMessage({
-          role: "error",
-          content: `step follow-up failed: ${errorDetail}`,
-          timestamp: new Date(),
-        });
-        this.log("error", "plan", `step follow-up failed: ${errorDetail}`);
-        break;
-      }
-    }
-
-    if (iterations >= MAX_ITERATIONS_PER_MESSAGE) {
-      this.log("warn", "plan", `step reached max iterations (${MAX_ITERATIONS_PER_MESSAGE})`);
-    }
-
-    this.log("info", "plan", `step finished after ${iterations} iterations`);
+    this.pushMessage({ role: "status", content, timestamp: new Date() });
   }
 
   cancelCurrentResponse(): boolean {
@@ -762,25 +293,6 @@ export class ChatEngine {
         toolCallId: message.toolCallId,
         name: message.name,
       })),
-      pendingQuestions: this.pendingQuestions
-        ? { id: this.pendingQuestions.id, items: this.pendingQuestions.items }
-        : undefined,
-      pendingConfirmation: this.pendingConfirmation
-        ? {
-            id: this.pendingConfirmation.id,
-            toolName: this.pendingConfirmation.toolName,
-            parameters: this.pendingConfirmation.parameters,
-          }
-        : undefined,
-      plan: this.currentPlan
-        ? {
-            goal: this.currentPlan.goal,
-            steps: this.currentPlan.steps,
-            status: this.currentPlan.status,
-            feedback: this.currentPlan.feedback,
-          }
-        : undefined,
-      planMode: this.planMode || undefined,
     };
   }
 
@@ -817,72 +329,6 @@ export class ChatEngine {
       }
     }
 
-    if (state.pendingQuestions) {
-      const sq = state.pendingQuestions;
-      this.pendingQuestions = {
-        id: sq.id,
-        items: sq.items,
-        resolve: (answers) => {
-          const lines = ["# Questions", ""];
-          for (const a of answers) {
-            lines.push(a.question);
-            lines.push(a.answer);
-            lines.push("");
-          }
-          this.pendingQuestions = null;
-          this.notifyQuestionListeners();
-          this.pushMessage({
-            role: "tool_result",
-            content: lines.join("\n"),
-            toolName: "ask_question",
-            toolSuccess: true,
-            timestamp: new Date(),
-          });
-          this.conversation.addUserMessage(lines.join("\n"));
-        },
-      };
-      this.notifyQuestionListeners();
-    }
-
-    if (state.pendingConfirmation) {
-      const sc = state.pendingConfirmation;
-      this.pendingConfirmation = {
-        id: sc.id,
-        toolName: sc.toolName,
-        parameters: sc.parameters,
-        resolve: (decision) => {
-          const resultText = decision.approved
-            ? "approved by user"
-            : `rejected by user${decision.reason ? `: ${decision.reason}` : ""}`;
-          this.pendingConfirmation = null;
-          this.notifyConfirmationListeners();
-          this.pushMessage({
-            role: "tool_result",
-            content: resultText,
-            toolName: sc.toolName,
-            toolSuccess: decision.approved,
-            timestamp: new Date(),
-          });
-          this.conversation.addUserMessage(resultText);
-        },
-      };
-      this.notifyConfirmationListeners();
-    }
-
-    if (state.plan) {
-      this.currentPlan = {
-        goal: state.plan.goal,
-        steps: state.plan.steps.map((s) => ({ ...s })),
-        status: state.plan.status,
-        feedback: state.plan.feedback ?? [],
-      };
-      this.notifyPlanListeners();
-    }
-
-    if (state.planMode) {
-      this.planMode = true;
-    }
-
     this.emitImmediate();
   }
 
@@ -902,7 +348,6 @@ export class ChatEngine {
     if (lastIndex >= 0 && lastMessage) {
       const updated = updater(lastMessage);
       this.messages[lastIndex] = updated;
-      // When streaming finishes, emit immediately so the UI clears the spinner
       if (lastMessage.streaming && !updated.streaming) {
         this.emitImmediate();
       } else {
@@ -1046,35 +491,16 @@ export class ChatEngine {
     this.log(
       "info",
       "engine",
-      `processing message (planMode=${this.planMode}, queueLength=${this.messageQueue.length})`,
+      `processing message (queueLength=${this.messageQueue.length})`,
     );
 
-    if (this.hookDispatcher && this.pluginContext) {
-      await this.hookDispatcher
-        .dispatchConversationStart(this.pluginContext)
-        .catch((e: unknown) => {
-          this.log(
-            "warn",
-            "hook",
-            `conversationStart failed: ${e instanceof Error ? e.message : String(e)}`,
-          );
-        });
-    }
-
     try {
-      const isPlanGeneration = this.planMode;
-
-      const isFeedback = this.pendingPlanFeedback !== null;
       let llmInput = userInput;
-      if (isFeedback) {
-        llmInput = `Revise the plan based on this feedback: ${this.pendingPlanFeedback}\n\nYou may use read-only tools to investigate further if needed. If the feedback raises new ambiguities or choices, use ask_question to clarify with the user before finalizing. Then output the updated plan inside <plan> tags with <goal> and <step> tags.`;
-        this.pendingPlanFeedback = null;
-      }
       if (attachments && attachments.length > 0) {
-        const attachmentLines = attachments.map((a) =>
-          a.isImage
-            ? `[Attached image: ${a.path}] (use view_image tool to analyze)`
-            : `[Attached file: ${a.path}] (use read_file tool to read)`,
+        const attachmentLines = attachments.map((attachment) =>
+          attachment.isImage
+            ? `[Attached image: ${attachment.path}] (use view_image tool to analyze)`
+            : `[Attached file: ${attachment.path}] (use read_file tool to read)`,
         );
         llmInput = llmInput + "\n\n" + attachmentLines.join("\n");
       }
@@ -1086,9 +512,6 @@ export class ChatEngine {
         `initial response: finishReason=${completionResult.finishReason}, toolCalls=${completionResult.toolCalls.length}, contentLength=${completionResult.content.length}`,
       );
 
-      // Normalize: if LLM says "tool_calls" but no tool calls were parsed, treat as "stop".
-      // This happens when the provider returns finish_reason=tool_calls natively but kraken
-      // uses XML-based tool calling, so no native tool calls are present.
       if (
         completionResult.finishReason === "tool_calls" &&
         completionResult.toolCalls.length === 0
@@ -1119,60 +542,49 @@ export class ChatEngine {
           break;
         }
 
-        // Only remove the assistant message if it has no visible text content
-        const lastMsg = this.messages[this.messages.length - 1];
-        if (lastMsg && lastMsg.role === "assistant" && !lastMsg.content.trim()) {
+        const lastMessage = this.messages[this.messages.length - 1];
+        if (lastMessage && lastMessage.role === "assistant" && !lastMessage.content.trim()) {
           this.removeLastMessage();
         }
 
-        // Parse parameters and push tool_call messages first
         this.log(
           "info",
           "engine",
-          `iteration ${iterations}: executing ${completionResult.toolCalls.length} tool call(s): ${completionResult.toolCalls.map((tc) => tc.function.name).join(", ")}`,
+          `iteration ${iterations}: executing ${completionResult.toolCalls.length} tool call(s): ${completionResult.toolCalls.map((toolCallEntry) => toolCallEntry.function.name).join(", ")}`,
         );
         const preparedCalls = await Promise.all(
-          completionResult.toolCalls.map(async (toolCall) => {
+          completionResult.toolCalls.map(async (toolCallEntry) => {
             let parameters: Record<string, unknown>;
             try {
-              parameters = JSON.parse(toolCall.function.arguments);
+              parameters = JSON.parse(toolCallEntry.function.arguments);
             } catch (parseError) {
               this.log(
                 "warn",
                 "engine",
-                `failed to parse parameters for ${toolCall.function.name}: ${parseError instanceof Error ? parseError.message : String(parseError)}, raw: ${toolCall.function.arguments.slice(0, 200)}`,
+                `failed to parse parameters for ${toolCallEntry.function.name}: ${parseError instanceof Error ? parseError.message : String(parseError)}, raw: ${toolCallEntry.function.arguments.slice(0, 200)}`,
               );
               parameters = {};
-            }
-
-            if (this.hookDispatcher) {
-              parameters = await this.hookDispatcher.dispatchBeforeToolCall(
-                toolCall.function.name,
-                parameters,
-              );
             }
 
             this.pushMessage({
               role: "tool_call",
               content: JSON.stringify(parameters, null, 2),
-              toolName: toolCall.function.name,
+              toolName: toolCallEntry.function.name,
               timestamp: new Date(),
             });
 
-            return { toolCall, parameters };
+            return { toolCall: toolCallEntry, parameters };
           }),
         );
 
         this.checkCancelled();
 
-        // Execute all tools in parallel (with confirmation checks)
         const results = await Promise.all(
           preparedCalls.map(({ toolCall, parameters }) =>
-            this.executeToolWithConfirmation(toolCall, parameters, toolContext),
+            this.executeToolCall(toolCall, parameters, toolContext),
           ),
         );
 
-        // Push results in order and add to conversation history
         for (const { toolCall, toolResult, error } of results) {
           if (toolResult) {
             const resultText = toolResult.success
@@ -1246,37 +658,10 @@ export class ChatEngine {
       this.log(
         "info",
         "engine",
-        `message processing complete: ${iterations} iterations, planGeneration=${isPlanGeneration}`,
+        `message processing complete: ${iterations} iterations`,
       );
 
-      if (isPlanGeneration) {
-        // Scan all assistant messages for a <plan> block (the last one wins)
-        for (let i = this.messages.length - 1; i >= 0; i--) {
-          const msg = this.messages[i];
-          if (msg && msg.role === "assistant") {
-            const raw = msg.rawContent ?? msg.content;
-            const parsed = parsePlanFromContent(raw);
-            if (parsed) {
-              this.currentPlan = {
-                goal: parsed.goal,
-                steps: parsed.steps.map((desc, idx) => ({
-                  id: idx + 1,
-                  description: desc,
-                  status: "pending",
-                })),
-                status: "draft",
-                feedback: [],
-              };
-              this.notifyPlanListeners();
-              // Auto-approve: execute the plan immediately after generation
-              queueMicrotask(() => this.approvePlan());
-              break;
-            }
-          }
-        }
-      }
-
-      if (iterations >= MAX_ITERATIONS_PER_MESSAGE && !isPlanGeneration) {
+      if (iterations >= MAX_ITERATIONS_PER_MESSAGE) {
         this.reachedIterationLimit = true;
         this.pushMessage({
           role: "status",
@@ -1317,18 +702,6 @@ export class ChatEngine {
         }
       }
     } finally {
-      if (this.hookDispatcher && this.pluginContext) {
-        await this.hookDispatcher
-          .dispatchConversationEnd(this.pluginContext)
-          .catch((e: unknown) => {
-            this.log(
-              "warn",
-              "hook",
-              `conversationEnd failed: ${e instanceof Error ? e.message : String(e)}`,
-            );
-          });
-      }
-
       this.log(
         "info",
         "engine",
@@ -1370,8 +743,8 @@ export class ChatEngine {
           );
         }
       }
-      const messages = this.conversation.getMessagesWithSystemPrompt();
-      const completionResult = await this.languageModelClient.complete(messages);
+      const conversationMessages = this.conversation.getMessagesWithSystemPrompt();
+      const completionResult = await this.languageModelClient.complete(conversationMessages);
       this.trackTokenUsage(completionResult);
 
       this.checkCancelled();
@@ -1438,5 +811,31 @@ export class ChatEngine {
 
   getTokenUsage(): TokenUsageSummary {
     return { ...this.tokenUsage };
+  }
+
+  getConversation(): ConversationHistory {
+    return this.conversation;
+  }
+
+  getLanguageModelClient(): LanguageModelClient {
+    return this.languageModelClient;
+  }
+
+  async triggerCompaction(maximumContextTokens: number = 128_000): Promise<CompactionResult> {
+    const compactionResult = await performTieredCompaction(
+      this.conversation,
+      this.languageModelClient,
+      maximumContextTokens,
+    );
+
+    if (compactionResult.tier !== "none") {
+      this.pushMessage({
+        role: "status",
+        content: `compacted (${compactionResult.tier}): ${compactionResult.tokensBeforeCompaction.toLocaleString()} → ${compactionResult.tokensAfterCompaction.toLocaleString()} tokens`,
+        timestamp: new Date(),
+      });
+    }
+
+    return compactionResult;
   }
 }

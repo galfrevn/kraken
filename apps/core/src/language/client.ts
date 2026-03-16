@@ -27,7 +27,7 @@ export class LanguageModelClient {
   constructor(llmProxyUrl: string, languageModelConfiguration: LanguageModelConfiguration) {
     this.llmProxyClient = createLlmProxyClient(llmProxyUrl);
     this.model = languageModelConfiguration.model;
-    this.provider = languageModelConfiguration.provider;
+    this.provider = "openrouter";
     this.defaultTemperature = languageModelConfiguration.temperature;
     this.defaultMaxTokens = languageModelConfiguration.maxTokens;
     this.tokenUsage = {

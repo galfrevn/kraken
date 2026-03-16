@@ -37,40 +37,12 @@ function buildDaemonEnvironment(configuration: AgentConfiguration): Record<strin
   const environmentVariables: Record<string, string | undefined> = {
     ...process.env,
     DOTENV_PATH: join(KRAKEN_HOME, ".env"),
-    LLM_PROVIDER: configuration.languageModel.provider,
+    LLM_PROVIDER: "openrouter",
   };
 
   const apiKey = configuration.languageModel.apiKey;
   if (apiKey) {
-    switch (configuration.languageModel.provider) {
-      case "openrouter":
-        environmentVariables.OPENROUTER_API_KEY = apiKey;
-        break;
-      case "openai":
-        environmentVariables.OPENAI_API_KEY = apiKey;
-        break;
-      case "anthropic":
-        environmentVariables.ANTHROPIC_API_KEY = apiKey;
-        break;
-    }
-  }
-
-  const baseUrl = configuration.languageModel.baseUrl;
-  if (baseUrl) {
-    switch (configuration.languageModel.provider) {
-      case "openrouter":
-        environmentVariables.OPENROUTER_BASE_URL = baseUrl;
-        break;
-      case "openai":
-        environmentVariables.OPENAI_BASE_URL = baseUrl;
-        break;
-      case "anthropic":
-        environmentVariables.ANTHROPIC_BASE_URL = baseUrl;
-        break;
-      case "ollama":
-        environmentVariables.OLLAMA_BASE_URL = baseUrl;
-        break;
-    }
+    environmentVariables.OPENROUTER_API_KEY = apiKey;
   }
 
   return environmentVariables;

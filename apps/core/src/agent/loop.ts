@@ -7,7 +7,6 @@ import { toolsToNativeFormat } from "@/tools/schema.ts";
 import type { Task } from "@/queue/schema.ts";
 import type { ToolExecutionContext } from "@/tools/schema.ts";
 import type { AgentDatabase } from "@/storage/database.ts";
-import type { HookDispatcher } from "@/plugins/hooks.ts";
 import type { ToolCallEntry } from "@/language/schema.ts";
 
 const DEFAULT_MAX_ITERATIONS = 40;
@@ -32,7 +31,6 @@ export class AgentExecutionLoop {
   private database: AgentDatabase;
   private maxIterations: number;
   private workingDirectory: string;
-  private hookDispatcher?: HookDispatcher;
 
   constructor(
     languageModelClient: LanguageModelClient,
@@ -47,10 +45,6 @@ export class AgentExecutionLoop {
     this.database = database;
     this.maxIterations = configuration.maxIterations ?? DEFAULT_MAX_ITERATIONS;
     this.workingDirectory = configuration.workingDirectory;
-  }
-
-  setHookDispatcher(dispatcher: HookDispatcher): void {
-    this.hookDispatcher = dispatcher;
   }
 
   async executeTask(taskId: string): Promise<AgentLoopResult> {
@@ -168,13 +162,6 @@ export class AgentExecutionLoop {
         parameters = {};
       }
 
-      if (this.hookDispatcher) {
-        parameters = await this.hookDispatcher.dispatchBeforeToolCall(
-          toolCall.function.name,
-          parameters,
-        );
-      }
-
       this.database.addTaskLog(task.id, "info", `calling tool: ${toolCall.function.name}`, {
         parameters: JSON.stringify(parameters),
       });
@@ -184,14 +171,6 @@ export class AgentExecutionLoop {
         parameters,
         context,
       );
-
-      if (this.hookDispatcher) {
-        await this.hookDispatcher.dispatchAfterToolCall(
-          toolCall.function.name,
-          parameters,
-          toolResult,
-        );
-      }
 
       this.database.addTaskLog(
         task.id,

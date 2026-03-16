@@ -3,7 +3,7 @@ import { ConversationHistory } from "@/language/conversation.ts";
 import { ToolRegistry } from "@/tools/registry.ts";
 import { buildSystemPrompt, type EnvironmentContext } from "@/agent/prompt.ts";
 import { toolsToNativeFormat } from "@/tools/schema.ts";
-import type { ToolExecutionContext } from "@/tools/schema.ts";
+import type { ToolExecutionContext, ToolProgressCallback } from "@/tools/schema.ts";
 
 const DEFAULT_SUBAGENT_MAX_ITERATIONS = 25;
 
@@ -12,6 +12,9 @@ export interface SubagentConfiguration {
   model?: string;
   context?: string;
   maxIterations?: number;
+  depthLimit?: number;
+  currentDepth?: number;
+  onProgress?: ToolProgressCallback;
 }
 
 export interface SubagentResult {
@@ -37,6 +40,21 @@ export class SubagentRunner {
   }
 
   async execute(configuration: SubagentConfiguration): Promise<SubagentResult> {
+    const depthLimit = configuration.depthLimit ?? 2;
+    const currentDepth = configuration.currentDepth ?? 0;
+    const progressCallback = configuration.onProgress;
+
+    if (currentDepth >= depthLimit) {
+      return {
+        success: false,
+        output: `subagent depth limit reached (${depthLimit})`,
+        iterations: 0,
+        toolCalls: 0,
+      };
+    }
+
+    progressCallback?.({ type: "start", message: configuration.task.slice(0, 100) });
+
     const maxIterations = configuration.maxIterations ?? DEFAULT_SUBAGENT_MAX_ITERATIONS;
     const environmentContext: EnvironmentContext = {
       workingDirectory: this.workingDirectory,
@@ -72,11 +90,17 @@ export class SubagentRunner {
 
       while (iterations < maxIterations) {
         iterations += 1;
+        progressCallback?.({ type: "iteration", iterationNumber: iterations });
 
         if (
           completionResult.finishReason !== "tool_calls" ||
           completionResult.toolCalls.length === 0
         ) {
+          progressCallback?.({
+            type: "complete",
+            totalToolCalls,
+            message: `completed in ${iterations} iterations`,
+          });
           return {
             success: true,
             output: completionResult.content,
@@ -92,6 +116,8 @@ export class SubagentRunner {
           } catch {
             parameters = {};
           }
+
+          progressCallback?.({ type: "tool_call", toolName: toolCall.function.name });
 
           const toolResult = await this.toolRegistry.executeTool(
             toolCall.function.name,

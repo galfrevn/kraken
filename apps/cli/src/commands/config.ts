@@ -1,7 +1,6 @@
 import { existsSync, readFileSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { bold, colorize, fail, success, warn, KRAKEN_HOME } from "@/constants.ts";
-import { API_KEY_ENV_VAR_BY_PROVIDER } from "@/providers.ts";
 
 function findConfigFile(): string | null {
   const globalConfig = join(KRAKEN_HOME, "kraken.yml");
@@ -141,12 +140,7 @@ function validateConfiguration(configurationFilePath: string): void {
 
   const languageModelSection = parsedConfiguration.languageModel as Record<string, string> | undefined;
 
-  if (!languageModelSection?.provider) {
-    fail("missing required field: languageModel.provider");
-    validationErrorCount++;
-  } else {
-    success(`languageModel.provider: ${languageModelSection.provider}`);
-  }
+  success("languageModel.provider: openrouter");
 
   if (!languageModelSection?.model) {
     fail("missing required field: languageModel.model");
@@ -155,28 +149,24 @@ function validateConfiguration(configurationFilePath: string): void {
     success(`languageModel.model: ${languageModelSection.model}`);
   }
 
-  if (languageModelSection?.provider) {
-    const expectedEnvironmentVariable = API_KEY_ENV_VAR_BY_PROVIDER[languageModelSection.provider];
-    if (expectedEnvironmentVariable) {
-      const apiKeyValue = Bun.env[expectedEnvironmentVariable];
-      if (apiKeyValue) {
-        success(`${expectedEnvironmentVariable} is set in environment`);
+  const expectedEnvironmentVariable = "OPENROUTER_API_KEY";
+  const apiKeyValue = Bun.env[expectedEnvironmentVariable];
+  if (apiKeyValue) {
+    success(`${expectedEnvironmentVariable} is set in environment`);
+  } else {
+    const envFilePath = join(KRAKEN_HOME, ".env");
+    if (existsSync(envFilePath)) {
+      const envFileContents = readFileSync(envFilePath, "utf-8");
+      const envFileHasKey = envFileContents.includes(`${expectedEnvironmentVariable}=`);
+      if (envFileHasKey) {
+        success(`${expectedEnvironmentVariable} found in ~/.kraken/.env`);
       } else {
-        const envFilePath = join(KRAKEN_HOME, ".env");
-        if (existsSync(envFilePath)) {
-          const envFileContents = readFileSync(envFilePath, "utf-8");
-          const envFileHasKey = envFileContents.includes(`${expectedEnvironmentVariable}=`);
-          if (envFileHasKey) {
-            success(`${expectedEnvironmentVariable} found in ~/.kraken/.env`);
-          } else {
-            fail(`${expectedEnvironmentVariable} not found (required for ${languageModelSection.provider})`);
-            validationErrorCount++;
-          }
-        } else {
-          fail(`${expectedEnvironmentVariable} not found and ~/.kraken/.env does not exist`);
-          validationErrorCount++;
-        }
+        fail(`${expectedEnvironmentVariable} not found (required for openrouter)`);
+        validationErrorCount++;
       }
+    } else {
+      fail(`${expectedEnvironmentVariable} not found and ~/.kraken/.env does not exist`);
+      validationErrorCount++;
     }
   }
 

@@ -12,8 +12,19 @@ export interface ToolDefinition {
   requiresConfirmation?: boolean;
 }
 
+export interface ToolProgressEvent {
+  type: "start" | "iteration" | "tool_call" | "complete";
+  toolName?: string;
+  iterationNumber?: number;
+  totalToolCalls?: number;
+  message?: string;
+}
+
+export type ToolProgressCallback = (progressEvent: ToolProgressEvent) => void;
+
 export interface ToolExecutionContext {
   workingDirectory: string;
+  onProgress?: ToolProgressCallback;
 }
 
 export interface ToolResult {

@@ -17,7 +17,6 @@ const COMMANDS: Record<string, { description: string; module: string }> = {
   init: { description: "Initialize kraken in the current project", module: "@/commands/init.ts" },
   config: { description: "View, edit, or validate project configuration", module: "@/commands/config.ts" },
   doctor: { description: "Check system health and dependencies", module: "@/commands/doctor.ts" },
-  plugins: { description: "Manage plugins (list/install/search/info)", module: "@/commands/plugins.ts" },
   update: { description: "Update kraken to the latest version", module: "@/commands/update.ts" },
   uninstall: {
     description: "Uninstall kraken from your system",

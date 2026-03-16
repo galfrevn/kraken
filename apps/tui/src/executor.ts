@@ -4,7 +4,7 @@ import type { ThreadManager } from "@/threads.ts";
 
 const DESTRUCTIVE_COMMAND_NAMES = new Set(["purge", "delete", "clear"]);
 
-const AGENT_EXCLUDED_COMMANDS = new Set(["continue", "plugins"]);
+const AGENT_EXCLUDED_COMMANDS = new Set(["continue"]);
 
 function toSessionDefinition(command: SlashCommand): SessionCommandDefinition {
   return {

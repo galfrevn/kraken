@@ -2,7 +2,7 @@ import { existsSync, readFileSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import * as p from "@clack/prompts";
 import { bold, colorize, fail, success, warn, KRAKEN_HOME } from "@/constants.ts";
-import { LLM_PROVIDERS, MODELS_BY_PROVIDER, API_KEY_ENV_VAR_BY_PROVIDER } from "@/providers.ts";
+import { MODELS_BY_PROVIDER, API_KEY_ENV_VAR_BY_PROVIDER } from "@/providers.ts";
 
 function findConfigurationFilePath(): string | null {
   const globalConfigPath = join(KRAKEN_HOME, "kraken.yml");
@@ -108,35 +108,25 @@ function listProviderConfiguration(): void {
   const parsedConfiguration = parseSimpleYaml(fileContents);
   const languageModelSection = parsedConfiguration.languageModel as Record<string, string> | undefined;
 
-  const currentProvider = languageModelSection?.provider ?? "not set";
   const currentModel = languageModelSection?.model ?? "not set";
 
-  const providerLabel = LLM_PROVIDERS.find((providerOption) => providerOption.value === currentProvider)?.label ?? currentProvider;
-
   console.log(`\n  ${bold("LLM Provider Configuration")}\n`);
-  console.log(`    ${bold("Provider:")}  ${colorize(providerLabel, "cyan")}`);
+  console.log(`    ${bold("Provider:")}  ${colorize("OpenRouter", "cyan")}`);
   console.log(`    ${bold("Model:")}     ${currentModel}`);
 
-  console.log(`\n  ${bold("API Keys:")}\n`);
+  console.log(`\n  ${bold("API Key:")}\n`);
 
   const apiKeysFromEnvFile = readApiKeysFromEnvFile();
+  const openrouterApiKeyValue = Bun.env["OPENROUTER_API_KEY"] || apiKeysFromEnvFile["OPENROUTER_API_KEY"];
+  const openrouterKeyStatusIndicator = openrouterApiKeyValue
+    ? colorize("set", "green")
+    : colorize("not set", "red");
 
-  for (const [providerName, environmentVariableName] of Object.entries(API_KEY_ENV_VAR_BY_PROVIDER)) {
-    const environmentVariableValue = Bun.env[environmentVariableName] || apiKeysFromEnvFile[environmentVariableName];
-    const providerDisplayLabel = LLM_PROVIDERS.find((providerOption) => providerOption.value === providerName)?.label ?? providerName;
-    const isCurrentProvider = providerName === currentProvider;
-    const statusIndicator = environmentVariableValue
-      ? colorize("set", "green")
-      : colorize("not set", "red");
-    const currentMarker = isCurrentProvider ? colorize(" (active)", "cyan") : "";
-
-    console.log(`    ${providerDisplayLabel.padEnd(12)} ${environmentVariableName.padEnd(24)} ${statusIndicator}${currentMarker}`);
-  }
-
+  console.log(`    ${"OPENROUTER_API_KEY".padEnd(24)} ${openrouterKeyStatusIndicator}`);
   console.log();
 }
 
-async function switchProviderInteractively(): Promise<void> {
+async function switchModelInteractively(): Promise<void> {
   const configurationFilePath = findConfigurationFilePath();
 
   if (!configurationFilePath) {
@@ -144,27 +134,17 @@ async function switchProviderInteractively(): Promise<void> {
     process.exit(1);
   }
 
-  p.intro("Switch LLM provider");
+  p.intro("Switch model");
 
-  const selectedProvider = await p.select({
-    message: "Select LLM provider",
-    options: LLM_PROVIDERS,
-  });
-
-  if (p.isCancel(selectedProvider)) {
-    p.cancel("Cancelled.");
-    process.exit(0);
-  }
-
-  const availableModelsForProvider = MODELS_BY_PROVIDER[selectedProvider];
-  if (!availableModelsForProvider) {
-    fail(`No models available for provider "${selectedProvider}"`);
+  const availableOpenRouterModels = MODELS_BY_PROVIDER["openrouter"];
+  if (!availableOpenRouterModels) {
+    fail("no models available for OpenRouter");
     process.exit(1);
   }
 
   const selectedModel = await p.select({
     message: "Select model",
-    options: availableModelsForProvider,
+    options: availableOpenRouterModels,
   });
 
   if (p.isCancel(selectedModel)) {
@@ -172,15 +152,15 @@ async function switchProviderInteractively(): Promise<void> {
     process.exit(0);
   }
 
-  const environmentVariableName = API_KEY_ENV_VAR_BY_PROVIDER[selectedProvider] ?? "OPENROUTER_API_KEY";
-  const apiKeysFromEnvFileForSwitch = readApiKeysFromEnvFile();
-  const existingApiKeyValue = Bun.env[environmentVariableName] || apiKeysFromEnvFileForSwitch[environmentVariableName];
+  const openrouterEnvironmentVariableName = API_KEY_ENV_VAR_BY_PROVIDER["openrouter"]!;
+  const apiKeysFromEnvFile = readApiKeysFromEnvFile();
+  const existingApiKeyValue = Bun.env[openrouterEnvironmentVariableName] || apiKeysFromEnvFile[openrouterEnvironmentVariableName];
   let finalApiKeyValue = "";
 
   if (existingApiKeyValue) {
     const maskedExistingKey = `${existingApiKeyValue.slice(0, 10)}...${existingApiKeyValue.slice(-4)}`;
     const shouldUseExistingKey = await p.confirm({
-      message: `Found ${environmentVariableName} (${maskedExistingKey}). Use it?`,
+      message: `Found ${openrouterEnvironmentVariableName} (${maskedExistingKey}). Use it?`,
       initialValue: true,
     });
 
@@ -196,8 +176,8 @@ async function switchProviderInteractively(): Promise<void> {
 
   if (!finalApiKeyValue) {
     const enteredApiKey = await p.text({
-      message: `Enter your ${selectedProvider} API key`,
-      placeholder: "sk-...",
+      message: "Enter your OpenRouter API key",
+      placeholder: "sk-or-...",
       validate: (inputValue = "") => {
         if (!inputValue.trim()) return "API key is required";
       },
@@ -212,7 +192,7 @@ async function switchProviderInteractively(): Promise<void> {
   }
 
   let updatedFileContents = readFileSync(configurationFilePath, "utf-8");
-  updatedFileContents = rewriteYamlValue(updatedFileContents, "languageModel.provider", selectedProvider as string);
+  updatedFileContents = rewriteYamlValue(updatedFileContents, "languageModel.provider", "openrouter");
   updatedFileContents = rewriteYamlValue(updatedFileContents, "languageModel.model", selectedModel as string);
   writeFileSync(configurationFilePath, updatedFileContents);
 
@@ -226,42 +206,28 @@ async function switchProviderInteractively(): Promise<void> {
   let apiKeyLineFound = false;
   for (let lineIndex = 0; lineIndex < environmentFileLines.length; lineIndex++) {
     const trimmedEnvironmentLine = environmentFileLines[lineIndex]!.trim();
-    if (trimmedEnvironmentLine.startsWith(`${environmentVariableName}=`) || trimmedEnvironmentLine.startsWith(`# ${environmentVariableName}=`)) {
-      environmentFileLines[lineIndex] = `${environmentVariableName}=${finalApiKeyValue}`;
+    if (trimmedEnvironmentLine.startsWith(`${openrouterEnvironmentVariableName}=`) || trimmedEnvironmentLine.startsWith(`# ${openrouterEnvironmentVariableName}=`)) {
+      environmentFileLines[lineIndex] = `${openrouterEnvironmentVariableName}=${finalApiKeyValue}`;
       apiKeyLineFound = true;
       break;
     }
   }
 
   if (!apiKeyLineFound) {
-    environmentFileLines.push(`${environmentVariableName}=${finalApiKeyValue}`);
+    environmentFileLines.push(`${openrouterEnvironmentVariableName}=${finalApiKeyValue}`);
   }
 
   writeFileSync(environmentFilePath, environmentFileLines.join("\n"));
 
-  const providerDisplayLabel = LLM_PROVIDERS.find((providerOption) => providerOption.value === selectedProvider)?.label ?? selectedProvider;
-  success(`Provider: ${providerDisplayLabel}`);
   success(`Model: ${selectedModel}`);
   success(`API key saved to ~/.kraken/.env`);
 
   warn("Restart kraken for changes to take effect.");
-  p.outro("Provider switched successfully.");
+  p.outro("Model switched successfully.");
 }
 
 function setApiKeyDirectly(apiKeyValue: string): void {
-  const configurationFilePath = findConfigurationFilePath();
-
-  if (!configurationFilePath) {
-    fail("no kraken.yml found. Run 'kraken init' to create one.");
-    process.exit(1);
-  }
-
-  const fileContents = readFileSync(configurationFilePath, "utf-8");
-  const parsedConfiguration = parseSimpleYaml(fileContents);
-  const languageModelSection = parsedConfiguration.languageModel as Record<string, string> | undefined;
-  const currentProvider = languageModelSection?.provider ?? "openrouter";
-
-  const environmentVariableName = API_KEY_ENV_VAR_BY_PROVIDER[currentProvider] ?? "OPENROUTER_API_KEY";
+  const openrouterEnvironmentVariableName = API_KEY_ENV_VAR_BY_PROVIDER["openrouter"]!;
   const environmentFilePath = join(KRAKEN_HOME, ".env");
 
   let environmentFileContents = "";
@@ -274,21 +240,21 @@ function setApiKeyDirectly(apiKeyValue: string): void {
 
   for (let lineIndex = 0; lineIndex < environmentFileLines.length; lineIndex++) {
     const trimmedLine = environmentFileLines[lineIndex]!.trim();
-    if (trimmedLine.startsWith(`${environmentVariableName}=`) || trimmedLine.startsWith(`# ${environmentVariableName}=`)) {
-      environmentFileLines[lineIndex] = `${environmentVariableName}=${apiKeyValue}`;
+    if (trimmedLine.startsWith(`${openrouterEnvironmentVariableName}=`) || trimmedLine.startsWith(`# ${openrouterEnvironmentVariableName}=`)) {
+      environmentFileLines[lineIndex] = `${openrouterEnvironmentVariableName}=${apiKeyValue}`;
       existingLineFound = true;
       break;
     }
   }
 
   if (!existingLineFound) {
-    environmentFileLines.push(`${environmentVariableName}=${apiKeyValue}`);
+    environmentFileLines.push(`${openrouterEnvironmentVariableName}=${apiKeyValue}`);
   }
 
   writeFileSync(environmentFilePath, environmentFileLines.join("\n"));
 
   const maskedApiKey = `${apiKeyValue.slice(0, 10)}...${apiKeyValue.slice(-4)}`;
-  success(`${environmentVariableName} updated (${maskedApiKey})`);
+  success(`${openrouterEnvironmentVariableName} updated (${maskedApiKey})`);
   warn("Restart kraken for changes to take effect.");
 }
 
@@ -296,9 +262,9 @@ function printProviderUsage(): void {
   console.log(`\n  ${bold("Usage:")}\n`);
   console.log(`    ${colorize("kraken provider", "cyan")} ${colorize("<subcommand>", "dim")}\n`);
   console.log(`  ${bold("Subcommands:")}\n`);
-  console.log(`    ${colorize("list", "cyan")}              Show current provider, model, and API key status`);
-  console.log(`    ${colorize("switch", "cyan")}            Interactive wizard to change provider, model, and API key`);
-  console.log(`    ${colorize("set-key", "cyan")} ${colorize("<key>", "dim")}      Set API key for the current provider\n`);
+  console.log(`    ${colorize("list", "cyan")}              Show current model and API key status`);
+  console.log(`    ${colorize("switch", "cyan")}            Interactive wizard to change model`);
+  console.log(`    ${colorize("set-key", "cyan")} ${colorize("<key>", "dim")}      Set OpenRouter API key\n`);
 }
 
 export async function execute(args: string[]): Promise<void> {
@@ -309,7 +275,7 @@ export async function execute(args: string[]): Promise<void> {
       listProviderConfiguration();
       break;
     case "switch":
-      await switchProviderInteractively();
+      await switchModelInteractively();
       break;
     case "set-key": {
       const apiKeyArgument = args.find((argument) => argument !== "set-key" && !argument.startsWith("-"));
