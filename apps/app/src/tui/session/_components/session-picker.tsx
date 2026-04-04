@@ -22,7 +22,10 @@ export const SessionPickerContent = ({ resolve, sdk, theme }: SessionPickerPrope
     sdk.client
       .fetch("/session")
       .then(async (response) => {
-        if (!response.ok) return;
+        if (!response.ok) {
+          setLoading(false);
+          return;
+        }
         const data = (await response.json()) as {
           sessions: Array<{
             id: string;
