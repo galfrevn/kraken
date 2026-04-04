@@ -60,6 +60,45 @@ pub struct DaemonConfig {
 
     #[serde(default)]
     pub repos: Vec<RepoConfig>,
+
+    #[serde(default)]
+    pub widget: WidgetConfig,
+}
+
+fn default_widget_token_ref() -> String {
+    "${KRAKEN_WIDGET_TOKEN}".to_string()
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize)]
+pub struct WidgetConfig {
+    #[serde(default = "default_widget_token_ref")]
+    pub token: String,
+
+    #[serde(default)]
+    pub enabled: bool,
+}
+
+impl Default for WidgetConfig {
+    fn default() -> Self {
+        Self {
+            token: default_widget_token_ref(),
+            enabled: false,
+        }
+    }
+}
+
+impl WidgetConfig {
+    pub fn resolved_token(&self) -> Option<String> {
+        if !self.enabled {
+            return None;
+        }
+        let resolved = substitute_environment_variables(&self.token);
+        if resolved.is_empty() {
+            None
+        } else {
+            Some(resolved)
+        }
+    }
 }
 
 #[derive(Debug, Clone, Deserialize, Serialize)]
@@ -1005,6 +1044,7 @@ impl Default for DaemonConfig {
             rate_limits: RateLimitsConfig::default(),
             channels: ChannelsConfig::default(),
             repos: Vec::new(),
+            widget: WidgetConfig::default(),
         }
     }
 }

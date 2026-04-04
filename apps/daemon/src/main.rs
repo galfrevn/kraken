@@ -821,6 +821,7 @@ pub async fn run_daemon() -> Result<(), Box<dyn std::error::Error>> {
             Some(http_api_audit_store),
             Some(loop_detector),
             Some(Arc::clone(&reload_handle)),
+            daemon_config.widget.resolved_token(),
         )
         .await
         {

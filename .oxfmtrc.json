@@ -1,4 +1,4 @@
 {
   "printWidth": 100,
-  "ignorePatterns": ["**/*.md", "**/*.json", "**/*.yml", "**/*.yaml", "**/*.toml"]
+  "ignorePatterns": ["**/*.md", "**/*.json", "**/*.yml", "**/*.yaml", "**/*.toml", "scripts/**"]
 }

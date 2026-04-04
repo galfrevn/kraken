@@ -50,6 +50,7 @@ struct HttpApiState {
     audit_store: Option<Arc<AuditStore>>,
     loop_detector: Option<Arc<LoopDetector>>,
     reload_handle: Option<Arc<ReloadHandle>>,
+    widget_token: Option<String>,
 }
 
 #[derive(Deserialize)]
@@ -116,6 +117,7 @@ pub async fn start_http_api_server(
         None,
         None,
         None,
+        None,
     )
     .await?;
 
@@ -139,6 +141,7 @@ pub async fn start_http_api_server_with_options(
     audit_store: Option<Arc<AuditStore>>,
     loop_detector: Option<Arc<LoopDetector>>,
     reload_handle: Option<Arc<ReloadHandle>>,
+    widget_token: Option<String>,
 ) -> Result<(), String> {
     let http_api_state = HttpApiState {
         task_store,
@@ -153,11 +156,13 @@ pub async fn start_http_api_server_with_options(
         audit_store,
         loop_detector,
         reload_handle,
+        widget_token,
     };
 
     let mut http_api_router = Router::new()
         .route("/api/schedule", post(handle_schedule_task_request))
         .route("/api/health", get(handle_health_check_request))
+        .route("/api/widget", get(handle_widget_request))
         .route("/api/status", get(handle_status_request))
         .route("/api/shutdown", post(handle_shutdown_request))
         .route("/api/tasks", get(handle_list_tasks_request))
@@ -215,6 +220,8 @@ pub async fn start_http_api_server_with_options(
             "/api/users/{channel}/{platform_id}",
             delete(handle_remove_user),
         )
+        .route("/api/channels/send", post(handle_channel_send))
+        .route("/api/channels/sessions", get(handle_channel_sessions))
         .with_state(http_api_state);
 
     if let Some(memory_store) = memory_store {
@@ -337,6 +344,77 @@ async fn handle_schedule_task_request(
             )
         }
     }
+}
+
+#[derive(Deserialize)]
+struct WidgetQueryParameters {
+    token: Option<String>,
+}
+
+async fn handle_widget_request(
+    State(http_api_state): State<HttpApiState>,
+    Query(params): Query<WidgetQueryParameters>,
+) -> impl IntoResponse {
+    if let Some(ref expected_token) = http_api_state.widget_token {
+        match &params.token {
+            Some(provided) if provided == expected_token => {}
+            _ => {
+                return (
+                    StatusCode::UNAUTHORIZED,
+                    axum::Json(json!({ "error": "invalid or missing token" })),
+                );
+            }
+        }
+    } else {
+        return (
+            StatusCode::NOT_FOUND,
+            axum::Json(json!({ "error": "widget not enabled" })),
+        );
+    }
+
+    let uptime_seconds = http_api_state
+        .daemon_start_time
+        .map(|start| start.elapsed().as_secs())
+        .unwrap_or(0);
+
+    let active_workers = http_api_state
+        .active_worker_count
+        .as_ref()
+        .map(|c| c.load(Ordering::Relaxed))
+        .unwrap_or(0);
+
+    let pending = http_api_state.task_store.count_by_status("pending").await;
+    let running = http_api_state.task_store.count_by_status("running").await;
+    let completed = http_api_state.task_store.count_by_status("completed").await;
+    let failed = http_api_state.task_store.count_by_status("failed").await;
+
+    let (recent_tasks, _) = http_api_state
+        .task_store
+        .list_tasks(Some("completed"), 3, 0)
+        .await;
+
+    let recent: Vec<serde_json::Value> = recent_tasks
+        .iter()
+        .map(|t| {
+            json!({
+                "name": t.name,
+                "status": t.status,
+                "cost": format!("${:.4}", t.estimated_cost_usd),
+                "completed_at": t.completed_at,
+            })
+        })
+        .collect();
+
+    (
+        StatusCode::OK,
+        axum::Json(json!({
+            "daemon": "online",
+            "uptime_seconds": uptime_seconds,
+            "workers": { "active": active_workers, "max": http_api_state.max_concurrent_workers },
+            "tasks": { "pending": pending, "running": running, "completed": completed, "failed": failed },
+            "recent": recent,
+        })),
+    )
 }
 
 async fn handle_health_check_request() -> impl IntoResponse {
@@ -1564,6 +1642,102 @@ async fn handle_remove_user(
     }
 }
 
+// ── Channel Send API ──────────────────────────────────────────────────
+
+#[derive(Deserialize)]
+struct ChannelSendBody {
+    /// Channel type: "telegram", "discord"
+    channel: String,
+    /// Target chat/channel ID
+    #[serde(rename = "chatId")]
+    chat_id: String,
+    /// Message text (markdown)
+    message: String,
+}
+
+async fn handle_channel_send(
+    State(state): State<HttpApiState>,
+    Json(body): Json<ChannelSendBody>,
+) -> impl IntoResponse {
+    let Some(reload_handle) = &state.reload_handle else {
+        return (
+            StatusCode::INTERNAL_SERVER_ERROR,
+            Json(serde_json::json!({"error": "daemon not fully initialized"})),
+        )
+            .into_response();
+    };
+
+    let router_guard = reload_handle.channel_router_handle.read().await;
+    let Some(router_handle) = router_guard.as_ref() else {
+        return (
+            StatusCode::SERVICE_UNAVAILABLE,
+            Json(serde_json::json!({"error": "channel router not available"})),
+        )
+            .into_response();
+    };
+
+    let Some(adapter) = router_handle.get_adapter(&body.channel) else {
+        return (
+            StatusCode::NOT_FOUND,
+            Json(serde_json::json!({"error": format!("no adapter for channel: {}", body.channel)})),
+        )
+            .into_response();
+    };
+
+    // Use Text so each adapter converts to its native format
+    match adapter
+        .send_message(
+            &body.chat_id,
+            crate::channels::types::MessageContent::Text(body.message),
+        )
+        .await
+    {
+        Ok(()) => Json(serde_json::json!({"status": "sent"})).into_response(),
+        Err(err) => (
+            StatusCode::INTERNAL_SERVER_ERROR,
+            Json(serde_json::json!({"error": format!("{err}")})),
+        )
+            .into_response(),
+    }
+}
+
+async fn handle_channel_sessions(State(state): State<HttpApiState>) -> impl IntoResponse {
+    let Some(reload_handle) = &state.reload_handle else {
+        return Json(serde_json::json!({"error": "daemon not fully initialized"})).into_response();
+    };
+
+    let pool = reload_handle.database_pool.clone();
+    let session_store = crate::db::channel_sessions::ChannelSessionStore::new(pool);
+    if let Err(err) = session_store.initialize().await {
+        return (
+            StatusCode::INTERNAL_SERVER_ERROR,
+            Json(serde_json::json!({"error": format!("failed to init session store: {err}")})),
+        )
+            .into_response();
+    }
+
+    match session_store.list_sessions(None).await {
+        Ok(sessions) => {
+            let entries: Vec<serde_json::Value> = sessions
+                .into_iter()
+                .map(|s| {
+                    serde_json::json!({
+                        "channelType": s.channel_type,
+                        "chatId": s.chat_id,
+                        "lastMessageAt": s.last_message_at,
+                    })
+                })
+                .collect();
+            Json(serde_json::json!({"sessions": entries})).into_response()
+        }
+        Err(err) => (
+            StatusCode::INTERNAL_SERVER_ERROR,
+            Json(serde_json::json!({"error": err})),
+        )
+            .into_response(),
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1598,11 +1772,13 @@ mod tests {
             audit_store: None,
             loop_detector: None,
             reload_handle: None,
+            widget_token: None,
         };
 
         Router::new()
             .route("/api/schedule", post(handle_schedule_task_request))
             .route("/api/health", get(handle_health_check_request))
+            .route("/api/widget", get(handle_widget_request))
             .route("/api/status", get(handle_status_request))
             .route("/api/shutdown", post(handle_shutdown_request))
             .route("/api/tasks", get(handle_list_tasks_request))
