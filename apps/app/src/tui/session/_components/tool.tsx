@@ -161,8 +161,8 @@ export const ToolCallDisplay = ({
     );
   }
 
-  if (toolName === "subagent" && resultContent) {
-    const childSessionId = extractChildSessionId(resultContent);
+  if (toolName === "subagent") {
+    const childSessionId = resultContent ? extractChildSessionId(resultContent) : null;
     const isRunning = state === "running";
 
     return (
