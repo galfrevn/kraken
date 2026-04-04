@@ -114,15 +114,13 @@ export async function copilotListModels(): Promise<ModelInfo[]> {
       }>;
     };
 
-    return data.data
-      .filter((m) => m.model_picker_enabled !== false)
-      .map((m) => ({
-        id: m.id,
-        name: m.name || m.id,
-        providerId: "copilot",
-        providerName: "GitHub Copilot",
-        contextLength: m.capabilities?.limits?.max_context_window_tokens,
-      }));
+    return data.data.map((m) => ({
+      id: m.id,
+      name: m.name || m.id,
+      providerId: "copilot",
+      providerName: "GitHub Copilot",
+      contextLength: m.capabilities?.limits?.max_context_window_tokens,
+    }));
   } catch {
     return [];
   }
