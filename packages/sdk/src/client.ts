@@ -192,7 +192,11 @@ export class DaemonClient {
       options.signal.addEventListener("abort", () => abortController.abort(), { once: true });
     }
 
-    connectAndStream();
+    connectAndStream().catch((error) => {
+      if (!abortController.signal.aborted) {
+        options.onError?.(error instanceof Error ? error : new Error(String(error)));
+      }
+    });
 
     return {
       unsubscribe: () => abortController.abort(),

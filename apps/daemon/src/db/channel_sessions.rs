@@ -200,6 +200,26 @@ impl ChannelSessionStore {
         Ok(sessions)
     }
 
+    pub async fn delete_by_channel(
+        &self,
+        channel_type: &str,
+        chat_id: &str,
+    ) -> Result<bool, String> {
+        let connection = self.pool.lock().await;
+        let rows_affected = connection
+            .execute(
+                "DELETE FROM channel_sessions WHERE channel_type = ?1 AND chat_id = ?2",
+                params![channel_type, chat_id],
+            )
+            .map_err(|error| format!("failed to delete session: {error}"))?;
+
+        if rows_affected > 0 {
+            info!(channel_type, chat_id, "deleted channel session via command");
+        }
+
+        Ok(rows_affected > 0)
+    }
+
     pub async fn delete_session(&self, id: &str) -> Result<bool, String> {
         let connection = self.pool.lock().await;
         let rows_affected = connection

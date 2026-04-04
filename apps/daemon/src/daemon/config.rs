@@ -57,6 +57,39 @@ pub struct DaemonConfig {
 
     #[serde(default)]
     pub channels: ChannelsConfig,
+
+    #[serde(default)]
+    pub repos: Vec<RepoConfig>,
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize)]
+pub struct RepoConfig {
+    pub name: String,
+    pub path: String,
+    #[serde(default)]
+    pub default: bool,
+}
+
+impl DaemonConfig {
+    pub fn resolve_repo_path(&self, name: Option<&str>) -> Option<String> {
+        let repo = if let Some(repo_name) = name {
+            self.repos.iter().find(|r| r.name.eq_ignore_ascii_case(repo_name))
+        } else {
+            self.repos
+                .iter()
+                .find(|r| r.default)
+                .or(self.repos.first())
+        };
+
+        repo.map(|r| {
+            if let Some(rest) = r.path.strip_prefix("~/") {
+                let home = dirs_next::home_dir().unwrap_or_else(|| PathBuf::from("."));
+                home.join(rest).to_string_lossy().to_string()
+            } else {
+                r.path.clone()
+            }
+        })
+    }
 }
 
 #[derive(Debug, Clone, Deserialize, Serialize)]
@@ -606,18 +639,77 @@ pub struct ChannelsConfig {
     #[serde(default)]
     pub telegram: Option<TelegramChannelConfig>,
 
+    #[serde(default)]
+    pub discord: Option<DiscordChannelConfig>,
+
     #[serde(rename = "workerPort", default = "default_channel_worker_port")]
     pub worker_port: u16,
+}
+
+#[derive(Debug, Clone, Copy, Deserialize, Serialize, Default, PartialEq)]
+#[serde(rename_all = "camelCase")]
+pub enum DmPolicy {
+    #[default]
+    Pairing,
+    Allowlist,
+    Disabled,
 }
 
 #[derive(Debug, Clone, Deserialize, Serialize)]
 pub struct TelegramChannelConfig {
     pub token: String,
 
-    #[serde(rename = "ownerId")]
-    pub owner_id: i64,
+    #[serde(rename = "dmPolicy", default)]
+    pub dm_policy: DmPolicy,
+
+    /// Telegram user IDs authorized in allowlist mode.
+    #[serde(rename = "allowFrom", default)]
+    pub allow_from: Vec<i64>,
 
     #[serde(default = "default_telegram_enabled")]
+    pub enabled: bool,
+
+    /// Deprecated: use dmPolicy + allowFrom instead. Kept for backward compatibility.
+    #[serde(rename = "ownerId", default, skip_serializing_if = "Option::is_none")]
+    pub owner_id: Option<i64>,
+}
+
+impl TelegramChannelConfig {
+    /// Returns the effective DM policy, accounting for backward compatibility with owner_id.
+    pub fn effective_dm_policy(&self) -> DmPolicy {
+        if self.owner_id.is_some() && self.dm_policy == DmPolicy::Pairing && self.allow_from.is_empty() {
+            // Legacy config with owner_id set but no explicit dmPolicy → treat as allowlist
+            return DmPolicy::Allowlist;
+        }
+        self.dm_policy.clone()
+    }
+
+    /// Returns the merged list of allowed user IDs (allow_from + legacy owner_id).
+    pub fn effective_allow_from(&self) -> Vec<i64> {
+        let mut ids = self.allow_from.clone();
+        if let Some(owner) = self.owner_id {
+            if owner != 0 && !ids.contains(&owner) {
+                ids.push(owner);
+            }
+        }
+        ids
+    }
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize)]
+pub struct DiscordChannelConfig {
+    pub token: String,
+
+    #[serde(rename = "dmPolicy", default)]
+    pub dm_policy: DmPolicy,
+
+    #[serde(rename = "allowFrom", default)]
+    pub allow_from: Vec<u64>,
+
+    #[serde(rename = "allowedChannels", default)]
+    pub allowed_channels: Vec<u64>,
+
+    #[serde(default = "default_discord_enabled")]
     pub enabled: bool,
 }
 
@@ -629,9 +721,30 @@ fn default_telegram_enabled() -> bool {
     true
 }
 
+fn default_discord_enabled() -> bool {
+    true
+}
+
 impl ChannelsConfig {
     pub fn has_any_enabled(&self) -> bool {
-        self.telegram.as_ref().map(|t| t.enabled).unwrap_or(false)
+        let telegram = self.telegram.as_ref().map(|t| t.enabled).unwrap_or(false);
+        let discord = self.discord.as_ref().map(|d| d.enabled).unwrap_or(false);
+        telegram || discord
+    }
+
+    pub fn resolved_discord(&self) -> Option<DiscordChannelConfig> {
+        self.discord.as_ref().and_then(|config| {
+            if !config.enabled {
+                return None;
+            }
+            Some(DiscordChannelConfig {
+                token: substitute_environment_variables(&config.token),
+                dm_policy: config.dm_policy,
+                allow_from: config.allow_from.clone(),
+                allowed_channels: config.allowed_channels.clone(),
+                enabled: config.enabled,
+            })
+        })
     }
 
     pub fn resolved_telegram(&self) -> Option<TelegramChannelConfig> {
@@ -641,8 +754,10 @@ impl ChannelsConfig {
             }
             Some(TelegramChannelConfig {
                 token: substitute_environment_variables(&config.token),
-                owner_id: config.owner_id,
+                dm_policy: config.effective_dm_policy(),
+                allow_from: config.effective_allow_from(),
                 enabled: config.enabled,
+                owner_id: config.owner_id,
             })
         })
     }
@@ -665,7 +780,16 @@ pub(crate) fn substitute_environment_variables(input: &str) -> String {
     while let Some(start_position) = result.find("${") {
         if let Some(end_position) = result[start_position..].find('}') {
             let variable_name = &result[start_position + 2..start_position + end_position];
-            let replacement_value = std::env::var(variable_name).unwrap_or_default();
+            let replacement_value = match std::env::var(variable_name) {
+                Ok(value) => value,
+                Err(_) => {
+                    warn!(
+                        variable = variable_name,
+                        "environment variable not set, substituting empty string"
+                    );
+                    String::new()
+                }
+            };
             result = format!(
                 "{}{}{}",
                 &result[..start_position],
@@ -877,6 +1001,7 @@ impl Default for DaemonConfig {
             audit: AuditConfig::default(),
             rate_limits: RateLimitsConfig::default(),
             channels: ChannelsConfig::default(),
+            repos: Vec::new(),
         }
     }
 }
@@ -988,8 +1113,14 @@ impl DaemonConfig {
             if telegram.enabled && telegram.token.is_empty() {
                 errors.push("channels.telegram.token is required when enabled".to_string());
             }
-            if telegram.enabled && telegram.owner_id == 0 {
-                errors.push("channels.telegram.ownerId is required when enabled".to_string());
+            if telegram.enabled {
+                let effective_policy = telegram.effective_dm_policy();
+                if effective_policy == DmPolicy::Allowlist && telegram.effective_allow_from().is_empty() {
+                    errors.push(
+                        "channels.telegram.allowFrom is required when dmPolicy is 'allowlist'"
+                            .to_string(),
+                    );
+                }
             }
         }
 

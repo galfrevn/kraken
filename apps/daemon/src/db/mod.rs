@@ -1,5 +1,6 @@
 pub mod audit;
 pub mod channel_sessions;
+pub mod channel_users;
 pub mod memory;
 pub mod tasks;
 

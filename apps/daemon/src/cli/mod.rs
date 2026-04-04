@@ -94,6 +94,14 @@ pub enum Commands {
     #[command(subcommand)]
     Channel(ChannelCommands),
 
+    /// Manage pairing requests for channel access
+    #[command(subcommand)]
+    Pairing(PairingCommands),
+
+    /// Manage authorized channel users
+    #[command(subcommand)]
+    Users(UsersCommands),
+
     /// Manage MCP servers
     #[command(subcommand)]
     Mcp(McpCommands),
@@ -373,6 +381,56 @@ pub enum ChannelCommands {
     Remove {
         /// Channel type to remove (e.g. telegram)
         name: String,
+    },
+}
+
+#[derive(Subcommand)]
+pub enum PairingCommands {
+    /// List pending pairing requests
+    List {
+        /// Channel type (e.g. telegram)
+        channel: String,
+    },
+    /// Approve a pairing request by code
+    Approve {
+        /// Channel type (e.g. telegram)
+        channel: String,
+        /// Pairing code to approve
+        code: String,
+    },
+    /// Reject a pairing request by code
+    Reject {
+        /// Channel type (e.g. telegram)
+        channel: String,
+        /// Pairing code to reject
+        code: String,
+    },
+}
+
+#[derive(Subcommand)]
+pub enum UsersCommands {
+    /// List authorized users
+    List {
+        /// Filter by channel type (e.g. telegram)
+        #[arg(long)]
+        channel: Option<String>,
+    },
+    /// Authorize a user directly by platform ID
+    Add {
+        /// Channel type (e.g. telegram)
+        channel: String,
+        /// Platform-specific user ID
+        platform_id: String,
+        /// Display name
+        #[arg(long)]
+        name: Option<String>,
+    },
+    /// Revoke a user's access
+    Remove {
+        /// Channel type (e.g. telegram)
+        channel: String,
+        /// Platform-specific user ID
+        platform_id: String,
     },
 }
 

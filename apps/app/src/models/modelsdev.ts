@@ -87,6 +87,9 @@ export async function refreshModelsDevData(): Promise<void> {
 let refreshIntervalId: ReturnType<typeof setInterval> | null = null;
 
 export function startModelsDevRefreshInterval(): void {
+  if (refreshIntervalId) {
+    clearInterval(refreshIntervalId);
+  }
   refreshModelsDevData();
   refreshIntervalId = setInterval(refreshModelsDevData, REFRESH_INTERVAL_MILLISECONDS);
 

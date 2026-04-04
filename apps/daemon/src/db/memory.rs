@@ -17,6 +17,11 @@ const RRF_K: f64 = 60.0;
 const EMBEDDING_DIMENSIONS: usize = 1536;
 const AGING_MAX_SESSION_SUMMARIES_PER_PROJECT: i64 = 5;
 const PRUNING_SOFT_DELETE_RETENTION_DAYS: i64 = 30;
+const MAX_LIMIT: i64 = 1000;
+
+fn clamp_limit(limit: i64, default: i64) -> i64 {
+    if limit <= 0 { default } else { limit.min(MAX_LIMIT) }
+}
 
 #[derive(Debug, Clone, serde::Serialize)]
 pub struct MemorySession {
@@ -383,10 +388,30 @@ impl MemoryStore {
     }
 
     pub async fn save_observation(&self, params: SaveObservationParams) -> SqlResult<Observation> {
+        if params.session_id.trim().is_empty() {
+            return Err(rusqlite::Error::InvalidParameterName(
+                "session_id cannot be empty".into(),
+            ));
+        }
+        if params.title.trim().is_empty() || params.content.trim().is_empty() {
+            return Err(rusqlite::Error::InvalidParameterName(
+                "title and content cannot be empty".into(),
+            ));
+        }
+
         let connection = self.pool.lock().await;
 
         let scope = params.scope.as_deref().unwrap_or("project");
         let project = params.project.as_deref().unwrap_or("");
+
+        // Ensure the session exists to prevent FK constraint violations.
+        // The client may have failed to create the session (e.g. daemon restart, race condition).
+        connection.execute(
+            "INSERT INTO memory_sessions (id, project, directory)
+             VALUES (?1, ?2, '')
+             ON CONFLICT(id) DO NOTHING",
+            params![params.session_id, project],
+        )?;
 
         let normalized_hash = compute_normalized_hash(
             &params.content,
@@ -589,6 +614,10 @@ impl MemoryStore {
         let connection = self.pool.lock().await;
 
         if hard_delete {
+            let _ = connection.execute(
+                "DELETE FROM memory_observations_vec WHERE observation_id = ?1",
+                params![observation_id],
+            );
             connection.execute(
                 "DELETE FROM memory_observations WHERE id = ?1",
                 params![observation_id],
@@ -613,7 +642,7 @@ impl MemoryStore {
             return Ok(Vec::new());
         }
 
-        let limit = options.limit.unwrap_or(DEFAULT_SEARCH_LIMIT);
+        let limit = clamp_limit(options.limit.unwrap_or(DEFAULT_SEARCH_LIMIT), DEFAULT_SEARCH_LIMIT);
 
         let mut where_clauses = vec![
             "memory_observations_fts MATCH ?1".to_string(),
@@ -683,8 +712,8 @@ impl MemoryStore {
     ) -> SqlResult<ContextResponse> {
         let connection = self.pool.lock().await;
 
-        let session_limit = session_limit.unwrap_or(DEFAULT_CONTEXT_SESSION_LIMIT);
-        let observation_limit = observation_limit.unwrap_or(DEFAULT_CONTEXT_OBSERVATION_LIMIT);
+        let session_limit = clamp_limit(session_limit.unwrap_or(DEFAULT_CONTEXT_SESSION_LIMIT), DEFAULT_CONTEXT_SESSION_LIMIT);
+        let observation_limit = clamp_limit(observation_limit.unwrap_or(DEFAULT_CONTEXT_OBSERVATION_LIMIT), DEFAULT_CONTEXT_OBSERVATION_LIMIT);
 
         let sessions = if let Some(project_name) = project {
             let mut statement = connection.prepare(
@@ -754,8 +783,8 @@ impl MemoryStore {
             row_to_observation,
         )?;
 
-        let before_limit = before.unwrap_or(DEFAULT_TIMELINE_RANGE);
-        let after_limit = after.unwrap_or(DEFAULT_TIMELINE_RANGE);
+        let before_limit = clamp_limit(before.unwrap_or(DEFAULT_TIMELINE_RANGE), DEFAULT_TIMELINE_RANGE);
+        let after_limit = clamp_limit(after.unwrap_or(DEFAULT_TIMELINE_RANGE), DEFAULT_TIMELINE_RANGE);
 
         let mut before_statement = connection.prepare(
             "SELECT id, session_id, type, title, content, project, scope, topic_key,
@@ -848,7 +877,7 @@ impl MemoryStore {
 
     pub async fn hybrid_search(&self, options: SearchOptions) -> SqlResult<Vec<SearchResult>> {
         let connection = self.pool.lock().await;
-        let limit = options.limit.unwrap_or(DEFAULT_SEARCH_LIMIT);
+        let limit = clamp_limit(options.limit.unwrap_or(DEFAULT_SEARCH_LIMIT), DEFAULT_SEARCH_LIMIT);
 
         let mut fts_ranked: Vec<(i64, f64)> = Vec::new();
         let sanitized_query = sanitize_fts_query(&options.query);
@@ -1027,35 +1056,66 @@ impl MemoryStore {
     pub async fn prune(&self) -> SqlResult<PruneResult> {
         let connection = self.pool.lock().await;
 
+        let retention = format!("-{PRUNING_SOFT_DELETE_RETENTION_DAYS} days");
+
         let pruned_observations: i64 = connection.query_row(
             "SELECT COUNT(*) FROM memory_observations
              WHERE deleted_at IS NOT NULL
                AND deleted_at < datetime('now', ?1)",
-            params![format!("-{PRUNING_SOFT_DELETE_RETENTION_DAYS} days")],
+            params![retention],
             |row| row.get(0),
-        )?;
-
-        connection.execute(
-            "DELETE FROM memory_observations
-             WHERE deleted_at IS NOT NULL
-               AND deleted_at < datetime('now', ?1)",
-            params![format!("-{PRUNING_SOFT_DELETE_RETENTION_DAYS} days")],
         )?;
 
         let pruned_vec_entries: i64 = connection
             .query_row(
                 "SELECT COUNT(*) FROM memory_observations_vec
-                 WHERE observation_id NOT IN (SELECT id FROM memory_observations)",
-                [],
+                 WHERE observation_id IN (
+                     SELECT id FROM memory_observations
+                     WHERE deleted_at IS NOT NULL
+                       AND deleted_at < datetime('now', ?1)
+                 )",
+                params![retention],
                 |row| row.get(0),
             )
             .unwrap_or(0);
 
-        let _ = connection.execute(
-            "DELETE FROM memory_observations_vec
-             WHERE observation_id NOT IN (SELECT id FROM memory_observations)",
-            [],
-        );
+        connection.execute_batch("BEGIN TRANSACTION;")?;
+
+        let result = (|| -> SqlResult<()> {
+            connection.execute(
+                "DELETE FROM memory_observations_vec
+                 WHERE observation_id IN (
+                     SELECT id FROM memory_observations
+                     WHERE deleted_at IS NOT NULL
+                       AND deleted_at < datetime('now', ?1)
+                 )",
+                params![retention],
+            )?;
+
+            connection.execute(
+                "DELETE FROM memory_observations
+                 WHERE deleted_at IS NOT NULL
+                   AND deleted_at < datetime('now', ?1)",
+                params![retention],
+            )?;
+
+            // Clean up any orphaned vec entries
+            let _ = connection.execute(
+                "DELETE FROM memory_observations_vec
+                 WHERE observation_id NOT IN (SELECT id FROM memory_observations)",
+                [],
+            );
+
+            Ok(())
+        })();
+
+        match result {
+            Ok(()) => connection.execute_batch("COMMIT;")?,
+            Err(e) => {
+                let _ = connection.execute_batch("ROLLBACK;");
+                return Err(e);
+            }
+        }
 
         Ok(PruneResult {
             pruned_observations,

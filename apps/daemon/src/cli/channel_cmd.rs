@@ -124,7 +124,7 @@ fn handle_list(json_mode: bool) -> Result<(), Box<dyn std::error::Error>> {
         channels.push(ChannelListEntry {
             channel_type: "telegram".to_string(),
             enabled: telegram.enabled,
-            details: format!("owner_id={}", telegram.owner_id),
+            details: format!("dm_policy={:?}, allow_from={:?}", telegram.effective_dm_policy(), telegram.effective_allow_from()),
         });
     }
 
@@ -138,7 +138,7 @@ async fn handle_sessions(
     json_mode: bool,
 ) -> Result<(), Box<dyn std::error::Error>> {
     let daemon_config = DaemonConfig::load(None).unwrap_or_default();
-    let database_path = std::path::Path::new(&daemon_config.database_path);
+    let database_path = resolve_database_path(&daemon_config.database_path);
 
     if !database_path.exists() {
         let empty_output = SessionListOutput {
@@ -148,7 +148,7 @@ async fn handle_sessions(
         return Ok(());
     }
 
-    let pool = crate::db::open_database(database_path)
+    let pool = crate::db::open_database(&database_path)
         .map_err(|error| format!("failed to open database: {error}"))?;
 
     let session_store = crate::db::channel_sessions::ChannelSessionStore::new(pool);
@@ -262,16 +262,12 @@ async fn handle_add_telegram(json_mode: bool) -> Result<(), Box<dyn std::error::
         return Ok(());
     }
 
-    let owner_id_input: String = Input::new()
-        .with_prompt("Your Telegram user ID (send /start to @userinfobot to get yours)")
-        .interact_text()?;
-
-    let owner_id: i64 = owner_id_input.parse().map_err(|_| {
-        format!(
-            "invalid owner ID '{}' — must be a numeric Telegram user ID",
-            owner_id_input
-        )
-    })?;
+    let policy_options = &["Pairing (users request access with a code)", "Allowlist (only specific IDs can message)"];
+    let policy_index = Select::new()
+        .with_prompt("DM Policy")
+        .items(policy_options)
+        .default(0)
+        .interact()?;
 
     save_secret_to_env_file("TELEGRAM_BOT_TOKEN", &bot_token)?;
     println!(
@@ -287,11 +283,46 @@ async fn handle_add_telegram(json_mode: bool) -> Result<(), Box<dyn std::error::
         config_json["channels"] = serde_json::json!({});
     }
 
-    config_json["channels"]["telegram"] = serde_json::json!({
-        "token": "${TELEGRAM_BOT_TOKEN}",
-        "ownerId": owner_id,
-        "enabled": true
-    });
+    // Ensure workerPort has a valid default
+    if config_json["channels"].get("workerPort").is_none()
+        || config_json["channels"]["workerPort"] == serde_json::json!(0)
+    {
+        config_json["channels"]["workerPort"] = serde_json::json!(7900);
+    }
+
+    if policy_index == 0 {
+        // Pairing mode — no IDs needed
+        config_json["channels"]["telegram"] = serde_json::json!({
+            "token": "${TELEGRAM_BOT_TOKEN}",
+            "dmPolicy": "pairing",
+            "enabled": true
+        });
+    } else {
+        // Allowlist mode — ask for IDs
+        let ids_input: String = Input::new()
+            .with_prompt("Telegram user IDs (comma-separated, get yours from @userinfobot)")
+            .interact_text()?;
+
+        let allow_from: Vec<i64> = ids_input
+            .split(',')
+            .map(|s| s.trim())
+            .filter(|s| !s.is_empty())
+            .map(|s| s.parse::<i64>())
+            .collect::<Result<Vec<_>, _>>()
+            .map_err(|_| "invalid user ID — must be numeric Telegram user IDs")?;
+
+        if allow_from.is_empty() {
+            output_error("no user IDs provided, aborted", None, json_mode);
+            return Ok(());
+        }
+
+        config_json["channels"]["telegram"] = serde_json::json!({
+            "token": "${TELEGRAM_BOT_TOKEN}",
+            "dmPolicy": "allowlist",
+            "allowFrom": allow_from,
+            "enabled": true
+        });
+    }
 
     save_config_json(&config_json)?;
 
@@ -367,4 +398,315 @@ pub async fn execute(
         }
         crate::cli::ChannelCommands::Remove { name } => handle_remove(name, json_mode).await,
     }
+}
+
+// ── Pairing Commands ──────────────────────────────────────────────────
+
+#[derive(Tabled)]
+struct PairingTableRow {
+    #[tabled(rename = "CODE")]
+    code: String,
+    #[tabled(rename = "USER")]
+    display_name: String,
+    #[tabled(rename = "PLATFORM ID")]
+    platform_id: String,
+    #[tabled(rename = "EXPIRES")]
+    expires_at: String,
+}
+
+#[derive(Serialize)]
+struct PairingListOutput {
+    requests: Vec<PairingListEntry>,
+}
+
+#[derive(Serialize)]
+struct PairingListEntry {
+    code: String,
+    platform_id: String,
+    display_name: Option<String>,
+    expires_at: String,
+}
+
+impl HumanDisplay for PairingListOutput {
+    fn display_human(&self) {
+        if self.requests.is_empty() {
+            println!("No pending pairing requests.");
+            return;
+        }
+
+        let table_rows: Vec<PairingTableRow> = self
+            .requests
+            .iter()
+            .map(|entry| PairingTableRow {
+                code: style(&entry.code).bold().to_string(),
+                display_name: entry.display_name.clone().unwrap_or_else(|| "—".into()),
+                platform_id: entry.platform_id.clone(),
+                expires_at: entry.expires_at.clone(),
+            })
+            .collect();
+
+        let rendered_table = Table::new(table_rows).to_string();
+        println!("{rendered_table}");
+        println!("{} pending request(s)", self.requests.len());
+    }
+}
+
+fn resolve_database_path(raw_path: &str) -> std::path::PathBuf {
+    if let Some(stripped) = raw_path.strip_prefix("~/") {
+        if let Some(home) = dirs_next::home_dir() {
+            return home.join(stripped);
+        }
+    }
+    std::path::PathBuf::from(raw_path)
+}
+
+fn open_user_store() -> Result<(crate::db::channel_users::ChannelUserStore, tokio::runtime::Handle), Box<dyn std::error::Error>> {
+    let daemon_config = DaemonConfig::load(None).unwrap_or_default();
+    let database_path = resolve_database_path(&daemon_config.database_path);
+
+    let pool = crate::db::open_database(&database_path)
+        .map_err(|error| format!("failed to open database: {error}"))?;
+
+    let store = crate::db::channel_users::ChannelUserStore::new(pool);
+    Ok((store, tokio::runtime::Handle::current()))
+}
+
+pub async fn execute_pairing(
+    command: crate::cli::PairingCommands,
+    json_mode: bool,
+) -> Result<(), Box<dyn std::error::Error>> {
+    let (store, _) = open_user_store()?;
+    store.initialize().await?;
+
+    match command {
+        crate::cli::PairingCommands::List { channel } => {
+            let requests = store.get_pending_requests(&channel).await?;
+
+            let entries: Vec<PairingListEntry> = requests
+                .into_iter()
+                .map(|r| PairingListEntry {
+                    code: r.pairing_code,
+                    platform_id: r.platform_id,
+                    display_name: r.display_name,
+                    expires_at: r.expires_at,
+                })
+                .collect();
+
+            let list_output = PairingListOutput { requests: entries };
+            output(&list_output, json_mode);
+        }
+        crate::cli::PairingCommands::Approve { channel, code } => {
+            let code_upper = code.to_uppercase();
+            match store.approve_pairing(&channel, &code_upper).await {
+                Ok(user) => {
+                    if json_mode {
+                        println!(
+                            "{}",
+                            serde_json::json!({
+                                "status": "approved",
+                                "platform_id": user.platform_id,
+                                "display_name": user.display_name,
+                                "channel": user.channel_type,
+                            })
+                        );
+                    } else {
+                        println!(
+                            "{} Authorized {} ({}) on {}",
+                            style("✓").green().bold(),
+                            style(user.display_name.as_deref().unwrap_or("unknown")).bold(),
+                            user.platform_id,
+                            user.channel_type,
+                        );
+                    }
+                }
+                Err(err) => {
+                    output_error(&err, None, json_mode);
+                }
+            }
+        }
+        crate::cli::PairingCommands::Reject { channel, code } => {
+            let code_upper = code.to_uppercase();
+            match store.reject_pairing(&channel, &code_upper).await {
+                Ok(request) => {
+                    if json_mode {
+                        println!(
+                            "{}",
+                            serde_json::json!({
+                                "status": "rejected",
+                                "platform_id": request.platform_id,
+                                "channel": request.channel_type,
+                            })
+                        );
+                    } else {
+                        println!(
+                            "{} Rejected pairing request from {} ({})",
+                            style("✓").green().bold(),
+                            request.display_name.as_deref().unwrap_or("unknown"),
+                            request.platform_id,
+                        );
+                    }
+                }
+                Err(err) => {
+                    output_error(&err, None, json_mode);
+                }
+            }
+        }
+    }
+
+    Ok(())
+}
+
+// ── Users Commands ────────────────────────────────────────────────────
+
+#[derive(Tabled)]
+struct UserTableRow {
+    #[tabled(rename = "CHANNEL")]
+    channel_type: String,
+    #[tabled(rename = "PLATFORM ID")]
+    platform_id: String,
+    #[tabled(rename = "NAME")]
+    display_name: String,
+    #[tabled(rename = "AUTHORIZED")]
+    authorized_at: String,
+    #[tabled(rename = "METHOD")]
+    authorized_by: String,
+}
+
+#[derive(Serialize)]
+struct UserListOutput {
+    users: Vec<UserListEntry>,
+}
+
+#[derive(Serialize)]
+struct UserListEntry {
+    channel_type: String,
+    platform_id: String,
+    display_name: Option<String>,
+    authorized_at: String,
+    authorized_by: String,
+}
+
+impl HumanDisplay for UserListOutput {
+    fn display_human(&self) {
+        if self.users.is_empty() {
+            println!("No authorized users.");
+            return;
+        }
+
+        let table_rows: Vec<UserTableRow> = self
+            .users
+            .iter()
+            .map(|entry| UserTableRow {
+                channel_type: entry.channel_type.clone(),
+                platform_id: entry.platform_id.clone(),
+                display_name: entry.display_name.clone().unwrap_or_else(|| "—".into()),
+                authorized_at: entry.authorized_at.clone(),
+                authorized_by: entry.authorized_by.clone(),
+            })
+            .collect();
+
+        let rendered_table = Table::new(table_rows).to_string();
+        println!("{rendered_table}");
+        println!("{} authorized user(s)", self.users.len());
+    }
+}
+
+pub async fn execute_users(
+    command: crate::cli::UsersCommands,
+    json_mode: bool,
+) -> Result<(), Box<dyn std::error::Error>> {
+    let (store, _) = open_user_store()?;
+    store.initialize().await?;
+
+    match command {
+        crate::cli::UsersCommands::List { channel } => {
+            let users = store.list_authorized(channel.as_deref()).await?;
+
+            let entries: Vec<UserListEntry> = users
+                .into_iter()
+                .map(|u| UserListEntry {
+                    channel_type: u.channel_type,
+                    platform_id: u.platform_id,
+                    display_name: u.display_name,
+                    authorized_at: u.authorized_at,
+                    authorized_by: u.authorized_by,
+                })
+                .collect();
+
+            let list_output = UserListOutput { users: entries };
+            output(&list_output, json_mode);
+        }
+        crate::cli::UsersCommands::Add {
+            channel,
+            platform_id,
+            name,
+        } => {
+            match store
+                .authorize_user(&channel, &platform_id, name.as_deref(), "cli")
+                .await
+            {
+                Ok(user) => {
+                    if json_mode {
+                        println!(
+                            "{}",
+                            serde_json::json!({
+                                "status": "authorized",
+                                "platform_id": user.platform_id,
+                                "channel": user.channel_type,
+                            })
+                        );
+                    } else {
+                        println!(
+                            "{} Authorized {} ({}) on {}",
+                            style("✓").green().bold(),
+                            style(user.display_name.as_deref().unwrap_or(&platform_id)).bold(),
+                            user.platform_id,
+                            user.channel_type,
+                        );
+                    }
+                }
+                Err(err) => {
+                    output_error(&err, None, json_mode);
+                }
+            }
+        }
+        crate::cli::UsersCommands::Remove {
+            channel,
+            platform_id,
+        } => {
+            match store.revoke_user(&channel, &platform_id).await {
+                Ok(true) => {
+                    if json_mode {
+                        println!(
+                            "{}",
+                            serde_json::json!({
+                                "status": "revoked",
+                                "platform_id": platform_id,
+                                "channel": channel,
+                            })
+                        );
+                    } else {
+                        println!(
+                            "{} Revoked access for {} on {}",
+                            style("✓").green().bold(),
+                            platform_id,
+                            channel,
+                        );
+                    }
+                }
+                Ok(false) => {
+                    output_error(
+                        &format!("user '{}' not found on channel '{}'", platform_id, channel),
+                        None,
+                        json_mode,
+                    );
+                }
+                Err(err) => {
+                    output_error(&err, None, json_mode);
+                }
+            }
+        }
+    }
+
+    Ok(())
 }

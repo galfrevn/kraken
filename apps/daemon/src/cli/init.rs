@@ -213,6 +213,7 @@ fn run_interactive_wizard() -> Result<DaemonConfig, Box<dyn std::error::Error>> 
         audit: Default::default(),
         rate_limits: Default::default(),
         channels: Default::default(),
+        repos: vec![],
     };
 
     Ok(daemon_configuration)
@@ -235,6 +236,7 @@ fn build_defaults_config() -> DaemonConfig {
         audit: Default::default(),
         rate_limits: Default::default(),
         channels: Default::default(),
+        repos: vec![],
     }
 }
 

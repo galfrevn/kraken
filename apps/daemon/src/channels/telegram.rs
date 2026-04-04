@@ -1,11 +1,15 @@
 use std::collections::HashMap;
+use std::sync::Arc;
 
 use async_trait::async_trait;
 use reqwest::Client as HttpClient;
 use teloxide::prelude::*;
-use teloxide::types::{ChatAction, MessageId, ParseMode};
+use teloxide::types::{BotCommand, ChatAction, MessageId, ParseMode};
 use tokio::sync::{mpsc, watch};
 use tracing::{error, info, warn};
+
+use crate::daemon::config::DmPolicy;
+use crate::db::channel_users::ChannelUserStore;
 
 use super::types::{ChannelAdapter, ChannelError, InboundMessage, MessageContent};
 
@@ -13,20 +17,29 @@ const TELEGRAM_MAX_MESSAGE_LENGTH: usize = 4096;
 
 pub struct TelegramAdapter {
     token: String,
-    owner_id: i64,
+    dm_policy: DmPolicy,
+    allow_from: Vec<i64>,
+    user_store: Option<Arc<ChannelUserStore>>,
     shutdown_tx: watch::Sender<bool>,
     shutdown_rx: watch::Receiver<bool>,
 }
 
 impl TelegramAdapter {
-    pub fn new(token: String, owner_id: i64) -> Self {
+    pub fn new(token: String, dm_policy: DmPolicy, allow_from: Vec<i64>) -> Self {
         let (shutdown_tx, shutdown_rx) = watch::channel(false);
         Self {
             token,
-            owner_id,
+            dm_policy,
+            allow_from,
+            user_store: None,
             shutdown_tx,
             shutdown_rx,
         }
+    }
+
+    pub fn with_user_store(mut self, user_store: Arc<ChannelUserStore>) -> Self {
+        self.user_store = Some(user_store);
+        self
     }
 
     fn create_bot(&self) -> Bot {
@@ -36,7 +49,7 @@ impl TelegramAdapter {
 
 fn content_to_html(content: MessageContent) -> String {
     match content {
-        MessageContent::Text(text) => html_escape(&text),
+        MessageContent::Text(text) => markdown_to_telegram_html(&text),
         MessageContent::Html(html) => html,
         MessageContent::Error(error_text) => format!("⚠️ {}", html_escape(&error_text)),
     }
@@ -57,26 +70,81 @@ impl ChannelAdapter for TelegramAdapter {
 
     async fn start(&self, message_tx: mpsc::Sender<InboundMessage>) -> Result<(), ChannelError> {
         let bot = self.create_bot();
-        let owner_id = self.owner_id;
+        let dm_policy = self.dm_policy;
+        let allow_from = self.allow_from.clone();
+        let user_store = self.user_store.clone();
         let mut shutdown_rx = self.shutdown_rx.clone();
 
-        info!(owner_id = owner_id, "starting telegram long polling");
+        info!(dm_policy = ?dm_policy, "starting telegram long polling");
+
+        // Register slash commands in Telegram's command menu
+        let menu_bot = bot.clone();
+        let _ = menu_bot
+            .set_my_commands(vec![
+                BotCommand::new("task", "Run a background task"),
+                BotCommand::new("new", "Start a new conversation"),
+                BotCommand::new("model", "Show or change the current model"),
+                BotCommand::new("cost", "Show usage and costs"),
+                BotCommand::new("status", "Show daemon status"),
+                BotCommand::new("repos", "List configured repos"),
+                BotCommand::new("users", "List authorized users"),
+                BotCommand::new("help", "List all commands"),
+            ])
+            .await
+            .inspect_err(|e| warn!(error = %e, "failed to register bot commands"));
 
         tokio::spawn(async move {
             let handler = Update::filter_message().endpoint(
-                move |_bot: Bot, msg: Message, message_tx: mpsc::Sender<InboundMessage>| {
-                    let owner_id = owner_id;
+                move |bot: Bot, msg: Message, message_tx: mpsc::Sender<InboundMessage>| {
+                    let allow_from = allow_from.clone();
+                    let user_store = user_store.clone();
                     async move {
                         let sender = msg.from.as_ref();
                         let sender_id = sender.map(|user| user.id.0 as i64).unwrap_or(0);
 
-                        if sender_id != owner_id {
-                            warn!(
-                                sender_id = sender_id,
-                                owner_id = owner_id,
-                                "ignoring message from non-owner"
-                            );
-                            return respond(());
+                        match dm_policy {
+                            DmPolicy::Disabled => {
+                                return respond(());
+                            }
+                            DmPolicy::Allowlist => {
+                                if !allow_from.contains(&sender_id) {
+                                    warn!(
+                                        sender_id = sender_id,
+                                        "ignoring message from non-allowed user"
+                                    );
+                                    return respond(());
+                                }
+                            }
+                            DmPolicy::Pairing => {
+                                if let Some(ref store) = user_store {
+                                    let platform_id = sender_id.to_string();
+                                    match store.is_authorized("telegram", &platform_id).await {
+                                        Ok(true) => { /* authorized, continue */ }
+                                        Ok(false) => {
+                                            handle_pairing_request(
+                                                &bot, &msg, sender_id, store,
+                                            )
+                                            .await;
+                                            return respond(());
+                                        }
+                                        Err(err) => {
+                                            error!(error = %err, "failed to check authorization");
+                                            return respond(());
+                                        }
+                                    }
+                                } else {
+                                    // No user_store — fall back to allow_from check
+                                    if !allow_from.is_empty()
+                                        && !allow_from.contains(&sender_id)
+                                    {
+                                        warn!(
+                                            sender_id = sender_id,
+                                            "ignoring message from unauthorized user"
+                                        );
+                                        return respond(());
+                                    }
+                                }
+                            }
                         }
 
                         let text = match msg.text() {
@@ -115,7 +183,12 @@ impl ChannelAdapter for TelegramAdapter {
                 }
                 _ = shutdown_rx.changed() => {
                     info!("telegram adapter received shutdown signal");
-                    dispatcher.shutdown_token().shutdown().expect("failed to shutdown dispatcher").await;
+                    match dispatcher.shutdown_token().shutdown() {
+                        Ok(shutdown_future) => shutdown_future.await,
+                        Err(err) => {
+                            error!(error = %err, "failed to initiate telegram dispatcher shutdown");
+                        }
+                    }
                 }
             }
         });
@@ -244,6 +317,52 @@ impl ChannelAdapter for TelegramAdapter {
             .send(true)
             .map_err(|error| ChannelError::Shutdown(format!("failed to send shutdown: {error}")))?;
         Ok(())
+    }
+}
+
+async fn handle_pairing_request(
+    bot: &Bot,
+    msg: &Message,
+    sender_id: i64,
+    user_store: &ChannelUserStore,
+) {
+    let display_name = msg
+        .from
+        .as_ref()
+        .map(|u| u.first_name.clone());
+
+    let platform_id = sender_id.to_string();
+
+    // Check pending count before attempting to create (avoids fragile string matching)
+    let pending_count = user_store
+        .get_pending_requests("telegram")
+        .await
+        .map(|r| r.len())
+        .unwrap_or(0);
+
+    if pending_count >= 3 {
+        warn!(sender_id = sender_id, "too many pending pairing requests, ignoring");
+        return;
+    }
+
+    match user_store
+        .create_pairing_request("telegram", &platform_id, display_name.as_deref())
+        .await
+    {
+        Ok(code) => {
+            let text = format!(
+                "🔐 Pairing required\n\n\
+                 Your code: {code}\n\n\
+                 Share this code with the Kraken owner to get access.\n\
+                 This code expires in 1 hour.",
+            );
+            if let Err(err) = bot.send_message(msg.chat.id, text).await {
+                error!(error = %err, "failed to send pairing code to user");
+            }
+        }
+        Err(err) => {
+            error!(error = %err, "failed to create pairing request");
+        }
     }
 }
 

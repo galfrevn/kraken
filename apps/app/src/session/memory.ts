@@ -29,7 +29,6 @@ export async function endMemorySession(): Promise<void> {
   if (!activeMemorySessionId) return;
 
   const sessionId = activeMemorySessionId;
-  activeMemorySessionId = null;
 
   const session = Session.get(sessionId);
   const summary = session?.title || "Session ended without summary";
@@ -39,6 +38,9 @@ export async function endMemorySession(): Promise<void> {
   } catch {
     // daemon not running -- silently skip
   }
+
+  // Clear after the call so we can retry if it fails
+  activeMemorySessionId = null;
 }
 
 export function getActiveMemorySessionId(): string | null {
