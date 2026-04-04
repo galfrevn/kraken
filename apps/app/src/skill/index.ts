@@ -1,17 +1,25 @@
 import { existsSync, readFileSync, readdirSync, statSync } from "node:fs";
 import { join, dirname } from "node:path";
 
+export interface SkillSlashCommand {
+  name: string;
+  aliases?: string[];
+}
+
 export interface SkillDefinition {
   name: string;
   description: string;
   content: string;
   filePath: string;
   directory: string;
+  slash?: SkillSlashCommand;
 }
 
 function parseSkillFrontmatter(rawContent: string): {
   name: string;
   description: string;
+  slash?: string;
+  aliases?: string;
   body: string;
 } | null {
   if (!rawContent.startsWith("---")) return null;
@@ -24,6 +32,8 @@ function parseSkillFrontmatter(rawContent: string): {
 
   let name = "";
   let description = "";
+  let slash = "";
+  let aliases = "";
 
   for (const line of frontmatterBlock.split("\n")) {
     const trimmedLine = line.trim();
@@ -37,12 +47,22 @@ function parseSkillFrontmatter(rawContent: string): {
         .slice(12)
         .trim()
         .replace(/^["']|["']$/g, "");
+    } else if (trimmedLine.startsWith("slash:")) {
+      slash = trimmedLine
+        .slice(6)
+        .trim()
+        .replace(/^["']|["']$/g, "");
+    } else if (trimmedLine.startsWith("aliases:")) {
+      aliases = trimmedLine
+        .slice(8)
+        .trim()
+        .replace(/^["']|["']$/g, "");
     }
   }
 
   if (!name) return null;
 
-  return { name, description, body };
+  return { name, description, slash, aliases, body };
 }
 
 function findSkillFiles(searchDirectory: string): string[] {
@@ -122,12 +142,20 @@ export function discoverSkills(): SkillDefinition[] {
 
         if (skills.some((existing) => existing.name === parsed.name)) continue;
 
+        const slashCommand: SkillSlashCommand | undefined = parsed.slash
+          ? {
+              name: parsed.slash,
+              aliases: parsed.aliases ? parsed.aliases.split(",").map((a) => a.trim()) : undefined,
+            }
+          : undefined;
+
         skills.push({
           name: parsed.name,
           description: parsed.description,
           content: parsed.body,
           filePath: skillFilePath,
           directory: dirname(skillFilePath),
+          slash: slashCommand,
         });
       } catch {}
     }
@@ -154,6 +182,20 @@ export function formatSkillContent(skill: SkillDefinition): string {
 
 ${skill.content}${companionSection}
 </skill_instructions>`;
+}
+
+export function getSkillSlashCommands(): Array<{
+  skillName: string;
+  description: string;
+  slash: SkillSlashCommand;
+}> {
+  return discoverSkills()
+    .filter((skill) => skill.slash)
+    .map((skill) => ({
+      skillName: skill.name,
+      description: skill.description,
+      slash: skill.slash!,
+    }));
 }
 
 export function buildSkillCatalog(): string {

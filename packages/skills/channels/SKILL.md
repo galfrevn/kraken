@@ -1,6 +1,8 @@
 ---
 name: channels
 description: Configure external messaging channel adapters (Telegram, etc.) — saves credentials securely and patches kraken.jsonc
+slash: channels
+aliases: telegram, discord
 ---
 
 # Channel Setup Skill

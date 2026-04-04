@@ -26,6 +26,7 @@ import { PermissionPrompt } from "@/tui/session/_components/permission.tsx";
 import type { PermissionRequest } from "@/tool/permission.ts";
 import { addAllowRule } from "@/tool/permission-allowlist.ts";
 import type { FileChange } from "@/tui/session/_components/files-sidebar.tsx";
+import { getSkillSlashCommands } from "@/skill/index.ts";
 import { getPrimaryAgents, type AgentColor } from "@/agent/agent.ts";
 import type { ThemeColors } from "@/tui/_context/theme.tsx";
 
@@ -258,6 +259,15 @@ export const Session = () => {
           openThemePicker();
         },
       },
+      ...getSkillSlashCommands().map((sc) => ({
+        title: sc.skillName,
+        value: `skill.${sc.skillName}`,
+        description: sc.description,
+        slash: { name: sc.slash.name, aliases: sc.slash.aliases },
+        onSelect: () => {
+          handlePromptSubmit(`Load the ${sc.skillName} skill and follow its instructions.`);
+        },
+      })),
     ]);
 
     return unregisterCommands;

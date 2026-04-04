@@ -1,6 +1,8 @@
 ---
 name: triggers
 description: Create, modify, and debug triggers -- cron jobs, webhooks, file watchers, CI failure handlers, PR mentions, and slash commands
+slash: triggers
+aliases: cron, webhooks
 ---
 
 Triggers live in `~/.kraken/kraken.jsonc` under the `triggers` key. Use `read` to inspect the current config and `edit` to modify it. After any change, reload the daemon with:

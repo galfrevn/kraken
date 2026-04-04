@@ -1,6 +1,8 @@
 ---
 name: notifications
 description: Configure and test notification channels -- Slack, Discord, Email, GitHub, and system notifications
+slash: notifications
+aliases: notify
 ---
 
 Notification channels live in `~/.kraken/kraken.jsonc` under `notifications.channels`. Use `read` to inspect and `edit` to modify. After changes, reload the daemon:

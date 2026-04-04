@@ -1,6 +1,8 @@
 ---
 name: secrets
 description: Manage API keys and secrets safely -- list, set, and delete without exposing values
+slash: secrets
+aliases: keys
 ---
 
 Secrets are stored in `~/.kraken/.env` and managed exclusively through the daemon API. You MUST NOT read or display secret values. The API only returns key names, never values.

@@ -1,6 +1,8 @@
 ---
 name: memory
 description: Persistent memory system -- save and search observations across sessions
+slash: memory
+aliases: remember
 ---
 
 You have three memory tools: `memory_save`, `memory_search`, and `memory_context`.

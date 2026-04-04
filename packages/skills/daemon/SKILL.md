@@ -1,6 +1,8 @@
 ---
 name: daemon
 description: Manage the Kraken daemon -- view status, manage tasks, and perform maintenance
+slash: daemon
+aliases: status
 ---
 
 Use `bash` with `curl` to interact with the daemon HTTP API at `http://localhost:50051`.

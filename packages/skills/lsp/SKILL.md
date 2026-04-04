@@ -1,6 +1,8 @@
 ---
 name: lsp
 description: Configure LSP language servers for real-time diagnostics after code edits
+slash: lsp
+aliases: diagnostics
 ---
 
 Kraken has built-in LSP integration that provides real-time diagnostics (errors, warnings) after every file edit. Language servers start lazily when you first edit a file of that language.

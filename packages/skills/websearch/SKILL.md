@@ -1,6 +1,8 @@
 ---
 name: websearch
 description: Search the web for real-time information -- docs, APIs, current events, troubleshooting
+slash: search
+aliases: web, google
 ---
 
 You have two web tools: `websearch` and `webfetch`. Use them together for research tasks.
