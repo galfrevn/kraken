@@ -21,6 +21,7 @@ import { ThemePickerContent } from "@/tui/session/_components/theme.tsx";
 import { SessionPickerContent } from "@/tui/session/_components/session-picker.tsx";
 import { QuestionPrompt } from "@/tui/session/_components/question.tsx";
 import { EmptyState } from "@/tui/session/_components/empty-state.tsx";
+import { StatusFooter } from "@/tui/session/_components/status-footer.tsx";
 import type { FileChange } from "@/tui/session/_components/files-sidebar.tsx";
 import { getPrimaryAgents, type AgentColor } from "@/agent/agent.ts";
 import type { ThemeColors } from "@/tui/_context/theme.tsx";
@@ -138,6 +139,7 @@ export const Session = () => {
     }>
   >([]);
   const [modifiedFiles, setModifiedFiles] = useState<FileChange[]>([]);
+  const [revertedMessages, setRevertedMessages] = useState<DisplayMessage[]>([]);
 
   const primaryAgents = getPrimaryAgents();
   const [currentAgentIndex, setCurrentAgentIndex] = useState(0);
@@ -257,6 +259,28 @@ export const Session = () => {
     return unregisterCommands;
   }, []);
 
+  const handleUndo = useCallback(() => {
+    if (isProcessing || displayMessages.length === 0) return;
+    const lastUserIndex = findLastIndex(displayMessages, (m) => m.role === "user");
+    if (lastUserIndex === -1) return;
+    const removed = displayMessages.slice(lastUserIndex);
+    setRevertedMessages((prev) => [...removed, ...prev]);
+    setDisplayMessages((prev) => prev.slice(0, lastUserIndex));
+  }, [isProcessing, displayMessages]);
+
+  const handleRedo = useCallback(() => {
+    if (isProcessing || revertedMessages.length === 0) return;
+    const firstUserIndex = revertedMessages.findIndex((m) => m.role === "user");
+    if (firstUserIndex === -1) return;
+    let nextUserIndex = revertedMessages.findIndex(
+      (m, i) => i > firstUserIndex && m.role === "user",
+    );
+    if (nextUserIndex === -1) nextUserIndex = revertedMessages.length;
+    const restored = revertedMessages.slice(0, nextUserIndex);
+    setRevertedMessages((prev) => prev.slice(nextUserIndex));
+    setDisplayMessages((prev) => [...prev, ...restored]);
+  }, [isProcessing, revertedMessages]);
+
   useKeyboard((keyEvent) => {
     if (keyEvent.ctrl && keyEvent.name === "m") {
       openModelPicker();
@@ -264,6 +288,12 @@ export const Session = () => {
     if (keyEvent.ctrl && keyEvent.name === "c") {
       renderer.destroy();
       process.exit(0);
+    }
+    if (keyEvent.ctrl && keyEvent.name === "z") {
+      handleUndo();
+    }
+    if (keyEvent.ctrl && keyEvent.name === "y") {
+      handleRedo();
     }
   });
 
@@ -676,6 +706,7 @@ export const Session = () => {
   }, [isProcessing, streamingParts.length, currentModelSelection.modelId, currentAgent]);
 
   async function handlePromptSubmit(userInputText: string) {
+    setRevertedMessages([]);
     setDisplayMessages((previousMessages) => [
       ...previousMessages,
       {
@@ -823,6 +854,12 @@ export const Session = () => {
           </box>
         )}
       </scrollbox>
+
+      <StatusFooter
+        undoAvailable={displayMessages.length > 0 && !isProcessing}
+        redoAvailable={revertedMessages.length > 0 && !isProcessing}
+        revertedCount={revertedMessages.filter((m) => m.role === "user").length}
+      />
 
       {pendingQuestion ? (
         <QuestionPrompt
