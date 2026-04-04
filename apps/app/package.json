@@ -1,0 +1,43 @@
+{
+  "name": "@kraken/app",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "bun run --watch src/index.tsx",
+    "start": "bun run src/index.tsx",
+    "worker": "bun run src/worker.ts",
+    "channel-worker": "bun run src/channel-worker.ts",
+    "build": "bun build src/index.tsx --outdir dist --target bun",
+    "lint": "oxlint src/",
+    "format": "oxfmt src/",
+    "typecheck": "tsc --noEmit",
+    "test": "bun test"
+  },
+  "dependencies": {
+    "@ai-sdk/anthropic": "^1.2.0",
+    "@kraken/sdk": "workspace:*",
+    "@ai-sdk/openai": "^1.3.0",
+    "@modelcontextprotocol/sdk": "^1.27.1",
+    "@openrouter/ai-sdk-provider": "0.4",
+    "@opentui-ui/dialog": "^0.1.2",
+    "@opentui/core": "^0.1.90",
+    "@opentui/react": "^0.1.90",
+    "ai": "^4.3.0",
+    "drizzle-orm": "^0.44.0",
+    "fuzzysort": "^3.1.0",
+    "hono": "^4.7.0",
+    "opentui-spinner": "^0.0.6",
+    "react": ">=19.0.0",
+    "turndown": "^7.2.2",
+    "zod": "^3.23.8"
+  },
+  "devDependencies": {
+    "@kraken/configuration": "workspace:*",
+    "@types/bun": "latest",
+    "@types/react": "^19.0.0",
+    "@types/turndown": "^5.0.6",
+    "drizzle-kit": "^0.31.0",
+    "typescript": "^5"
+  }
+}

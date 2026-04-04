@@ -1,37 +1,29 @@
 {
-  "name": "kraken",
-  "private": true,
-  "bin": {
-    "kraken": "./apps/cli/src/index.ts"
-  },
-  "workspaces": [
-    "apps/*",
-    "packages/*"
-  ],
-  "type": "module",
-  "scripts": {
-    "dev": "turbo dev",
-    "build": "turbo build",
-    "typecheck": "turbo typecheck",
-    "lint": "turbo run lint",
-    "format": "turbo run format",
-    "generate": "buf generate",
-    "proto:lint": "buf lint"
-  },
-  "dependencies": {
-    "@bufbuild/protobuf": "^2.11.0",
-    "@connectrpc/connect": "^2.1.1",
-    "dotenv": "^17.2.2",
-    "zod": "^4.1.13"
-  },
   "devDependencies": {
     "@kraken/configuration": "workspace:*",
-    "@kraken/sdk": "workspace:*",
     "@types/bun": "^1.3.10",
     "oxfmt": "^0.26.0",
     "oxlint": "^1.41.0",
     "turbo": "^2.8.12",
     "typescript": "^5"
   },
-  "packageManager": "bun@1.3.10"
+  "name": "kraken",
+  "packageManager": "bun@1.3.10",
+  "private": true,
+  "scripts": {
+    "build": "turbo build",
+    "dev": "bash scripts/dev/install.sh",
+    "format": "turbo run format",
+    "lint": "turbo run lint",
+    "typecheck": "turbo typecheck"
+  },
+  "type": "module",
+  "version": "0.1.4",
+  "workspaces": [
+    "apps/*",
+    "packages/*"
+  ],
+  "dependencies": {
+    "opentui-spinner": "^0.0.6"
+  }
 }

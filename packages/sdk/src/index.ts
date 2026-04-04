@@ -1,17 +1,38 @@
+export { DaemonClient } from "./client.ts";
+export { DaemonError, DaemonConnectionError } from "./types.ts";
 export type {
-  Tool,
-  ToolDefinition,
-  ToolParameterDefinition,
-  ToolExecutionContext,
-  ToolResult,
-  PluginContext,
-  PluginHooks,
-  PluginConfigField,
-  KrakenPlugin,
+  ScheduleRequest,
+  ScheduleResponse,
+  TaskDetails,
+  TaskListParams,
+  TaskUsageRequest,
+  TaskResultRequest,
+  RetryTaskRequest,
+  TaskLogEntry,
+  StatsParams,
+  StatsResponse,
+  CleanRequest,
+  StatusResponse,
+  CreateObservationRequest,
+  CreateObservationResponse,
+  Observation,
+  MemorySearchParams,
+  MemorySearchResult,
+  MemoryContextParams,
+  MemoryContextResponse,
+  MemoryContextSession,
+  MemoryContextObservation,
+  StartMemorySessionRequest,
+  EndMemorySessionRequest,
+  SecretEntry,
+  SetSecretRequest,
+  DaemonEventType,
+  DaemonEvent,
+  EventSubscriptionOptions,
+  AuditEvent,
+  AuditQueryParams,
+  AuditSummary,
+  ConfigChange,
+  ConfigReloadResponse,
+  ConfigValidateResponse,
 } from "./types.ts";
-
-import type { KrakenPlugin } from "./types.ts";
-
-export function definePlugin(plugin: KrakenPlugin): KrakenPlugin {
-  return plugin;
-}

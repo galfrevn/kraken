@@ -1,12 +1,16 @@
 {
-  "extends": "@kraken/configuration/tsconfig.base.json",
+  "extends": "../../packages/configuration/tsconfig.base.json",
   "compilerOptions": {
-    "outDir": "dist",
-    "rootDir": "src",
+    "target": "ESNext",
+    "module": "ESNext",
+    "moduleResolution": "bundler",
+    "strict": true,
+    "verbatimModuleSyntax": true,
+    "noEmit": true,
     "baseUrl": ".",
     "types": ["bun"],
-    "allowImportingTsExtensions": true,
-    "noEmit": true
+    "lib": ["ESNext"],
+    "allowImportingTsExtensions": true
   },
   "include": ["src/**/*.ts"]
 }

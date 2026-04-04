@@ -1,8 +1,4 @@
 #!/usr/bin/env bash
-#
-# Kraken Installer
-# Usage: curl -fsSL https://raw.githubusercontent.com/galfrevn/kraken/main/scripts/install.sh | bash
-#
 set -euo pipefail
 
 BOLD="\033[1m"
@@ -16,7 +12,7 @@ RESET="\033[0m"
 KRAKEN_HOME="$HOME/.kraken"
 KRAKEN_BIN="$KRAKEN_HOME/bin"
 KRAKEN_LIB="$KRAKEN_HOME/lib"
-KRAKEN_SRC="$KRAKEN_LIB/tui"
+KRAKEN_SRC="$KRAKEN_LIB/src"
 GITHUB_REPO="galfrevn/kraken"
 GITHUB_URL="https://github.com/$GITHUB_REPO"
 
@@ -43,7 +39,7 @@ detect_platform() {
   case "$(uname -s)" in
     Darwin) os="darwin" ;;
     Linux)  os="linux" ;;
-    *)      fail "unsupported operating system: $(uname -s)" ;;
+    *)      fail "unsupported operating system: $(uname -s). Kraken supports macOS and Linux." ;;
   esac
 
   case "$(uname -m)" in
@@ -55,8 +51,6 @@ detect_platform() {
 
   echo "$os-$arch"
 }
-
-# ===================================================================
 
 echo -e "${CYAN}"
 echo " ██ ▄█▀ ██▀███   ▄▄▄       ██ ▄█▀▓█████  ███▄    █ "
@@ -74,16 +68,13 @@ echo -e "  ${DIM}autonomous developer agent — installer${RESET}\n"
 PLATFORM=$(detect_platform)
 success "detected platform: $PLATFORM"
 
-# -------------------------------------------------------------------
-# 1. Check / install Bun (the only hard requirement)
-# -------------------------------------------------------------------
 step "checking bun"
 
 if command -v bun &>/dev/null; then
   BUN_VERSION=$(bun --version)
   success "bun v$BUN_VERSION"
 else
-  warn "bun is not installed"
+  warn "bun is not installed (required for TUI)"
   INSTALL_BUN=$(prompt "Install bun automatically? (Y/n)" "y")
 
   if [[ "$INSTALL_BUN" =~ ^[Yy]$ ]] || [ -z "$INSTALL_BUN" ]; then
@@ -98,13 +89,41 @@ else
       fail "bun installation failed. Install manually: https://bun.sh"
     fi
   else
-    fail "bun is required. Install it: https://bun.sh"
+    fail "bun is required for the TUI. Install it: https://bun.sh"
   fi
 fi
 
-# -------------------------------------------------------------------
-# 2. Prepare install directory
-# -------------------------------------------------------------------
+step "checking rust"
+
+if command -v cargo &>/dev/null; then
+  CARGO_VERSION=$(cargo --version | awk '{print $2}')
+  success "cargo $CARGO_VERSION"
+else
+  warn "rust/cargo is not installed (required for daemon)"
+  INSTALL_RUST=$(prompt "Install rust via rustup automatically? (Y/n)" "y")
+
+  if [[ "$INSTALL_RUST" =~ ^[Yy]$ ]] || [ -z "$INSTALL_RUST" ]; then
+    echo ""
+    curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y
+    source "$HOME/.cargo/env"
+
+    if command -v cargo &>/dev/null; then
+      success "rust installed: $(cargo --version | awk '{print $2}')"
+    else
+      fail "rust installation failed. Install manually: https://rustup.rs"
+    fi
+  else
+    fail "rust is required for the daemon. Install it: https://rustup.rs"
+  fi
+fi
+
+step "checking git"
+
+if ! command -v git &>/dev/null; then
+  fail "git is required. Install it: https://git-scm.com"
+fi
+success "git $(git --version | awk '{print $3}')"
+
 step "preparing installation"
 
 mkdir -p "$KRAKEN_BIN"
@@ -115,14 +134,7 @@ if [ -d "$KRAKEN_SRC" ]; then
   warn "existing installation found, updating..."
 fi
 
-# -------------------------------------------------------------------
-# 3. Clone / update the repository (always needed for TypeScript code)
-# -------------------------------------------------------------------
 step "fetching kraken source"
-
-if ! command -v git &>/dev/null; then
-  fail "git is required. Install it: https://git-scm.com"
-fi
 
 if [ -d "$KRAKEN_SRC/.git" ]; then
   cd "$KRAKEN_SRC"
@@ -136,111 +148,54 @@ fi
 
 cd "$KRAKEN_SRC"
 
-# -------------------------------------------------------------------
-# 4. Install TypeScript dependencies
-# -------------------------------------------------------------------
 step "installing dependencies"
 bun install --frozen-lockfile 2>/dev/null || bun install
-success "dependencies installed"
+success "node modules installed"
 
-# -------------------------------------------------------------------
-# 5. Get scheduler & gateway binaries (pre-built or build from source)
-# -------------------------------------------------------------------
-step "setting up native binaries"
+step "building daemon + CLI (rust)"
 
-PREBUILT_OK=false
-RELEASE_TAG=""
+cd apps/daemon
+cargo build --release 2>&1 | tail -5
+DAEMON_BIN="$KRAKEN_SRC/apps/daemon/target/release/kraken"
 
-# Try downloading pre-built binaries from the latest release
-if command -v curl &>/dev/null; then
-  LATEST_RELEASE=$(curl -fsSL "https://api.github.com/repos/$GITHUB_REPO/releases/latest" 2>/dev/null || echo "")
-
-  if [ -n "$LATEST_RELEASE" ]; then
-    RELEASE_TAG=$(echo "$LATEST_RELEASE" | grep '"tag_name"' | head -1 | sed 's/.*"tag_name": *"\([^"]*\)".*/\1/')
-
-    if [ -n "$RELEASE_TAG" ]; then
-      ASSET_NAME="kraken-$PLATFORM.tar.gz"
-      DOWNLOAD_URL="$GITHUB_URL/releases/download/$RELEASE_TAG/$ASSET_NAME"
-
-      echo -e "  ${DIM}trying $DOWNLOAD_URL${RESET}"
-
-      if curl -fsSL -o "/tmp/$ASSET_NAME" "$DOWNLOAD_URL" 2>/dev/null; then
-        tar -xzf "/tmp/$ASSET_NAME" -C "$KRAKEN_LIB/" 2>/dev/null && PREBUILT_OK=true
-        rm -f "/tmp/$ASSET_NAME"
-
-        if [ "$PREBUILT_OK" = true ]; then
-          success "downloaded pre-built binaries ($RELEASE_TAG)"
-        fi
-      fi
-    fi
-  fi
+if [ ! -f "$DAEMON_BIN" ]; then
+  fail "daemon build failed — binary not found at $DAEMON_BIN"
 fi
 
-# Fallback: build from source if pre-built binaries are not available
-if [ "$PREBUILT_OK" = false ]; then
-  warn "no pre-built binaries available, trying to build from source"
+cp "$DAEMON_BIN" "$KRAKEN_LIB/kraken"
+chmod +x "$KRAKEN_LIB/kraken"
+success "daemon built"
+cd "$KRAKEN_SRC"
 
-  if command -v cargo &>/dev/null; then
-    success "cargo found: $(cargo --version | awk '{print $2}')"
-    step "building scheduler (rust)"
-    cd apps/scheduler
-    cargo build --release 2>&1 | tail -1
-    cp target/release/scheduler "$KRAKEN_LIB/scheduler" 2>/dev/null || true
-    success "scheduler built"
-    cd "$KRAKEN_SRC"
-  else
-    warn "cargo not found -- scheduler won't be available (https://rustup.rs)"
-  fi
+step "building TUI app"
 
-  if command -v go &>/dev/null; then
-    success "go found: $(go version | awk '{print $3}' | sed 's/go//')"
-    step "building gateway (go)"
-    cd apps/gateway
-    go build -o ./bin/gateway ./cmd/gateway
-    cp bin/gateway "$KRAKEN_LIB/gateway" 2>/dev/null || true
-    success "gateway built"
-    cd "$KRAKEN_SRC"
-  else
-    warn "go not found -- gateway won't be available (https://go.dev/dl)"
-  fi
-fi
+cd apps/app
+bun build src/index.tsx --outdir "$KRAKEN_LIB/app" --target bun 2>&1 | tail -3
+success "TUI app built"
+cd "$KRAKEN_SRC"
 
-# -------------------------------------------------------------------
-# 6. Create CLI shim
-# -------------------------------------------------------------------
 step "creating CLI"
 
 cat > "$KRAKEN_BIN/kraken" << 'SHIM'
 #!/usr/bin/env bash
-exec bun run "$HOME/.kraken/lib/tui/apps/cli/src/index.ts" "$@"
+KRAKEN_LIB="$HOME/.kraken/lib"
+KRAKEN_BIN="$KRAKEN_LIB/kraken"
+
+if [ -x "$KRAKEN_BIN" ]; then
+  exec "$KRAKEN_BIN" "$@"
+else
+  echo "error: kraken binary not found at $KRAKEN_BIN" >&2
+  echo "try reinstalling: curl -fsSL https://raw.githubusercontent.com/galfrevn/kraken/main/scripts/install.sh | bash" >&2
+  exit 1
+fi
 SHIM
 
 chmod +x "$KRAKEN_BIN/kraken"
 success "created $KRAKEN_BIN/kraken"
 
-# -------------------------------------------------------------------
-# 7. Copy config templates
-# -------------------------------------------------------------------
-step "setting up configuration"
+RELEASE_TAG=$(cd "$KRAKEN_SRC" && git describe --tags --abbrev=0 2>/dev/null || echo "source")
+echo "$RELEASE_TAG" > "$KRAKEN_HOME/version"
 
-if [ -d "$KRAKEN_SRC/apps/cli/templates" ]; then
-  cp -n "$KRAKEN_SRC/apps/cli/templates/env.example" "$KRAKEN_HOME/config/.env.example" 2>/dev/null || true
-  cp -n "$KRAKEN_SRC/apps/cli/templates/kraken.example.yml" "$KRAKEN_HOME/config/kraken.example.yml" 2>/dev/null || true
-  success "config templates copied"
-fi
-
-# -------------------------------------------------------------------
-# 8. Write version marker
-# -------------------------------------------------------------------
-if [ -n "${RELEASE_TAG:-}" ]; then
-  echo "$RELEASE_TAG" > "$KRAKEN_HOME/version"
-else
-  echo "source" > "$KRAKEN_HOME/version"
-fi
-
-# -------------------------------------------------------------------
-# 9. Add to PATH
-# -------------------------------------------------------------------
 step "configuring PATH"
 
 add_to_path() {
@@ -288,30 +243,42 @@ else
   if echo "$PATH" | grep -q ".kraken/bin"; then
     success "~/.kraken/bin already in PATH"
   else
-    warn "could not detect shell config -- add manually:"
+    warn "could not detect shell config — add manually:"
     echo -e "    ${CYAN}export PATH=\"\$HOME/.kraken/bin:\$PATH\"${RESET}"
   fi
 fi
 
 export PATH="$KRAKEN_BIN:$PATH"
 
-# -------------------------------------------------------------------
-# 10. Verify
-# -------------------------------------------------------------------
 step "verifying installation"
 
-if command -v kraken &>/dev/null || [ -x "$KRAKEN_BIN/kraken" ]; then
-  "$KRAKEN_BIN/kraken" version 2>/dev/null && success "kraken is working" || success "kraken installed at $KRAKEN_BIN/kraken"
-else
-  warn "kraken installed but may not be in PATH yet"
+if [ -x "$KRAKEN_LIB/kraken" ]; then
+  success "daemon + CLI installed at $KRAKEN_LIB/kraken"
 fi
 
-# -------------------------------------------------------------------
-# Done — run init
-# -------------------------------------------------------------------
+if [ -x "$KRAKEN_BIN/kraken" ]; then
+  success "CLI shim installed at $KRAKEN_BIN/kraken"
+fi
+
 echo ""
 echo -e "${GREEN}${BOLD}  Installation complete!${RESET}"
 echo ""
 
-step "running kraken init"
+step "initial setup"
+echo ""
+echo -e "  Kraken needs some initial configuration (LLM provider, API key, etc.)"
+echo -e "  Running ${CYAN}kraken init${RESET} to get you started...\n"
+
 "$KRAKEN_BIN/kraken" init
+
+echo ""
+echo -e "${GREEN}${BOLD}  You're all set!${RESET}"
+echo ""
+echo -e "  ${CYAN}Usage:${RESET}"
+echo -e "    kraken start            Start TUI + daemon"
+echo -e "    kraken daemon start     Start daemon in background"
+echo -e "    kraken daemon status    Check daemon status"
+echo -e "    kraken daemon stop      Stop daemon"
+echo ""
+echo -e "  ${DIM}Restart your shell or run: export PATH=\"\$HOME/.kraken/bin:\$PATH\"${RESET}"
+echo ""

@@ -1,0 +1,181 @@
+use std::sync::Arc;
+use tokio::sync::{broadcast, watch};
+use tokio_stream::StreamExt;
+use tokio_stream::wrappers::BroadcastStream;
+use tracing::{info, warn};
+
+use super::engine::TriggerEngine;
+use super::types::{TriggerEvent, TriggerType as InternalTriggerType};
+use crate::types::{SchedulerEvent, TriggerType};
+
+pub struct CronTriggerListener {
+    trigger_engine: Arc<TriggerEngine>,
+    scheduler_event_receiver: broadcast::Receiver<SchedulerEvent>,
+}
+
+impl CronTriggerListener {
+    pub fn new(
+        trigger_engine: Arc<TriggerEngine>,
+        scheduler_event_receiver: broadcast::Receiver<SchedulerEvent>,
+    ) -> Self {
+        Self {
+            trigger_engine,
+            scheduler_event_receiver,
+        }
+    }
+
+    pub async fn run(self, mut shutdown_receiver: watch::Receiver<bool>) {
+        let trigger_engine = self.trigger_engine;
+        let broadcast_stream = BroadcastStream::new(self.scheduler_event_receiver);
+        tokio::pin!(broadcast_stream);
+
+        info!("cron trigger listener started");
+
+        loop {
+            tokio::select! {
+                maybe_event = broadcast_stream.next() => {
+                    match maybe_event {
+                        Some(Ok(scheduler_event)) => {
+                            Self::process_scheduler_event(&trigger_engine, scheduler_event).await;
+                        }
+                        Some(Err(lagged_error)) => {
+                            warn!(
+                                error = %lagged_error,
+                                "cron trigger listener dropped lagged broadcast messages"
+                            );
+                        }
+                        None => {
+                            info!("cron trigger listener broadcast channel closed");
+                            break;
+                        }
+                    }
+                }
+                _ = shutdown_receiver.changed() => {
+                    info!("cron trigger listener shutting down");
+                    break;
+                }
+            }
+        }
+    }
+
+    async fn process_scheduler_event(
+        trigger_engine: &TriggerEngine,
+        scheduler_event: SchedulerEvent,
+    ) {
+        if scheduler_event.trigger_type != TriggerType::Cron {
+            return;
+        }
+
+        let payload_as_json = scheduler_event
+            .payload
+            .clone()
+            .unwrap_or_else(|| serde_json::Value::Object(serde_json::Map::new()));
+
+        let trigger_event = TriggerEvent {
+            id: scheduler_event.id,
+            trigger_type: InternalTriggerType::Cron,
+            source: scheduler_event.source.clone(),
+            payload: payload_as_json,
+            fired_at: scheduler_event.timestamp,
+        };
+
+        let maybe_task_id = trigger_engine.handle_trigger_event(trigger_event).await;
+
+        if let Some(created_task_id) = maybe_task_id {
+            info!(
+                task_id = %created_task_id,
+                source = %scheduler_event.source,
+                "cron trigger listener created task from scheduler event"
+            );
+        }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_cron_event_filtering_accepts_cron_trigger_type() {
+        let cron_scheduler_event = SchedulerEvent {
+            id: "test-id".to_string(),
+            trigger_type: TriggerType::Cron,
+            source: "cron:daily-check".to_string(),
+            payload: None,
+            timestamp: chrono::Utc::now(),
+        };
+
+        assert_eq!(cron_scheduler_event.trigger_type, TriggerType::Cron);
+    }
+
+    #[test]
+    fn test_cron_event_filtering_rejects_file_change_trigger_type() {
+        let file_change_scheduler_event = SchedulerEvent {
+            id: "test-id".to_string(),
+            trigger_type: TriggerType::FileChange,
+            source: "watcher:src-watcher".to_string(),
+            payload: None,
+            timestamp: chrono::Utc::now(),
+        };
+
+        assert_ne!(file_change_scheduler_event.trigger_type, TriggerType::Cron);
+    }
+
+    #[test]
+    fn test_trigger_event_creation_from_cron_scheduler_event() {
+        let scheduler_event = SchedulerEvent {
+            id: "event-123".to_string(),
+            trigger_type: TriggerType::Cron,
+            source: "cron:nightly-build".to_string(),
+            payload: Some(serde_json::json!({"param1": "value1"})),
+            timestamp: chrono::DateTime::from_timestamp(1710400000, 0)
+                .unwrap_or_else(chrono::Utc::now),
+        };
+
+        let payload_as_json = scheduler_event
+            .payload
+            .clone()
+            .unwrap_or_else(|| serde_json::Value::Object(serde_json::Map::new()));
+
+        let trigger_event = TriggerEvent {
+            id: scheduler_event.id.clone(),
+            trigger_type: InternalTriggerType::Cron,
+            source: scheduler_event.source.clone(),
+            payload: payload_as_json,
+            fired_at: scheduler_event.timestamp,
+        };
+
+        assert_eq!(trigger_event.id, "event-123");
+        assert_eq!(trigger_event.trigger_type, InternalTriggerType::Cron);
+        assert_eq!(trigger_event.source, "cron:nightly-build");
+        assert_eq!(trigger_event.payload["param1"], "value1");
+    }
+
+    #[test]
+    fn test_trigger_event_creation_from_cron_event_without_payload() {
+        let scheduler_event = SchedulerEvent {
+            id: "event-456".to_string(),
+            trigger_type: TriggerType::Cron,
+            source: "cron:simple-job".to_string(),
+            payload: None,
+            timestamp: chrono::Utc::now(),
+        };
+
+        let payload_as_json = scheduler_event
+            .payload
+            .clone()
+            .unwrap_or_else(|| serde_json::Value::Object(serde_json::Map::new()));
+
+        let trigger_event = TriggerEvent {
+            id: scheduler_event.id.clone(),
+            trigger_type: InternalTriggerType::Cron,
+            source: scheduler_event.source.clone(),
+            payload: payload_as_json,
+            fired_at: scheduler_event.timestamp,
+        };
+
+        assert_eq!(trigger_event.id, "event-456");
+        assert!(trigger_event.payload.is_object());
+        assert_eq!(trigger_event.payload.as_object().unwrap().len(), 0);
+    }
+}

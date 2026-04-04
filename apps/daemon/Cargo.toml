@@ -1,0 +1,47 @@
+[package]
+name = "kraken"
+version = "0.1.0"
+edition = "2024"
+
+[[bin]]
+name = "kraken"
+path = "src/main.rs"
+
+[dependencies]
+tokio = { version = "1", features = ["full"] }
+tokio-stream = { version = "0.1", features = ["sync"] }
+notify = "8"
+notify-debouncer-mini = "0.6"
+cron = "0.15"
+chrono = { version = "0.4", features = ["serde"] }
+uuid = { version = "1", features = ["v4"] }
+tracing = "0.1"
+tracing-subscriber = { version = "0.3", features = ["env-filter"] }
+dashmap = "6"
+rusqlite = { version = "0.32", features = ["bundled"] }
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+dirs-next = "2"
+sysinfo = "0.33"
+reqwest = { version = "0.12", features = ["json", "stream"] }
+async-trait = "0.1"
+futures = "0.3"
+regex = "1"
+axum = "0.8"
+hmac = "0.12"
+sha2 = "0.10"
+hex = "0.4"
+subtle = "2"
+tower = { version = "0.5", features = ["util"] }
+clap = { version = "4", features = ["derive"] }
+console = "0.15"
+dialoguer = "0.11"
+tabled = "0.17"
+sqlite-vec = "0.1.7"
+base64 = "0.22.1"
+teloxide = { version = "0.13", features = ["macros"] }
+tokio-util = "0.7.18"
+
+[dev-dependencies]
+serial_test = "3.4.0"
+http-body-util = "0.1"

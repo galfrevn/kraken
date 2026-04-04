@@ -6,6 +6,11 @@
   "exports": {
     ".": "./src/index.ts"
   },
+  "scripts": {
+    "lint": "oxlint src/",
+    "format": "oxfmt src/",
+    "typecheck": "tsc --noEmit"
+  },
   "devDependencies": {
     "@kraken/configuration": "workspace:*",
     "@types/bun": "latest",
