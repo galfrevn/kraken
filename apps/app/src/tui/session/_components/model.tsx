@@ -7,15 +7,14 @@ import { useModels } from "@/tui/_context/models.tsx";
 import { useTheme } from "@/tui/_context/theme.tsx";
 import type { ModelInfo, ModelSelection } from "@/models/types.ts";
 
+const PAGE_SCROLL_ITEM_COUNT = 10;
+
 type ModelPickerContentProperties = ChoiceContext<ModelSelection>;
 
-type PickerStage = "provider" | "model";
-
-interface ProviderOption {
-  id: string;
-  name: string;
-  modelCount: number;
-  hasCurrentModel: boolean;
+interface DisplayModelOption {
+  modelInfo: ModelInfo;
+  section: "favorite" | "recent" | "provider";
+  sectionLabel: string;
 }
 
 export const ModelPickerContent = ({ resolve }: ModelPickerContentProperties) => {
@@ -23,182 +22,169 @@ export const ModelPickerContent = ({ resolve }: ModelPickerContentProperties) =>
   const terminalDimensions = useTerminalDimensions();
   const { providers, current, favorites, recents, overriddenByEnvironment, toggleFavorite } =
     useModels();
-
-  const [stage, setStage] = useState<PickerStage>("provider");
-  const [selectedProviderId, setSelectedProviderId] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedIndex, setSelectedIndex] = useState(0);
   const scrollboxReference = useRef<ScrollBoxRenderable>(null);
 
-  const providerOptions = useMemo((): ProviderOption[] => {
-    return Object.entries(providers).map(([id, data]) => ({
-      id,
-      name: data.name,
-      modelCount: data.models.length,
-      hasCurrentModel: data.models.some(
-        (m) => m.id === current.modelId && m.providerId === current.providerId,
-      ),
-    }));
-  }, [providers, current]);
+  const allModelOptions = useMemo((): DisplayModelOption[] => {
+    const optionsList: DisplayModelOption[] = [];
+    const addedModelKeys = new Set<string>();
 
-  const modelOptions = useMemo((): ModelInfo[] => {
-    if (!selectedProviderId) return [];
-    const providerData = providers[selectedProviderId];
-    if (!providerData) return [];
+    const allModels: ModelInfo[] = Object.values(providers).flatMap(
+      (providerModels) => providerModels.models,
+    );
 
-    const models = [...providerData.models];
-
-    if (!searchQuery.trim()) {
-      const favoriteIds = new Set(
-        favorites.filter((f) => f.providerId === selectedProviderId).map((f) => f.modelId),
+    for (const favoriteSelection of favorites) {
+      const matchingModel = allModels.find(
+        (model) =>
+          model.id === favoriteSelection.modelId &&
+          model.providerId === favoriteSelection.providerId,
       );
-      const recentIds = new Set(
-        recents.filter((r) => r.providerId === selectedProviderId).map((r) => r.modelId),
-      );
-
-      models.sort((a, b) => {
-        const aFav = favoriteIds.has(a.id) ? 0 : 1;
-        const bFav = favoriteIds.has(b.id) ? 0 : 1;
-        if (aFav !== bFav) return aFav - bFav;
-        const aRecent = recentIds.has(a.id) ? 0 : 1;
-        const bRecent = recentIds.has(b.id) ? 0 : 1;
-        if (aRecent !== bRecent) return aRecent - bRecent;
-        return a.name.localeCompare(b.name);
-      });
-
-      return models;
+      if (matchingModel) {
+        const modelKey = `${matchingModel.providerId}:${matchingModel.id}`;
+        if (!addedModelKeys.has(modelKey)) {
+          addedModelKeys.add(modelKey);
+          optionsList.push({
+            modelInfo: matchingModel,
+            section: "favorite",
+            sectionLabel: "Favorites",
+          });
+        }
+      }
     }
 
-    const results = fuzzysort.go(searchQuery, models, {
-      keys: [(m: ModelInfo) => m.name, (m: ModelInfo) => m.id],
-    });
-    return results.map((r) => r.obj);
-  }, [selectedProviderId, providers, searchQuery, favorites, recents]);
+    for (const recentSelection of recents) {
+      const matchingModel = allModels.find(
+        (model) =>
+          model.id === recentSelection.modelId && model.providerId === recentSelection.providerId,
+      );
+      if (matchingModel) {
+        const modelKey = `${matchingModel.providerId}:${matchingModel.id}`;
+        if (!addedModelKeys.has(modelKey)) {
+          addedModelKeys.add(modelKey);
+          optionsList.push({ modelInfo: matchingModel, section: "recent", sectionLabel: "Recent" });
+        }
+      }
+    }
 
-  const listMaxHeight = useMemo(() => {
-    const items = stage === "provider" ? providerOptions.length : modelOptions.length;
-    return Math.min(items, Math.floor(terminalDimensions.height / 2) - 6);
-  }, [stage, providerOptions.length, modelOptions.length, terminalDimensions.height]);
+    for (const [providerId, providerModels] of Object.entries(providers)) {
+      for (const modelInfo of providerModels.models) {
+        const modelKey = `${modelInfo.providerId}:${modelInfo.id}`;
+        if (!addedModelKeys.has(modelKey)) {
+          addedModelKeys.add(modelKey);
+          optionsList.push({
+            modelInfo,
+            section: "provider",
+            sectionLabel: providerModels.name || providerId,
+          });
+        }
+      }
+    }
+
+    return optionsList;
+  }, [providers, favorites, recents]);
+
+  const filteredModelOptions = useMemo(() => {
+    if (!searchQuery.trim()) return allModelOptions;
+
+    const searchResults = fuzzysort.go(searchQuery, allModelOptions, {
+      keys: [
+        (option: DisplayModelOption) => option.modelInfo.name,
+        (option: DisplayModelOption) => option.modelInfo.id,
+        (option: DisplayModelOption) => option.modelInfo.providerName,
+      ],
+    });
+
+    return searchResults.map((result) => result.obj);
+  }, [allModelOptions, searchQuery]);
+
+  const computedListMaxHeight = useMemo(() => {
+    return Math.min(
+      filteredModelOptions.length + 10,
+      Math.floor(terminalDimensions.height / 2) - 4,
+    );
+  }, [filteredModelOptions.length, terminalDimensions.height]);
 
   const moveSelection = useCallback(
     (direction: number) => {
-      const total = stage === "provider" ? providerOptions.length : modelOptions.length;
-      if (total === 0) return;
-      setSelectedIndex((prev) => {
-        let next = prev + direction;
-        if (next < 0) next = total - 1;
-        if (next >= total) next = 0;
-        return next;
+      setSelectedIndex((previousIndex) => {
+        const totalOptions = filteredModelOptions.length;
+        if (totalOptions === 0) return 0;
+        let nextIndex = previousIndex + direction;
+        if (nextIndex < 0) nextIndex = totalOptions - 1;
+        if (nextIndex >= totalOptions) nextIndex = 0;
+
+        const currentScrollbox = scrollboxReference.current;
+        if (currentScrollbox) {
+          const targetOption = filteredModelOptions[nextIndex];
+          if (targetOption) {
+            const childId = `${targetOption.modelInfo.providerId}:${targetOption.modelInfo.id}`;
+            currentScrollbox.scrollChildIntoView(childId);
+          }
+        }
+
+        return nextIndex;
       });
     },
-    [stage, providerOptions.length, modelOptions.length],
+    [filteredModelOptions.length],
   );
 
   useKeyboard((keyEvent) => {
-    if (keyEvent.name === "up") moveSelection(-1);
-    else if (keyEvent.name === "down") moveSelection(1);
-    else if (keyEvent.name === "escape") {
+    if (keyEvent.name === "up" || (keyEvent.ctrl && keyEvent.name === "p")) {
+      moveSelection(-1);
+    } else if (keyEvent.name === "down" || (keyEvent.ctrl && keyEvent.name === "n")) {
+      moveSelection(1);
+    } else if (keyEvent.name === "pageup") {
+      moveSelection(-PAGE_SCROLL_ITEM_COUNT);
+    } else if (keyEvent.name === "pagedown") {
+      moveSelection(PAGE_SCROLL_ITEM_COUNT);
+    } else if (keyEvent.name === "escape") {
       resolve(undefined as unknown as ModelSelection);
-    } else if (keyEvent.name === "left" && stage === "model" && !searchQuery) {
-      setStage("provider");
-      setSelectedProviderId(null);
-      setSearchQuery("");
-      setSelectedIndex(0);
     } else if (keyEvent.name === "return") {
-      if (stage === "provider") {
-        const provider = providerOptions[selectedIndex];
-        if (provider) {
-          setSelectedProviderId(provider.id);
-          setStage("model");
-          setSearchQuery("");
-          setSelectedIndex(0);
-        }
-      } else {
-        const model = modelOptions[selectedIndex];
-        if (model && !overriddenByEnvironment) {
-          resolve({ modelId: model.id, providerId: model.providerId });
-        }
+      const selectedOption = filteredModelOptions[selectedIndex];
+      if (selectedOption && !overriddenByEnvironment) {
+        resolve({
+          modelId: selectedOption.modelInfo.id,
+          providerId: selectedOption.modelInfo.providerId,
+        });
       }
-    } else if (keyEvent.ctrl && keyEvent.name === "f" && stage === "model") {
-      const model = modelOptions[selectedIndex];
-      if (model) toggleFavorite(model.id, model.providerId);
+    } else if (keyEvent.ctrl && keyEvent.name === "f") {
+      const selectedOption = filteredModelOptions[selectedIndex];
+      if (selectedOption) {
+        toggleFavorite(selectedOption.modelInfo.id, selectedOption.modelInfo.providerId);
+      }
     }
   });
 
-  const isFavorite = (model: ModelInfo) =>
-    favorites.some((f) => f.modelId === model.id && f.providerId === model.providerId);
+  const isCurrentModel = (modelInfo: ModelInfo) =>
+    modelInfo.id === current.modelId && modelInfo.providerId === current.providerId;
 
-  const isCurrent = (model: ModelInfo) =>
-    model.id === current.modelId && model.providerId === current.providerId;
+  const isFavorite = (modelInfo: ModelInfo) =>
+    favorites.some((f) => f.modelId === modelInfo.id && f.providerId === modelInfo.providerId);
 
-  if (stage === "provider") {
-    return (
-      <box flexDirection="column" width="100%" paddingY={1}>
-        <box paddingX={4}>
-          <box flexDirection="row" justifyContent="space-between" width="100%">
-            <text attributes={TextAttributes.BOLD} fg={theme.text} content="Select provider" />
-            <text fg={theme.textMuted} content="esc" />
-          </box>
-        </box>
-        <box height={1} />
-        <scrollbox
-          ref={scrollboxReference}
-          paddingX={1}
-          maxHeight={listMaxHeight}
-          scrollbarOptions={{ visible: false }}
-        >
-          {providerOptions.map((provider, i) => {
-            const isSelected = i === selectedIndex;
-            return (
-              <box
-                key={provider.id}
-                flexDirection="row"
-                justifyContent="space-between"
-                paddingLeft={3}
-                paddingRight={2}
-                backgroundColor={isSelected ? theme.accent : undefined}
-              >
-                <box flexDirection="row" gap={1}>
-                  {provider.hasCurrentModel && (
-                    <text fg={isSelected ? theme.background : theme.accent} content="●" />
-                  )}
-                  <text
-                    attributes={isSelected ? TextAttributes.BOLD : undefined}
-                    fg={isSelected ? theme.background : theme.text}
-                    content={provider.name}
-                  />
-                </box>
-                <text
-                  fg={isSelected ? theme.background : theme.textMuted}
-                  content={`${provider.modelCount} models`}
-                />
-              </box>
-            );
-          })}
-        </scrollbox>
-        <box paddingX={4} paddingTop={1} flexDirection="row" gap={2}>
-          <box flexDirection="row" gap={1}>
-            <text fg={theme.text} content="enter" />
-            <text fg={theme.textMuted} content="select" />
-          </box>
-        </box>
-      </box>
-    );
-  }
+  const sectionBoundaries = useMemo(() => {
+    const boundaries: { index: number; label: string }[] = [];
+    let lastLabel = "";
+    for (let i = 0; i < filteredModelOptions.length; i++) {
+      const currentLabel = filteredModelOptions[i]!.sectionLabel;
+      if (currentLabel !== lastLabel) {
+        boundaries.push({ index: i, label: currentLabel });
+        lastLabel = currentLabel;
+      }
+    }
+    return boundaries;
+  }, [filteredModelOptions]);
+
+  const sectionIndexSet = useMemo(() => {
+    return new Set(sectionBoundaries.map((b) => b.index));
+  }, [sectionBoundaries]);
 
   return (
     <box flexDirection="column" width="100%" paddingY={1}>
       <box paddingX={4}>
         <box flexDirection="row" justifyContent="space-between" width="100%">
-          <box flexDirection="row" gap={1}>
-            <text
-              fg={theme.textMuted}
-              content={providerOptions.find((p) => p.id === selectedProviderId)?.name ?? ""}
-            />
-            <text fg={theme.textMuted} content="/" />
-            <text attributes={TextAttributes.BOLD} fg={theme.text} content="Select model" />
-          </box>
-          <text fg={theme.textMuted} content="← back  esc close" />
+          <text attributes={TextAttributes.BOLD} fg={theme.text} content="Select model" />
+          <text fg={theme.textMuted} content="esc close" />
         </box>
       </box>
       <box paddingX={4} paddingTop={1}>
@@ -214,48 +200,61 @@ export const ModelPickerContent = ({ resolve }: ModelPickerContentProperties) =>
           onInput={(newValue: string) => {
             setSearchQuery(newValue);
             setSelectedIndex(0);
+            const s = scrollboxReference.current;
+            if (s) s.scrollBy(-s.scrollTop);
           }}
         />
       </box>
       <scrollbox
         ref={scrollboxReference}
         paddingX={1}
-        maxHeight={listMaxHeight}
+        maxHeight={computedListMaxHeight}
         scrollbarOptions={{ visible: false }}
       >
-        {modelOptions.map((model, i) => {
-          const isSelected = i === selectedIndex;
-          const fav = isFavorite(model);
-          const cur = isCurrent(model);
+        {filteredModelOptions.map((displayOption, optionIndex) => {
+          const isSelected = optionIndex === selectedIndex;
+          const isCurrent = isCurrentModel(displayOption.modelInfo);
+          const fav = isFavorite(displayOption.modelInfo);
+          const showSectionHeader = sectionIndexSet.has(optionIndex);
+          const sectionLabel = showSectionHeader
+            ? (sectionBoundaries.find((b) => b.index === optionIndex)?.label ?? "")
+            : "";
+
           return (
             <box
-              key={model.id}
-              flexDirection="row"
-              justifyContent="space-between"
-              paddingLeft={3}
-              paddingRight={2}
-              backgroundColor={isSelected ? theme.accent : undefined}
+              key={`${displayOption.modelInfo.providerId}:${displayOption.modelInfo.id}`}
+              id={`${displayOption.modelInfo.providerId}:${displayOption.modelInfo.id}`}
+              flexDirection="column"
             >
-              <box flexDirection="row" gap={1} flexGrow={1}>
-                {cur && <text fg={isSelected ? theme.background : theme.accent} content="●" />}
-                {fav && !cur && (
-                  <text fg={isSelected ? theme.background : theme.warning} content="★" />
-                )}
-                <text
-                  attributes={isSelected ? TextAttributes.BOLD : undefined}
-                  fg={isSelected ? theme.background : theme.text}
-                  content={model.name}
-                  wrapMode="none"
-                />
+              {sectionLabel !== "" && (
+                <box paddingTop={optionIndex > 0 ? 1 : 0} paddingLeft={3}>
+                  <text attributes={TextAttributes.BOLD} fg={theme.accent} content={sectionLabel} />
+                </box>
+              )}
+              <box
+                flexDirection="row"
+                paddingLeft={3}
+                paddingRight={2}
+                backgroundColor={isSelected ? theme.accent : undefined}
+              >
+                <box flexDirection="row" gap={1} flexGrow={1}>
+                  {isCurrent && (
+                    <text fg={isSelected ? theme.background : theme.accent} content="●" />
+                  )}
+                  {fav && !isCurrent && (
+                    <text fg={isSelected ? theme.background : theme.warning} content="★" />
+                  )}
+                  <text
+                    attributes={isSelected ? TextAttributes.BOLD : undefined}
+                    fg={isSelected ? theme.background : theme.text}
+                    content={displayOption.modelInfo.name}
+                    wrapMode="none"
+                  />
+                </box>
               </box>
             </box>
           );
         })}
-        {modelOptions.length === 0 && (
-          <box paddingLeft={3}>
-            <text fg={theme.textMuted} content="No models found" />
-          </box>
-        )}
       </scrollbox>
       <box paddingX={4} paddingTop={1} flexDirection="row" gap={2}>
         <box flexDirection="row" gap={1}>
