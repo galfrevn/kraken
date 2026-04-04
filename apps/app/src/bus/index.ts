@@ -69,6 +69,10 @@ export const Events = {
   Todo: {
     Updated: "todo.updated",
   },
+  Lsp: {
+    ServerStarted: "lsp.server.started",
+    DiagnosticsUpdated: "lsp.diagnostics.updated",
+  },
   Daemon: {
     TaskStarted: "daemon.task.started",
     TaskCompleted: "daemon.task.completed",

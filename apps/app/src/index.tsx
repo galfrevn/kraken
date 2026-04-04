@@ -5,6 +5,7 @@ import { startServer } from "@/server/server.ts";
 import { initializeBuiltinTools } from "@/tool/registry.ts";
 import { initializeAgents, applyAgentConfigOverrides } from "@/agent/agent.ts";
 import { initializeMcpServers, shutdownMcpServers } from "@/mcp/index.ts";
+import { initializeLsp, shutdownLsp } from "@/lsp/manager.ts";
 import { startDaemonEventBridge, stopDaemonEventBridge } from "@/daemon/events.ts";
 import { loadConfig } from "@/config/index.ts";
 import { Session } from "@/session/index.ts";
@@ -74,9 +75,12 @@ async function main(): Promise<void> {
     console.warn("[mcp] background init failed:", error);
   });
 
+  initializeLsp(config.lsp);
+
   process.on("exit", () => {
     stopDaemonEventBridge();
     shutdownMcpServers().catch(() => {});
+    shutdownLsp().catch(() => {});
   });
 
   const renderer = await createCliRenderer({

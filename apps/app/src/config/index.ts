@@ -45,6 +45,19 @@ const configSchema = z.object({
   daemonUrl: z.string().default("http://localhost:50051"),
   embeddingModel: z.string().default("openai/text-embedding-3-small"),
   agents: z.record(z.string(), agentConfigSchema).default({}),
+  lsp: z
+    .union([
+      z.literal(false),
+      z.record(
+        z.string(),
+        z.object({
+          enabled: z.boolean().optional(),
+          command: z.array(z.string()).optional(),
+          extensions: z.array(z.string()).optional(),
+        }),
+      ),
+    ])
+    .default({}),
 });
 
 export type KrakenConfig = z.infer<typeof configSchema>;

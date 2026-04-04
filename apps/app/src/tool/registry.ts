@@ -1,6 +1,8 @@
 import { tool as vercelTool } from "ai";
 import type { ToolDefinition } from "@/tool/tool.ts";
+import type { ToolResult } from "@/tool/tool.ts";
 import { logToolCall } from "@/audit/index.ts";
+import { getLspManager, formatDiagnostics } from "@/lsp/manager.ts";
 
 const registeredTools = new Map<string, ToolDefinition>();
 const sessionToolCallCounts = new Map<string, number>();
@@ -20,6 +22,8 @@ export function resolveToolsForAiSdk(context: {
   messageId: string;
   workingDirectory: string;
   abortSignal: AbortSignal;
+  channelType?: string;
+  channelChatId?: string;
 }) {
   const resolvedTools: Record<string, ReturnType<typeof vercelTool>> = {};
 
@@ -58,6 +62,26 @@ export function resolveToolsForAiSdk(context: {
             errorMessage,
             durationMs,
           });
+        }
+
+        if ((toolId === "edit" || toolId === "write") && result) {
+          const toolResult = result as ToolResult;
+          const filePath = toolResult.metadata?.path as string | undefined;
+          if (filePath) {
+            try {
+              const lsp = getLspManager();
+              if (lsp) {
+                await lsp.notifyFileChanged(filePath);
+                const diagnostics = await lsp.getDiagnosticsForFile(filePath, { waitMs: 1500 });
+                const formatted = formatDiagnostics(filePath, diagnostics);
+                if (formatted) {
+                  toolResult.content += formatted;
+                }
+              }
+            } catch {
+              // LSP errors should never break the tool
+            }
+          }
         }
 
         return result;

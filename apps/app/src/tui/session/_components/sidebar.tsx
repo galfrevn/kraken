@@ -2,10 +2,13 @@ import { readFileSync } from "fs";
 import { spawnSync } from "child_process";
 import { resolve, dirname } from "path";
 import { fileURLToPath } from "url";
+import { useState, useEffect } from "react";
 import { TextAttributes } from "@opentui/core";
 import { useTheme } from "@/tui/_context/theme.tsx";
 import { useDaemonStatus } from "@/daemon/status.tsx";
 import { TodoDisplay } from "@/tui/session/_components/todo.tsx";
+import { Bus, Events } from "@/bus/index.ts";
+import { getLspManager } from "@/lsp/manager.ts";
 
 const SIDEBAR_WIDTH = 42;
 const currentFileDirectory = dirname(fileURLToPath(import.meta.url));
@@ -63,6 +66,16 @@ export const Sidebar = ({
 }: SidebarProperties) => {
   const { theme } = useTheme();
   const daemonStatus = useDaemonStatus();
+  const [activeServers, setActiveServers] = useState<string[]>(
+    () => getLspManager()?.getActiveServers() ?? [],
+  );
+
+  useEffect(() => {
+    const subscription = Bus.subscribe(Events.Lsp.ServerStarted, () => {
+      setActiveServers(getLspManager()?.getActiveServers() ?? []);
+    });
+    return () => subscription.unsubscribe();
+  }, []);
 
   const homeDirectory = process.env.HOME ?? process.env.USERPROFILE ?? "";
   const currentDirectory = process.cwd();
@@ -102,7 +115,16 @@ export const Sidebar = ({
 
       <box flexDirection="column" marginTop={1}>
         <text fg={theme.text} attributes={TextAttributes.BOLD} content="LSP" />
-        <text fg={theme.textMuted} content="LSPs will activate as files are read" />
+        {activeServers.length > 0 ? (
+          activeServers.map((server) => (
+            <text key={server}>
+              <span fg={theme.success}>● </span>
+              <span fg={theme.textMuted}>{server}</span>
+            </text>
+          ))
+        ) : (
+          <text fg={theme.textMuted} content="activates on first edit" />
+        )}
       </box>
 
       {todos && todos.length > 0 && <TodoDisplay todos={todos} agentColor={agentColor} />}
