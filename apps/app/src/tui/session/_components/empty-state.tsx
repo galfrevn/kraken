@@ -1,12 +1,6 @@
 import { useMemo } from "react";
 import { useTheme } from "@/tui/_context/theme.tsx";
 
-const LOGO_LINES = [
-  "█░░█ █▀▀▄ ▄▀▀▄ █░░█ █▀▀▀ █▀▀▄   █▀▀▀ █▀▀█ █▀▀▄ █▀▀▀",
-  "█▀▀░ █▀▀░ █▀▀█ █▀▀░ █▀▀░ █░░█   █░░░ █░░█ █░░█ █▀▀░",
-  "█░░█ █░░█ █░░█ █░░█ ████ █  █   ████ ████ ████ ████",
-];
-
 const TIPS = [
   "Use {h}kraken task create{/h} to queue a new task for the daemon",
   "Use {h}kraken task list{/h} to see pending and running tasks",
@@ -44,14 +38,6 @@ export const EmptyState = () => {
 
   return (
     <box flexDirection="column" alignItems="center" justifyContent="center" flexGrow={1}>
-      <box flexDirection="column" alignItems="center">
-        {LOGO_LINES.map((line, i) => (
-          <text key={i} fg={theme.accent} content={line} />
-        ))}
-      </box>
-
-      <box height={2} />
-
       <text fg={theme.textMuted} content="Ask anything to get started." />
 
       <box height={1} />

@@ -35,6 +35,16 @@ export const Home = () => {
   const [currentAgentIndex, setCurrentAgentIndex] = useState(0);
   const currentAgent = primaryAgents[currentAgentIndex] ?? primaryAgents[0]!;
   const currentAgentColor = resolveAgentColor(currentAgent.color, theme);
+  const [isDialogOpen, setIsDialogOpen] = useState(false);
+
+  const openDialog = useCallback(async <T,>(fn: () => Promise<T>): Promise<T> => {
+    setIsDialogOpen(true);
+    try {
+      return await fn();
+    } finally {
+      setIsDialogOpen(false);
+    }
+  }, []);
 
   const handleToggleAgent = useCallback(() => {
     setCurrentAgentIndex((prev) => (prev + 1) % primaryAgents.length);
@@ -48,7 +58,7 @@ export const Home = () => {
         description: "Resume a previous conversation",
         slash: { name: "sessions", aliases: ["resume", "continue"] },
         onSelect: () => {
-          (async () => {
+          openDialog(async () => {
             const selectedSession = await dialog.choice<{ id: string }>({
               content: (choiceContext) => (
                 <SessionPickerContent {...choiceContext} sdk={sdk} theme={theme} />
@@ -58,7 +68,7 @@ export const Home = () => {
             if (selectedSession) {
               route.goToSession(selectedSession.id);
             }
-          })().catch(() => {});
+          }).catch(() => {});
         },
       },
       {
@@ -67,7 +77,7 @@ export const Home = () => {
         description: "Open the model picker",
         slash: { name: "model" },
         onSelect: () => {
-          (async () => {
+          openDialog(async () => {
             const selectedModelResult = await dialog.choice<ModelSelection>({
               content: (choiceContext) => <ModelPickerContent {...choiceContext} />,
               size: "medium",
@@ -75,7 +85,7 @@ export const Home = () => {
             if (selectedModelResult) {
               await selectModel(selectedModelResult.modelId, selectedModelResult.providerId);
             }
-          })().catch(() => {});
+          }).catch(() => {});
         },
       },
       {
@@ -84,12 +94,12 @@ export const Home = () => {
         description: "Change the color theme",
         slash: { name: "theme", aliases: ["themes"] },
         onSelect: () => {
-          (async () => {
+          openDialog(async () => {
             await dialog.choice<string>({
               content: (choiceContext) => <ThemePickerContent {...choiceContext} />,
               size: "large",
             });
-          })().catch(() => {});
+          }).catch(() => {});
         },
       },
       {
@@ -122,7 +132,7 @@ export const Home = () => {
 
   useKeyboard((keyEvent) => {
     if (keyEvent.ctrl && keyEvent.name === "m") {
-      (async () => {
+      openDialog(async () => {
         const selectedModelResult = await dialog.choice<ModelSelection>({
           content: (choiceContext) => <ModelPickerContent {...choiceContext} />,
           size: "medium",
@@ -130,7 +140,7 @@ export const Home = () => {
         if (selectedModelResult) {
           await selectModel(selectedModelResult.modelId, selectedModelResult.providerId);
         }
-      })().catch(() => {});
+      }).catch(() => {});
     }
     if (keyEvent.ctrl && keyEvent.name === "t") {
       route.goToTasks();
@@ -169,7 +179,7 @@ export const Home = () => {
 
       <SessionPrompt
         onSubmit={handlePromptSubmit}
-        disabled={false}
+        disabled={isDialogOpen}
         isProcessing={false}
         agentName={currentAgent.name}
         agentColor={currentAgentColor}
