@@ -72,7 +72,7 @@ function createWidget(data) {
     const col = stack.addStack();
     col.layoutVertically();
     const n = col.addText(String(value || 0));
-    n.font = Font.boldMonospacedSystemFont(18);
+    n.font = Font.boldSystemFont(18);
     n.textColor = color;
     const l = col.addText(label);
     l.font = Font.systemFont(9);
@@ -102,7 +102,7 @@ function createWidget(data) {
       name.lineLimit = 1;
       r.addSpacer();
       const cost = r.addText(task.cost || "");
-      cost.font = Font.monospacedSystemFont(9);
+      cost.font = Font.regularMonospacedSystemFont(9);
       cost.textColor = COLORS.muted;
       w.addSpacer(2);
     }

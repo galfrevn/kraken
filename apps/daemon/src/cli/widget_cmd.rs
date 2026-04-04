@@ -19,8 +19,10 @@ pub async fn execute(
     match command {
         WidgetCommands::Setup => handle_setup(json_mode).await,
         WidgetCommands::Status => handle_status(json_mode).await,
-        WidgetCommands::Tunnel => handle_tunnel(json_mode).await,
-        WidgetCommands::TunnelStop => handle_tunnel_stop(json_mode).await,
+        WidgetCommands::Tunnel(sub) => match sub {
+            super::TunnelCommands::Start => handle_tunnel(json_mode).await,
+            super::TunnelCommands::Stop => handle_tunnel_stop(json_mode).await,
+        },
     }
 }
 
@@ -358,7 +360,7 @@ async fn handle_tunnel(_json_mode: bool) -> Result<(), Box<dyn std::error::Error
             println!("  {} {}", style("→").dim(), style(&url).cyan());
             println!(
                 "\n  Stop with: {}",
-                style("kraken widget tunnel-stop").cyan()
+                style("kraken widget tunnel stop").cyan()
             );
             return Ok(());
         }

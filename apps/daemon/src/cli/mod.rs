@@ -493,9 +493,15 @@ pub enum WidgetCommands {
     Setup,
     /// Show current widget status and tunnel info
     Status,
-    /// Start a Cloudflare tunnel in the background
-    Tunnel,
+    /// Manage the Cloudflare tunnel
+    #[command(subcommand)]
+    Tunnel(TunnelCommands),
+}
+
+#[derive(Subcommand)]
+pub enum TunnelCommands {
+    /// Start the tunnel in background
+    Start,
     /// Stop the running tunnel
-    #[command(name = "tunnel-stop")]
-    TunnelStop,
+    Stop,
 }
