@@ -26,6 +26,7 @@ import type { PermissionRequest } from "@/tool/permission.ts";
 import { addAllowRule } from "@/tool/permission-allowlist.ts";
 import type { FileChange } from "@/tui/session/_components/files-sidebar.tsx";
 import { getSkillSlashCommands, loadSkillByName, formatSkillContent } from "@/skill/index.ts";
+import { CommandPalette } from "@/tui/session/_components/command-palette.tsx";
 import { getPrimaryAgents, type AgentColor } from "@/agent/agent.ts";
 import type { ThemeColors } from "@/tui/_context/theme.tsx";
 
@@ -144,6 +145,7 @@ export const Session = () => {
   const [modifiedFiles, setModifiedFiles] = useState<FileChange[]>([]);
   const [revertedMessages, setRevertedMessages] = useState<DisplayMessage[]>([]);
   const [pendingPermission, setPendingPermission] = useState<PermissionRequest | null>(null);
+  const [commandPaletteOpen, setCommandPaletteOpen] = useState(false);
 
   const primaryAgents = getPrimaryAgents();
   const [currentAgentIndex, setCurrentAgentIndex] = useState(0);
@@ -302,6 +304,9 @@ export const Session = () => {
   useKeyboard((keyEvent) => {
     if (keyEvent.ctrl && keyEvent.name === "m") {
       openModelPicker();
+    }
+    if (keyEvent.ctrl && keyEvent.name === "p") {
+      setCommandPaletteOpen(true);
     }
     if (keyEvent.ctrl && keyEvent.name === "c") {
       renderer.destroy();
@@ -887,7 +892,9 @@ export const Session = () => {
         )}
       </scrollbox>
 
-      {pendingPermission ? (
+      {commandPaletteOpen ? (
+        <CommandPalette onClose={() => setCommandPaletteOpen(false)} />
+      ) : pendingPermission ? (
         <PermissionPrompt
           request={pendingPermission}
           agentColor={currentAgentColor}
