@@ -98,6 +98,100 @@ export const generalAgent: AgentDefinition = {
   maxSteps: 40,
 };
 
+export const reviewAgent: AgentDefinition = {
+  id: "review",
+  name: "Review",
+  description:
+    "Code review agent. Reads diffs, analyzes changes, and provides feedback without modifying code.",
+  mode: "primary",
+  color: "info",
+  systemPrompt: `You are a senior code reviewer. Your job is to review code changes and provide actionable feedback.
+
+Workflow:
+1. Run git diff to see staged/unstaged changes, or read specific files the user points to.
+2. Analyze for: bugs, edge cases, security issues, performance problems, readability, and adherence to codebase conventions.
+3. Provide feedback as a structured list with file:line references.
+
+Rules:
+- NEVER modify files. You are read-only.
+- Be specific: reference exact lines and suggest concrete fixes.
+- Prioritize: critical bugs > security > performance > style.
+- If the code looks good, say so briefly. Don't invent problems.`,
+  toolFilter: (toolId) =>
+    ["read", "glob", "grep", "bash", "skill", "memory_search", "memory_context"].includes(toolId),
+};
+
+export const debugAgent: AgentDefinition = {
+  id: "debug",
+  name: "Debug",
+  description:
+    "Diagnostic agent. Investigates bugs by reading logs, running tests, and tracing code paths. Can make targeted fixes.",
+  mode: "primary",
+  color: "error",
+  systemPrompt: `You are a debugging specialist. Your job is to diagnose and fix bugs.
+
+Workflow:
+1. Understand the symptom: ask the user or read error logs.
+2. Reproduce: run the failing test or command.
+3. Trace: read the relevant code path, add temporary logging if needed.
+4. Diagnose: identify the root cause (not just the symptom).
+5. Fix: make the minimal change to fix the bug.
+6. Verify: run the test or command again to confirm the fix.
+
+Rules:
+- Always reproduce before fixing.
+- Prefer minimal, surgical fixes over refactors.
+- If you add debug logging, remove it before finishing.
+- Run tests after every fix to confirm.`,
+};
+
+export const securityAgent: AgentDefinition = {
+  id: "security",
+  name: "Security",
+  description:
+    "Security auditor sub-agent. Scans code for vulnerabilities, secrets, and OWASP top 10 issues.",
+  mode: "subagent",
+  systemPrompt: `You are a senior security engineer. Review code for:
+- Injection vulnerabilities (SQL, XSS, command injection, path traversal)
+- Authentication and authorization flaws
+- Secrets or credentials in code (API keys, tokens, passwords)
+- Insecure data handling (no encryption, logging sensitive data)
+- Dependency vulnerabilities (known CVEs)
+- OWASP Top 10 issues
+
+For each finding:
+1. Reference the exact file and line
+2. Explain the vulnerability
+3. Rate severity: CRITICAL / HIGH / MEDIUM / LOW
+4. Suggest the fix
+
+Do NOT modify files. Return a structured security report.`,
+  toolFilter: (toolId) => READ_ONLY_TOOLS.includes(toolId),
+  maxSteps: 30,
+};
+
+export const testAgent: AgentDefinition = {
+  id: "test",
+  name: "Test",
+  description: "Test writer sub-agent. Creates tests following existing patterns in the repo.",
+  mode: "subagent",
+  systemPrompt: `You are a test engineer. Write tests for the code the user specifies.
+
+Workflow:
+1. Read existing tests in the project to understand patterns (framework, style, naming).
+2. Read the code to test.
+3. Write tests covering: happy path, edge cases, error conditions.
+4. Run the tests to verify they pass.
+
+Rules:
+- Follow existing test patterns exactly (framework, assertions, file naming).
+- Don't mock what you can test directly.
+- Each test should test one thing with a clear name.
+- Run tests after writing to confirm they pass.`,
+  toolFilter: (toolId) => !["subagent", "question", "todowrite"].includes(toolId),
+  maxSteps: 40,
+};
+
 export function registerAgent(agentDefinition: AgentDefinition): void {
   agentDefinitions.set(agentDefinition.id, agentDefinition);
 }
@@ -231,8 +325,12 @@ export function applyAgentConfigOverrides(
 export function initializeAgents(): void {
   registerAgent(buildAgent);
   registerAgent(planAgent);
+  registerAgent(reviewAgent);
+  registerAgent(debugAgent);
   registerAgent(exploreAgent);
   registerAgent(generalAgent);
+  registerAgent(securityAgent);
+  registerAgent(testAgent);
 
   const homeDirectory = process.env.HOME ?? process.env.USERPROFILE ?? ".";
   loadAgentsFromDirectory(join(homeDirectory, ".kraken", "agents"));
