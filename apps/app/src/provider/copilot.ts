@@ -3,7 +3,7 @@ import type { LanguageModelV1 } from "ai";
 import { loadAuth, saveAuth, hasAuth } from "./auth.ts";
 import type { ModelInfo } from "@/models/types.ts";
 
-const COPILOT_CLIENT_ID = "Ov23li8tweQw6odWQebz";
+const COPILOT_CLIENT_ID = "Ov23lin9Z7AKpqkbBnc3";
 const COPILOT_BASE_URL = "https://api.githubcopilot.com";
 const DEVICE_CODE_URL = "https://github.com/login/device/code";
 const ACCESS_TOKEN_URL = "https://github.com/login/oauth/access_token";
