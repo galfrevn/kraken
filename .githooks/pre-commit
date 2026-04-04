@@ -1,6 +1,5 @@
 #!/bin/sh
 
-# Get staged TS/JS files only (oxfmt crashes on JSON, YAML, MD)
 STAGED_FILES=$(git diff --cached --name-only --diff-filter=ACMR -- '*.ts' '*.tsx' '*.js' '*.jsx')
 
 if [ -z "$STAGED_FILES" ]; then
