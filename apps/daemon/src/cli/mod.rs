@@ -493,4 +493,6 @@ pub enum WidgetCommands {
     Setup,
     /// Show current widget status and tunnel instructions
     Status,
+    /// Start a Cloudflare tunnel to expose the daemon API
+    Tunnel,
 }

@@ -1,11 +1,16 @@
+use std::process::Command;
+
 use console::style;
 use dialoguer::Password;
+use tracing::info;
 
 use crate::cli::env_helpers::save_secret_to_env_file;
 use crate::cli::output::output_error;
 use crate::daemon::config::DaemonConfig;
 
 use super::WidgetCommands;
+
+const WIDGET_SCRIPT_FILENAME: &str = "kraken-widget.js";
 
 pub async fn execute(
     command: WidgetCommands,
@@ -14,7 +19,28 @@ pub async fn execute(
     match command {
         WidgetCommands::Setup => handle_setup(json_mode).await,
         WidgetCommands::Status => handle_status(json_mode).await,
+        WidgetCommands::Tunnel => handle_tunnel(json_mode).await,
     }
+}
+
+fn kraken_dir() -> std::path::PathBuf {
+    dirs_next::home_dir().unwrap_or_default().join(".kraken")
+}
+
+fn ensure_widget_script() -> std::path::PathBuf {
+    let widget_dir = kraken_dir().join("widget");
+    let script_path = widget_dir.join(WIDGET_SCRIPT_FILENAME);
+
+    if !script_path.exists() {
+        let _ = std::fs::create_dir_all(&widget_dir);
+        let _ = std::fs::write(
+            &script_path,
+            include_str!("../../../../scripts/widget/kraken-widget.js"),
+        );
+        info!("widget script written to {}", script_path.display());
+    }
+
+    script_path
 }
 
 async fn handle_setup(json_mode: bool) -> Result<(), Box<dyn std::error::Error>> {
@@ -67,6 +93,13 @@ async fn handle_setup(json_mode: bool) -> Result<(), Box<dyn std::error::Error>>
         style(config_path.display()).cyan()
     );
 
+    let script_path = ensure_widget_script();
+    println!(
+        "  {} Scriptable widget at {}",
+        style("✓").green().bold(),
+        style(script_path.display()).cyan()
+    );
+
     let daemon_port = DaemonConfig::load(None)
         .map(|c| c.services.daemon_port)
         .unwrap_or(50051);
@@ -95,11 +128,14 @@ async fn handle_setup(json_mode: bool) -> Result<(), Box<dyn std::error::Error>>
     }
 
     println!("\n{}", style("Next steps:").bold());
-    println!("  1. Start a tunnel:  ./scripts/widget/tunnel.sh");
+    println!(
+        "  1. Start a tunnel:        {}",
+        style("kraken widget tunnel").cyan()
+    );
     println!("  2. Copy the tunnel URL");
     println!(
         "  3. Open {} in Scriptable on your iPhone",
-        style("scripts/widget/kraken-widget.js").cyan()
+        style(script_path.display()).cyan()
     );
     println!("  4. Set KRAKEN_URL and KRAKEN_TOKEN in the script");
     println!("  5. Add a Scriptable widget to your home screen\n");
@@ -147,11 +183,75 @@ async fn handle_status(json_mode: bool) -> Result<(), Box<dyn std::error::Error>
         style("●").green(),
         style("enabled").green()
     );
+
+    let script_path = ensure_widget_script();
     println!(
-        "  {} Start a tunnel: {}",
+        "  {} Scriptable script: {}",
         style("→").dim(),
-        style("./scripts/widget/tunnel.sh").cyan()
+        style(script_path.display()).cyan()
     );
+    println!(
+        "  {} Start a tunnel:    {}",
+        style("→").dim(),
+        style("kraken widget tunnel").cyan()
+    );
+
+    Ok(())
+}
+
+async fn handle_tunnel(json_mode: bool) -> Result<(), Box<dyn std::error::Error>> {
+    if json_mode {
+        return Err("tunnel requires interactive mode".into());
+    }
+
+    if Command::new("cloudflared")
+        .arg("--version")
+        .output()
+        .is_err()
+    {
+        println!(
+            "\n  {} cloudflared not found. Install it:",
+            style("!").red().bold()
+        );
+        println!(
+            "    macOS:  {}",
+            style("brew install cloudflare/cloudflare/cloudflared").cyan()
+        );
+        println!(
+            "    Linux:  {}",
+            style("sudo apt install cloudflared").cyan()
+        );
+        return Err("cloudflared not installed".into());
+    }
+
+    let daemon_port = DaemonConfig::load(None)
+        .map(|c| c.services.daemon_port)
+        .unwrap_or(50051);
+
+    println!(
+        "\n  {} Starting tunnel to localhost:{}...",
+        style("●").green().bold(),
+        daemon_port
+    );
+    println!(
+        "  {} The public URL will appear below. Use it in the Scriptable widget.",
+        style("→").dim()
+    );
+    println!(
+        "  {} Press {} to stop.\n",
+        style("→").dim(),
+        style("Ctrl+C").bold()
+    );
+
+    let status = Command::new("cloudflared")
+        .arg("tunnel")
+        .arg("--url")
+        .arg(format!("http://localhost:{daemon_port}"))
+        .status()?;
+
+    if !status.success() {
+        return Err("cloudflared exited with error".into());
+    }
 
     Ok(())
 }
