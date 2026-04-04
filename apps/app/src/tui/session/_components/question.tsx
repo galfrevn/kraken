@@ -1,6 +1,7 @@
 import { useState, useEffect } from "react";
 import { useKeyboard } from "@opentui/react";
 import { useTheme } from "@/tui/_context/theme.tsx";
+import { EMPTY_BORDER_CHARACTERS } from "@/tui/_theme/borders.ts";
 
 interface QuestionOption {
   label: string;
@@ -47,6 +48,7 @@ export const QuestionPrompt = ({
     }
     return initial;
   });
+
   const [selections, setSelections] = useState<Record<string, Set<string>>>(() => {
     const initial: Record<string, Set<string>> = {};
     for (const q of questions) {
@@ -62,6 +64,7 @@ export const QuestionPrompt = ({
       ? [...currentQuestion.options, { label: "Type your own answer", description: "" }]
       : currentQuestion.options
     : [];
+
   const currentSelections = currentQuestion ? selections[currentQuestion.id]! : new Set<string>();
   const isSingleImmediateSubmit =
     questions.length === 1 && !questions[0]!.multiple && questions[0]!.custom === false;
@@ -235,120 +238,118 @@ export const QuestionPrompt = ({
     <box flexDirection="column" flexShrink={0} marginTop={1}>
       {hasMultipleQuestions && (
         <box flexDirection="row" gap={2} marginBottom={1} paddingLeft={3}>
-          {questions.map((q, index) => (
-            <text
-              key={q.id}
-              fg={index === activeTab ? color : theme.textMuted}
-              content={`${index + 1}. ${q.header}`}
-            />
-          ))}
-          <text fg={activeTab === questions.length ? color : theme.textMuted} content="✓ Confirm" />
+          {questions.map((q, index) => {
+            const isActive = index === activeTab;
+            return isActive ? (
+              <text key={q.id} fg="black" bg={color} content={` ${q.header} `} />
+            ) : (
+              <text key={q.id} fg={theme.textMuted} content={q.header} />
+            );
+          })}
+          {(() => {
+            const isActive = activeTab === questions.length;
+            return isActive ? (
+              <text fg="black" bg={color} content=" Confirm " />
+            ) : (
+              <text fg={theme.textMuted} content="Confirm" />
+            );
+          })()}
         </box>
       )}
 
       <box
-        flexDirection="column"
-        border={["left"]}
+        border={["left"] as const}
         borderColor={color}
-        paddingLeft={2}
-        paddingRight={2}
-        paddingY={1}
+        customBorderChars={{
+          ...EMPTY_BORDER_CHARACTERS,
+          vertical: "┃",
+          bottomLeft: "╹",
+        }}
+        backgroundColor={theme.backgroundElement}
       >
-        {isConfirmTab ? (
-          <box flexDirection="column">
-            <text fg={theme.text} content="Review your answers:" />
-            <box height={1} />
-            {questions.map((q) => {
-              const selected = selections[q.id]!;
-              const customText = customTexts[q.id] ?? "";
-              const values = Array.from(selected).map((v) =>
-                v === CUSTOM_OPTION_VALUE && customText.trim() ? customText.trim() : v,
-              );
-              const display =
-                values.length > 0 ? values.join(", ") : (q.options[0]?.label ?? "(none)");
-              return (
-                <box key={q.id} flexDirection="column" marginBottom={1}>
-                  <text fg={theme.textMuted} content={q.header} />
-                  <text fg={color} content={`  ${display}`} />
-                </box>
-              );
-            })}
-          </box>
-        ) : (
-          <>
-            <text fg={theme.text} content={currentQuestion!.question} />
-            <box height={1} />
-            {optionsWithCustom.map((option, index) => {
-              const isCustomSlot =
-                index === currentQuestion!.options.length && currentQuestion!.custom !== false;
-              const optionValue = isCustomSlot ? CUSTOM_OPTION_VALUE : option.label;
-              const isSelected = currentSelections.has(optionValue);
-              const isCursorHere = index === cursor;
-
-              const icon = currentQuestion!.multiple
-                ? isSelected
-                  ? "[✓]"
-                  : "[ ]"
-                : isSelected
-                  ? "◉"
-                  : "○";
-
-              const iconColor = isSelected ? color : theme.textMuted;
-              const labelColor = isCursorHere ? theme.text : theme.textMuted;
-              const prefix = isCursorHere ? "▸ " : "  ";
-              const numberHint = index < 9 ? `${index + 1}. ` : "   ";
-
-              return (
-                <box key={`${optionValue}-${index}`} flexDirection="column">
-                  <box flexDirection="row" gap={1}>
-                    <text fg={iconColor} content={icon} />
-                    <text fg={labelColor} content={`${prefix}${numberHint}${option.label}`} />
+        <box flexDirection="column" paddingLeft={2} paddingRight={2} paddingY={1}>
+          {isConfirmTab ? (
+            <box flexDirection="column">
+              <text fg={theme.text} content="Review your answers:" />
+              <box height={1} />
+              {questions.map((q) => {
+                const selected = selections[q.id]!;
+                const customText = customTexts[q.id] ?? "";
+                const values = Array.from(selected).map((v) =>
+                  v === CUSTOM_OPTION_VALUE && customText.trim() ? customText.trim() : v,
+                );
+                const display =
+                  values.length > 0 ? values.join(", ") : (q.options[0]?.label ?? "(none)");
+                return (
+                  <box key={q.id} flexDirection="column" marginBottom={1}>
+                    <text fg={theme.textMuted} content={q.header} />
+                    <text fg={color} content={`  ${display}`} />
                   </box>
-                  {option.description && !isCustomSlot && (
-                    <text fg={theme.textMuted} content={`        ${option.description}`} />
-                  )}
-                  {isCustomSlot && editingCustom && isCursorHere && (
-                    <box flexDirection="row" marginLeft={4} marginTop={0}>
-                      <text fg={theme.textMuted} content="  > " />
-                      <text fg={theme.text} content={customTexts[currentQuestion!.id] ?? ""} />
-                      <text fg={color} content="▎" />
-                    </box>
-                  )}
-                </box>
-              );
-            })}
-          </>
-        )}
+                );
+              })}
+            </box>
+          ) : (
+            <>
+              <text fg={theme.text} content={currentQuestion!.question} />
+              <box height={1} />
+              {optionsWithCustom.map((option, index) => {
+                const isCustomSlot =
+                  index === currentQuestion!.options.length && currentQuestion!.custom !== false;
+                const optionValue = isCustomSlot ? CUSTOM_OPTION_VALUE : option.label;
+                const isSelected = currentSelections.has(optionValue);
+                const isCursorHere = index === cursor;
+
+                const numberHint = `${index + 1}. `;
+                const labelText = `${numberHint}${option.label}`;
+
+                return (
+                  <box key={`${optionValue}-${index}`} flexDirection="column">
+                    {isCursorHere ? (
+                      <text fg="black" bg={color} content={`${labelText}`} />
+                    ) : (
+                      <text fg={isSelected ? theme.text : theme.textMuted} content={labelText} />
+                    )}
+                    {option.description && !isCustomSlot && (
+                      <text fg={theme.textMuted} content={`   ${option.description}`} />
+                    )}
+                    {isCustomSlot && editingCustom && isCursorHere && (
+                      <box flexDirection="row" marginLeft={2} marginTop={0}>
+                        <text fg={theme.textMuted} content=" " />
+                        {customTexts[currentQuestion!.id] && (
+                          <text fg={theme.text} content={customTexts[currentQuestion!.id] ?? ""} />
+                        )}
+                        <text fg={color} content="▎" />
+                      </box>
+                    )}
+                  </box>
+                );
+              })}
+            </>
+          )}
+        </box>
       </box>
 
       <box flexDirection="row" gap={2} paddingLeft={3} marginTop={1}>
         {!editingCustom ? (
           <>
+            {hasMultipleQuestions && (
+              <box flexDirection="row" gap={1}>
+                <text fg={theme.text} content="⇆" />
+                <text fg={theme.textMuted} content="tab" />
+              </box>
+            )}
             <box flexDirection="row" gap={1}>
               <text fg={theme.text} content="↑↓" />
-              <text fg={theme.textMuted} content="navigate" />
-            </box>
-            <box flexDirection="row" gap={1}>
-              <text fg={theme.text} content="1-9" />
               <text fg={theme.textMuted} content="select" />
             </box>
             <box flexDirection="row" gap={1}>
               <text fg={theme.text} content="enter" />
-              <text
-                fg={theme.textMuted}
-                content={isConfirmTab || !hasMultipleQuestions ? "confirm" : "select"}
-              />
+              <text fg={theme.textMuted} content="confirm" />
             </box>
             <box flexDirection="row" gap={1}>
               <text fg={theme.text} content="esc" />
               <text fg={theme.textMuted} content="dismiss" />
             </box>
-            {hasMultipleQuestions && (
-              <box flexDirection="row" gap={1}>
-                <text fg={theme.text} content="tab" />
-                <text fg={theme.textMuted} content="next" />
-              </box>
-            )}
           </>
         ) : (
           <>
