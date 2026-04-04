@@ -238,7 +238,7 @@ export const ModelPickerContent = ({ resolve }: ModelPickerContentProperties) =>
               paddingRight={2}
               backgroundColor={isSelected ? theme.accent : undefined}
             >
-              <box flexDirection="row" gap={1}>
+              <box flexDirection="row" gap={1} flexGrow={1}>
                 {cur && <text fg={isSelected ? theme.background : theme.accent} content="●" />}
                 {fav && !cur && (
                   <text fg={isSelected ? theme.background : theme.warning} content="★" />
@@ -247,13 +247,9 @@ export const ModelPickerContent = ({ resolve }: ModelPickerContentProperties) =>
                   attributes={isSelected ? TextAttributes.BOLD : undefined}
                   fg={isSelected ? theme.background : theme.text}
                   content={model.name}
+                  wrapMode="none"
                 />
               </box>
-              <text
-                fg={isSelected ? theme.background : theme.textMuted}
-                content={model.id}
-                flexShrink={0}
-              />
             </box>
           );
         })}
