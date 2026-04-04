@@ -103,11 +103,19 @@ function runMigrations(db: BunDatabase): void {
 
   const migrations: Array<{ version: number; sql: string }> = [
     { version: 1, sql: "ALTER TABLE session ADD COLUMN parent_id TEXT" },
+    { version: 2, sql: "ALTER TABLE session ADD COLUMN summary_message_id TEXT" },
   ];
 
   for (const migration of migrations) {
     if (appliedVersions.has(migration.version)) continue;
-    db.exec(migration.sql);
+    try {
+      db.exec(migration.sql);
+    } catch (migrationError: unknown) {
+      const errorMessage = migrationError instanceof Error ? migrationError.message : "";
+      if (!errorMessage.includes("duplicate column name")) {
+        throw migrationError;
+      }
+    }
     db.exec(`INSERT INTO schema_migrations (version) VALUES (${migration.version})`);
   }
 }

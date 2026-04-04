@@ -57,7 +57,7 @@ export class DaemonClient {
     this.audit = new AuditApi(request);
   }
 
-  private async request<T>(
+  async request<T>(
     method: string,
     path: string,
     body?: unknown,
@@ -101,6 +101,14 @@ export class DaemonClient {
 
   async schedule(data: ScheduleRequest): Promise<ScheduleResponse> {
     return this.request("POST", "/api/schedule", data);
+  }
+
+  async sendToChannel(data: {
+    channel: string;
+    chatId: string;
+    message: string;
+  }): Promise<{ status: string }> {
+    return this.request("POST", "/api/channels/send", data);
   }
 
   async stats(params?: StatsParams): Promise<StatsResponse> {

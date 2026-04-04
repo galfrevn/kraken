@@ -43,6 +43,8 @@ export const Events = {
     Created: "session.created",
     Updated: "session.updated",
     Deleted: "session.deleted",
+    Compacting: "session.compacting",
+    Compacted: "session.compacted",
   },
   Message: {
     Created: "message.created",

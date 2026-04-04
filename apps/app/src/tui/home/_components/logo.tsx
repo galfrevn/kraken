@@ -1,11 +1,19 @@
 import { useTheme } from "@/tui/_context/theme.tsx";
 
+const LOGO_LINES = [
+  "█░░█ █▀▀▄ ▄▀▀▄ █░░█ █▀▀▀ █▀▀▄   █▀▀▀ █▀▀█ █▀▀▄ █▀▀▀",
+  "█▀▀░ █▀▀░ █▀▀█ █▀▀░ █▀▀░ █░░█   █░░░ █░░█ █░░█ █▀▀░",
+  "█░░█ █░░█ █░░█ █░░█ ████ █  █   ████ ████ ████ ████",
+];
+
 export const Logo = () => {
   const { theme } = useTheme();
 
   return (
-    <box alignItems="center">
-      <ascii-font text="kraken" style={{ font: "tiny" }} color={theme.primary} />
+    <box flexDirection="column" alignItems="center">
+      {LOGO_LINES.map((line, i) => (
+        <text key={i} fg={theme.accent} content={line} />
+      ))}
     </box>
   );
 };

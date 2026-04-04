@@ -172,7 +172,7 @@ export const ToolCallDisplay = ({
         paddingLeft={3}
         flexShrink={0}
         border={["left"] as const}
-        customBorderChars={{ ...EMPTY_BORDER_CHARACTERS, vertical: "│" }}
+        customBorderChars={{ ...EMPTY_BORDER_CHARACTERS, vertical: "┃" }}
         borderColor={isRunning ? theme.warning : theme.borderSubtle}
         onMouseUp={
           childSessionId && onNavigateToSession

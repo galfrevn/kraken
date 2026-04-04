@@ -1,4 +1,4 @@
-import { streamText } from "ai";
+import { streamText, generateText } from "ai";
 import { resolveLanguageModel } from "@/provider/index.ts";
 import { resolveToolsForAiSdk } from "@/tool/registry.ts";
 import { buildSystemPrompt } from "@/agent/prompt.ts";
@@ -55,4 +55,25 @@ export async function streamLlm(options: StreamLlmOptions) {
     maxTokens: config.maxTokens,
     abortSignal: options.abortSignal,
   });
+}
+
+interface GeneratePlainOptions {
+  system: string;
+  messages: CoreMessage[];
+  agentId?: string;
+}
+
+export async function generatePlainText(options: GeneratePlainOptions): Promise<string> {
+  const agentDefinition = options.agentId ? getAgent(options.agentId) : undefined;
+  const languageModel = resolveLanguageModel(agentDefinition?.model);
+
+  const result = await generateText({
+    model: languageModel,
+    system: options.system,
+    messages: options.messages,
+    temperature: 0,
+    maxTokens: 4096,
+  });
+
+  return result.text;
 }

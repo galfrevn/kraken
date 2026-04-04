@@ -62,6 +62,9 @@ pub struct DaemonConfig {
     pub repos: Vec<RepoConfig>,
 
     #[serde(default)]
+    pub github: GitHubConfig,
+
+    #[serde(default)]
     pub widget: WidgetConfig,
 }
 
@@ -107,6 +110,24 @@ pub struct RepoConfig {
     pub path: String,
     #[serde(default)]
     pub default: bool,
+}
+
+#[derive(Debug, Clone, Default, Deserialize, Serialize)]
+pub struct GitHubConfig {
+    #[serde(default)]
+    pub token: Option<String>,
+
+    #[serde(rename = "defaultRepo", default)]
+    pub default_repo: Option<String>,
+}
+
+impl GitHubConfig {
+    pub fn resolved_token(&self) -> Option<String> {
+        self.token
+            .as_ref()
+            .map(|t| substitute_environment_variables(t))
+            .filter(|t| !t.is_empty())
+    }
 }
 
 impl DaemonConfig {
@@ -1044,6 +1065,7 @@ impl Default for DaemonConfig {
             rate_limits: RateLimitsConfig::default(),
             channels: ChannelsConfig::default(),
             repos: Vec::new(),
+            github: GitHubConfig::default(),
             widget: WidgetConfig::default(),
         }
     }

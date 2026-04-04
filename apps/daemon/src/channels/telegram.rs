@@ -82,14 +82,19 @@ impl ChannelAdapter for TelegramAdapter {
         let _ = menu_bot
             .set_my_commands(vec![
                 BotCommand::new("task", "Run a background task"),
+                BotCommand::new("tasks", "List recent tasks"),
                 BotCommand::new("new", "Start a new conversation"),
-                BotCommand::new("model", "Show or change the current model"),
-                BotCommand::new("agent", "Show or switch agent (build/plan)"),
-                BotCommand::new("cost", "Show usage and costs"),
-                BotCommand::new("status", "Show daemon status"),
-                BotCommand::new("repos", "List configured repos"),
-                BotCommand::new("users", "List authorized users"),
-                BotCommand::new("help", "List all commands"),
+                BotCommand::new("model", "Show or change model"),
+                BotCommand::new("agent", "Switch agent (build/plan)"),
+                BotCommand::new("git", "Branch, status, commits"),
+                BotCommand::new("read", "Show file contents"),
+                BotCommand::new("grep", "Search code"),
+                BotCommand::new("cost", "Usage and costs"),
+                BotCommand::new("pr", "List PRs or PR details"),
+                BotCommand::new("issues", "List open issues"),
+                BotCommand::new("status", "Daemon status"),
+                BotCommand::new("repos", "Configured repos"),
+                BotCommand::new("help", "All commands"),
             ])
             .await
             .inspect_err(|e| warn!(error = %e, "failed to register bot commands"));

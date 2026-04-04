@@ -49,9 +49,15 @@ pub async fn handle_builtin_command(
         "status" => Some(handle_status(ctx.daemon_port).await),
         "users" => Some(handle_users(ctx, channel_type).await),
         "task" => Some(handle_task(ctx, &command.args, channel_type, chat_id).await),
+        "tasks" => Some(handle_tasks(ctx.daemon_port).await),
         "agent" => Some(handle_agent(ctx, &command.args, channel_type, chat_id).await),
         "repos" => Some(handle_repos(ctx.daemon_port).await),
         "cost" => Some(handle_cost(ctx.daemon_port).await),
+        "read" => Some(handle_read(&command.args).await),
+        "grep" => Some(handle_grep(&command.args).await),
+        "git" => Some(handle_git(&command.args).await),
+        "pr" => Some(handle_pr(ctx.daemon_port, &command.args).await),
+        "issues" => Some(handle_issues(ctx.daemon_port, &command.args).await),
         _ => None,
     }
 }
@@ -62,17 +68,26 @@ fn handle_help() -> String {
         "",
         "<b>Chat</b>",
         "/new — Start a new conversation",
-        "/model — Show or change current model",
-        "/agent — Show or switch agent (build/plan)",
+        "/model — Show or change model",
+        "/agent — Switch agent (build/plan)",
         "",
         "<b>Tasks</b>",
         "/task &lt;prompt&gt; — Run a background task",
-        "/cost — Show usage and costs",
+        "/tasks — List recent tasks",
+        "/cost — Usage and costs",
+        "",
+        "<b>Code</b>",
+        "/read &lt;file&gt; — Show file contents",
+        "/grep &lt;pattern&gt; [path] — Search code",
+        "/git — Branch, status, recent commits",
+        "/pr — List open PRs",
+        "/pr &lt;number&gt; — PR details",
+        "/issues — List open issues",
         "",
         "<b>System</b>",
         "/status — Daemon status",
-        "/repos — List configured repos",
-        "/users — List authorized users",
+        "/repos — Configured repos",
+        "/users — Authorized users",
         "/help — This message",
     ]
     .join("\n")
@@ -440,6 +455,378 @@ fn format_tokens(count: u64) -> String {
     } else {
         count.to_string()
     }
+}
+
+// ── /tasks — list recent tasks ────────────────────────────────────────
+
+async fn handle_tasks(daemon_port: u16) -> String {
+    let url = format!("http://127.0.0.1:{daemon_port}/api/tasks?limit=10");
+    let client = reqwest::Client::new();
+
+    match client
+        .get(&url)
+        .timeout(std::time::Duration::from_secs(3))
+        .send()
+        .await
+    {
+        Ok(response) if response.status().is_success() => {
+            if let Ok(body) = response.json::<serde_json::Value>().await {
+                let tasks = body["tasks"].as_array();
+                match tasks {
+                    Some(tasks) if tasks.is_empty() => "No tasks.".to_string(),
+                    Some(tasks) => {
+                        let mut lines = vec!["<b>Recent tasks:</b>".to_string()];
+                        for task in tasks.iter().take(10) {
+                            let status = task["status"].as_str().unwrap_or("?");
+                            let name = task["name"].as_str().unwrap_or("untitled");
+                            let id = task["id"].as_str().unwrap_or("");
+                            let short_id = &id[..8.min(id.len())];
+                            let icon = match status {
+                                "completed" => "✓",
+                                "failed" => "✗",
+                                "running" => "⏳",
+                                "pending" => "○",
+                                "cancelled" => "⊘",
+                                _ => "?",
+                            };
+                            let truncated_name = if name.len() > 50 {
+                                format!("{}...", &name[..47])
+                            } else {
+                                name.to_string()
+                            };
+                            lines
+                                .push(format!("  {icon} <code>{short_id}</code> {truncated_name}"));
+                        }
+                        lines.join("\n")
+                    }
+                    None => "No tasks found.".to_string(),
+                }
+            } else {
+                "Failed to parse tasks.".to_string()
+            }
+        }
+        _ => "Daemon is not responding.".to_string(),
+    }
+}
+
+// ── /read — show file contents ────────────────────────────────────────
+
+async fn handle_read(args: &str) -> String {
+    if args.is_empty() {
+        return "Usage: /read path/to/file".to_string();
+    }
+
+    let config = DaemonConfig::load(None).unwrap_or_default();
+    let file_path = resolve_file_path(&config, args.trim());
+
+    match std::fs::read_to_string(&file_path) {
+        Ok(contents) => {
+            let truncated = if contents.len() > 3500 {
+                format!(
+                    "{}...\n\n<i>({} lines total, showing first ~100)</i>",
+                    &contents[..3500],
+                    contents.lines().count()
+                )
+            } else {
+                contents
+            };
+            format!("<code>{}</code>", html_escape(&truncated))
+        }
+        Err(err) => format!("Failed to read {}: {err}", args.trim()),
+    }
+}
+
+// ── /grep — search code ──────────────────────────────────────────────
+
+async fn handle_grep(args: &str) -> String {
+    if args.is_empty() {
+        return "Usage: /grep pattern [path]".to_string();
+    }
+
+    let config = DaemonConfig::load(None).unwrap_or_default();
+    let (pattern, search_path) = match args.split_once(' ') {
+        Some((p, path)) => (p.trim(), path.trim()),
+        None => (args.trim(), "."),
+    };
+
+    let resolved_path = resolve_file_path(&config, search_path);
+
+    let output = std::process::Command::new("rg")
+        .args([
+            "--max-count",
+            "20",
+            "--no-heading",
+            "--line-number",
+            pattern,
+        ])
+        .arg(&resolved_path)
+        .output();
+
+    match output {
+        Ok(result) => {
+            let stdout = String::from_utf8_lossy(&result.stdout);
+            if stdout.is_empty() {
+                format!("No matches for <code>{pattern}</code>")
+            } else {
+                let truncated = if stdout.len() > 3500 {
+                    format!("{}...", &stdout[..3500])
+                } else {
+                    stdout.to_string()
+                };
+                format!(
+                    "<b>grep:</b> <code>{pattern}</code>\n<pre>{}</pre>",
+                    html_escape(&truncated)
+                )
+            }
+        }
+        Err(_) => "rg (ripgrep) not found. Install it to use /grep.".to_string(),
+    }
+}
+
+// ── /git — branch, status, commits ───────────────────────────────────
+
+async fn handle_git(args: &str) -> String {
+    let config = DaemonConfig::load(None).unwrap_or_default();
+    let workdir = config
+        .resolve_repo_path(None)
+        .unwrap_or_else(|| ".".to_string());
+
+    let subcommand = if args.is_empty() {
+        "summary"
+    } else {
+        args.trim()
+    };
+
+    match subcommand {
+        "summary" | "s" => git_summary(&workdir),
+        "diff" | "d" => git_diff(&workdir),
+        "log" | "l" => git_log(&workdir),
+        _ => format!("Unknown: /git {subcommand}\nTry: /git, /git diff, /git log"),
+    }
+}
+
+fn git_summary(workdir: &str) -> String {
+    let branch = run_git(workdir, &["branch", "--show-current"]);
+    let status = run_git(workdir, &["status", "--short"]);
+    let last_commit = run_git(workdir, &["log", "-1", "--format=%h %s (%cr)"]);
+
+    let mut lines = vec![format!("<b>Branch:</b> {}", branch.trim())];
+
+    if let Some(commit) = last_commit.lines().next() {
+        lines.push(format!("<b>Last commit:</b> {commit}"));
+    }
+
+    let changes: Vec<&str> = status.lines().collect();
+    if changes.is_empty() {
+        lines.push("Working tree clean.".to_string());
+    } else {
+        lines.push(format!("<b>Changes:</b> {} file(s)", changes.len()));
+        for change in changes.iter().take(15) {
+            lines.push(format!("  <code>{change}</code>"));
+        }
+        if changes.len() > 15 {
+            lines.push(format!("  ... +{} more", changes.len() - 15));
+        }
+    }
+
+    lines.join("\n")
+}
+
+fn git_diff(workdir: &str) -> String {
+    let diff = run_git(workdir, &["diff", "--stat"]);
+    if diff.is_empty() {
+        return "No unstaged changes.".to_string();
+    }
+    let truncated = if diff.len() > 3500 {
+        format!("{}...", &diff[..3500])
+    } else {
+        diff
+    };
+    format!("<pre>{}</pre>", html_escape(&truncated))
+}
+
+fn git_log(workdir: &str) -> String {
+    let log = run_git(
+        workdir,
+        &["log", "--oneline", "--graph", "-15", "--format=%h %s (%cr)"],
+    );
+    if log.is_empty() {
+        return "No commits.".to_string();
+    }
+    format!("<pre>{}</pre>", html_escape(&log))
+}
+
+fn run_git(workdir: &str, args: &[&str]) -> String {
+    std::process::Command::new("git")
+        .args(args)
+        .current_dir(workdir)
+        .output()
+        .map(|o| String::from_utf8_lossy(&o.stdout).to_string())
+        .unwrap_or_default()
+}
+
+// ── Helpers ──────────────────────────────────────────────────────────
+
+fn resolve_file_path(config: &DaemonConfig, path: &str) -> String {
+    if std::path::Path::new(path).is_absolute() {
+        return path.to_string();
+    }
+    if let Some(repo_path) = config.resolve_repo_path(None) {
+        format!("{repo_path}/{path}")
+    } else {
+        path.to_string()
+    }
+}
+
+// ── /pr — list or show PRs ────────────────────────────────────────────
+
+async fn handle_pr(daemon_port: u16, args: &str) -> String {
+    let client = reqwest::Client::new();
+
+    if args.is_empty() {
+        // List open PRs
+        let url = format!("http://127.0.0.1:{daemon_port}/api/github/pulls?state=open");
+        match client
+            .get(&url)
+            .timeout(std::time::Duration::from_secs(10))
+            .send()
+            .await
+        {
+            Ok(response) if response.status().is_success() => {
+                if let Ok(body) = response.json::<serde_json::Value>().await {
+                    let pulls = body["pulls"].as_array();
+                    match pulls {
+                        Some(prs) if prs.is_empty() => "No open PRs.".to_string(),
+                        Some(prs) => {
+                            let mut lines = vec!["<b>Open PRs:</b>".to_string()];
+                            for pr in prs.iter().take(15) {
+                                let number = pr["number"].as_u64().unwrap_or(0);
+                                let title = pr["title"].as_str().unwrap_or("untitled");
+                                let author = pr["user"]["login"].as_str().unwrap_or("?");
+                                let draft = pr["draft"].as_bool().unwrap_or(false);
+                                let draft_tag = if draft { " [draft]" } else { "" };
+                                lines.push(format!(
+                                    "  <b>#{number}</b> {title} <i>({author})</i>{draft_tag}"
+                                ));
+                            }
+                            lines.join("\n")
+                        }
+                        None => "Failed to parse PRs.".to_string(),
+                    }
+                } else {
+                    "Failed to parse response.".to_string()
+                }
+            }
+            Ok(response) => {
+                let text = response.text().await.unwrap_or_default();
+                format!("GitHub error: {text}")
+            }
+            _ => "GitHub not configured or daemon not responding.".to_string(),
+        }
+    } else if let Ok(number) = args.trim().parse::<u64>() {
+        // Get specific PR
+        let url = format!("http://127.0.0.1:{daemon_port}/api/github/pulls/{number}");
+        match client
+            .get(&url)
+            .timeout(std::time::Duration::from_secs(10))
+            .send()
+            .await
+        {
+            Ok(response) if response.status().is_success() => {
+                if let Ok(pr) = response.json::<serde_json::Value>().await {
+                    let title = pr["title"].as_str().unwrap_or("untitled");
+                    let author = pr["user"]["login"].as_str().unwrap_or("?");
+                    let state = pr["state"].as_str().unwrap_or("?");
+                    let head = pr["head"]["ref"].as_str().unwrap_or("?");
+                    let base = pr["base"]["ref"].as_str().unwrap_or("?");
+                    let additions = pr["additions"].as_u64().unwrap_or(0);
+                    let deletions = pr["deletions"].as_u64().unwrap_or(0);
+                    let files = pr["changed_files"].as_u64().unwrap_or(0);
+                    let body_text = pr["body"].as_str().unwrap_or("");
+                    let body_preview = if body_text.len() > 500 {
+                        format!("{}...", &body_text[..500])
+                    } else {
+                        body_text.to_string()
+                    };
+
+                    format!(
+                        "<b>PR #{number}: {title}</b>\n\
+                         Author: {author}\n\
+                         {head} → {base} ({state})\n\
+                         +{additions} -{deletions} ({files} files)\n\
+                         {body_preview}"
+                    )
+                } else {
+                    "Failed to parse PR.".to_string()
+                }
+            }
+            _ => format!("PR #{number} not found."),
+        }
+    } else {
+        "Usage: /pr or /pr <number>".to_string()
+    }
+}
+
+// ── /issues — list issues ────────────────────────────────────────────
+
+async fn handle_issues(daemon_port: u16, args: &str) -> String {
+    let client = reqwest::Client::new();
+
+    if args.is_empty() || args.trim() == "open" {
+        let url = format!("http://127.0.0.1:{daemon_port}/api/github/issues?state=open");
+        match client
+            .get(&url)
+            .timeout(std::time::Duration::from_secs(10))
+            .send()
+            .await
+        {
+            Ok(response) if response.status().is_success() => {
+                if let Ok(body) = response.json::<serde_json::Value>().await {
+                    let issues = body["issues"]
+                        .as_array()
+                        .map(|arr| {
+                            arr.iter()
+                                .filter(|i| i.get("pull_request").is_none())
+                                .cloned()
+                                .collect::<Vec<_>>()
+                        })
+                        .unwrap_or_default();
+
+                    if issues.is_empty() {
+                        return "No open issues.".to_string();
+                    }
+
+                    let mut lines = vec!["<b>Open issues:</b>".to_string()];
+                    for issue in issues.iter().take(15) {
+                        let number = issue["number"].as_u64().unwrap_or(0);
+                        let title = issue["title"].as_str().unwrap_or("untitled");
+                        let labels: Vec<&str> = issue["labels"]
+                            .as_array()
+                            .map(|arr| arr.iter().filter_map(|l| l["name"].as_str()).collect())
+                            .unwrap_or_default();
+                        let label_str = if labels.is_empty() {
+                            String::new()
+                        } else {
+                            format!(" [{}]", labels.join(", "))
+                        };
+                        lines.push(format!("  <b>#{number}</b> {title}{label_str}"));
+                    }
+                    lines.join("\n")
+                } else {
+                    "Failed to parse issues.".to_string()
+                }
+            }
+            _ => "GitHub not configured or daemon not responding.".to_string(),
+        }
+    } else {
+        "Usage: /issues".to_string()
+    }
+}
+
+fn html_escape(text: &str) -> String {
+    text.replace('&', "&amp;")
+        .replace('<', "&lt;")
+        .replace('>', "&gt;")
 }
 
 #[cfg(test)]

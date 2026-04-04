@@ -24,6 +24,15 @@ const TOOL_HINTS: Record<string, string> = {
     "Ask the user structured questions with selectable options. Use sparingly — only when you genuinely need clarification to proceed.",
   todowrite:
     "Create or update a task list for complex multi-step work. Use merge=true to update specific items, merge=false to replace all.",
+  channel_send:
+    "Send a message to a connected channel (Telegram, Discord). Use to notify the user on their phone.",
+  github_pr_list: "List pull requests on GitHub.",
+  github_pr_get: "Get PR details (title, changes, status).",
+  github_pr_create: "Create a new pull request.",
+  github_pr_comment: "Comment on a PR or issue.",
+  github_pr_merge: "Merge a pull request.",
+  github_issue_list: "List GitHub issues.",
+  github_issue_create: "Create a new GitHub issue.",
 };
 
 function buildSubAgentCatalog(availableToolIds: string[]): string {

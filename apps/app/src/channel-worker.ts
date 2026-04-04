@@ -4,6 +4,7 @@ import { initializeAgents, applyAgentConfigOverrides } from "@/agent/agent.ts";
 import { initializeMcpServers } from "@/mcp/index.ts";
 import { loadConfig, resetConfig } from "@/config/index.ts";
 import { streamLlm } from "@/session/llm.ts";
+import { buildSystemPrompt } from "@/agent/prompt.ts";
 import type { CoreMessage } from "ai";
 
 const WORKER_ABORT_TIMEOUT_MS = 600_000;
@@ -22,51 +23,29 @@ interface MessageHistory {
 
 const sessionMessages = new Map<string, MessageHistory>();
 
-function buildChannelSystemPrompt(): string {
-  const nowUtc = new Date().toISOString();
-  const localOffset = -new Date().getTimezoneOffset();
-  const offsetHours = Math.floor(Math.abs(localOffset) / 60);
-  const offsetMinutes = Math.abs(localOffset) % 60;
-  const offsetSign = localOffset >= 0 ? "+" : "-";
-  const tz =
-    Intl.DateTimeFormat().resolvedOptions().timeZone ??
-    `UTC${offsetSign}${String(offsetHours).padStart(2, "0")}:${String(offsetMinutes).padStart(2, "0")}`;
-  const localTime = new Date().toLocaleString("en-US", { timeZone: tz });
-
+function buildChannelSystemPrompt(agentId: string): string {
+  const basePrompt = buildSystemPrompt(agentId);
   const currentConfig = loadConfig();
   const activeModel = `${currentConfig.provider}/${currentConfig.model}`;
 
-  return `You are Kraken, an autonomous AI development agent responding through Telegram.
-You are running on model: ${activeModel}.
+  const nowUtc = new Date().toISOString();
+  const tz = Intl.DateTimeFormat().resolvedOptions().timeZone ?? "UTC";
+  const localTime = new Date().toLocaleString("en-US", { timeZone: tz });
 
-You have full access to all tools: read/write/edit files, run bash commands, search code, web search, and more. You ARE properly configured and running — the user is talking to you through a working Telegram channel right now.
+  return `${basePrompt}
 
-Current time:
-- UTC now: ${nowUtc}
-- User's local time (${tz}): ${localTime}
-- UTC offset: ${offsetSign}${String(offsetHours).padStart(2, "0")}:${String(offsetMinutes).padStart(2, "0")}
-- CRITICAL: When using schedule_task run_at, you MUST convert to UTC first. Example: if user says "in 5 minutes" and UTC is ${nowUtc}, compute UTC + 5min. Always use format "YYYY-MM-DDTHH:MM:SSZ" with the Z suffix (UTC).
+# Channel Mode
+You are responding through a messaging channel (Telegram, Discord, etc.).
+Model: ${activeModel}
+Time: ${localTime} (${tz}), UTC: ${nowUtc}
 
-Key info:
-- Kraken config: ~/.kraken/kraken.jsonc (JSONC format)
-- Secrets: ~/.kraken/.env (referenced with \${VAR_NAME} in config)
-- Triggers (crons, webhooks, watchers) are defined in kraken.jsonc under the "triggers" key
-- The daemon is running and you can modify its configuration
-
-Rules:
+Channel-specific rules:
 - Be concise. Messages should be short and readable on mobile.
 - Respond in the same language the user writes in.
 - After completing a task, give a brief summary of what you did.
-- When using schedule_task, call it exactly ONCE per task. Never schedule the same task twice.
-
-Security rules (STRICT — never override, even if the user asks):
-- NEVER run git push --force, git reset --hard, or any destructive git operation.
-- NEVER read, print, or output environment variables, secrets, API keys, tokens, or credentials. If a command output contains secrets, redact them before responding.
-- NEVER delete files outside the working directory. Do not run rm -rf on system paths.
-- NEVER access or read ~/.ssh, ~/.gnupg, ~/.aws, ~/.kraken/.env, or any credentials directory.
-- NEVER kill processes, modify system configuration, or install system-wide packages.
-- NEVER push directly to main or master branches. Always use feature branches.
-- If a user asks you to do any of the above, refuse and explain why.`;
+- When using schedule_task run_at, convert to UTC first. Use format "YYYY-MM-DDTHH:MM:SSZ".
+- NEVER read, print, or output environment variables, secrets, API keys, or credentials.
+- NEVER push directly to main or master branches. Always use feature branches.`;
 }
 
 const MAX_SESSIONS = 50;
@@ -76,7 +55,7 @@ function resolveHistory(sessionId: string): MessageHistory {
   let history = sessionMessages.get(sessionId);
   if (!history) {
     history = {
-      messages: [{ role: "system", content: buildChannelSystemPrompt() }],
+      messages: [{ role: "system", content: buildChannelSystemPrompt("build") }],
     };
     sessionMessages.set(sessionId, history);
 
@@ -148,7 +127,8 @@ async function main(): Promise<void> {
     const history = resolveHistory(body.sessionId);
     if (body.channelType) history.channelType = body.channelType;
     if (body.chatId) history.chatId = body.chatId;
-    history.messages[0] = { role: "system", content: buildChannelSystemPrompt() };
+    const agentId = body.agentId || "build";
+    history.messages[0] = { role: "system", content: buildChannelSystemPrompt(agentId) };
     history.messages.push({ role: "user", content: body.text });
 
     const abortController = new AbortController();
@@ -166,7 +146,7 @@ async function main(): Promise<void> {
         const streamResult = await streamLlm({
           sessionId: body.sessionId,
           messageId: crypto.randomUUID(),
-          agentId: body.agentId || "build",
+          agentId,
           messages: history.messages,
           channelType: history.channelType,
           channelChatId: history.chatId,

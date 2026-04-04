@@ -1,0 +1,23 @@
+{
+  "name": "@kraken/visuals",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "remotion studio",
+    "build": "remotion render KrakenDemo out/kraken-demo.mp4",
+    "preview": "remotion preview"
+  },
+  "dependencies": {
+    "@remotion/cli": "4.0.445",
+    "@remotion/google-fonts": "4.0.445",
+    "@remotion/transitions": "4.0.445",
+    "react": "^19.0.0",
+    "react-dom": "^19.0.0",
+    "remotion": "4.0.445"
+  },
+  "devDependencies": {
+    "@types/react": "^19.0.0",
+    "typescript": "^5"
+  }
+}

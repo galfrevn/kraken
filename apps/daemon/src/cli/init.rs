@@ -214,6 +214,7 @@ fn run_interactive_wizard() -> Result<DaemonConfig, Box<dyn std::error::Error>> 
         rate_limits: Default::default(),
         channels: Default::default(),
         repos: vec![],
+        github: Default::default(),
         widget: Default::default(),
     };
 
@@ -238,6 +239,7 @@ fn build_defaults_config() -> DaemonConfig {
         rate_limits: Default::default(),
         channels: Default::default(),
         repos: vec![],
+        github: Default::default(),
         widget: Default::default(),
     }
 }

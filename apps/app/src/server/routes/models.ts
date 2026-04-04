@@ -20,7 +20,7 @@ function readModelState(): ModelState {
   }
   const config = loadConfig();
   return {
-    current: { modelId: config.model, providerId: config.provider },
+    current: { modelId: config.model ?? "", providerId: config.provider ?? "" },
     favorites: [],
     recents: [],
   };
@@ -43,8 +43,8 @@ function resolveCurrentModel(modelState: ModelState): ModelSelection {
   const environmentProviderId = process.env.KRAKEN_PROVIDER;
   if (environmentModelId || environmentProviderId) {
     return {
-      modelId: environmentModelId ?? config.model,
-      providerId: environmentProviderId ?? config.provider,
+      modelId: environmentModelId ?? config.model ?? "",
+      providerId: environmentProviderId ?? config.provider ?? "",
     };
   }
   return modelState.current;

@@ -36,14 +36,16 @@ const agentConfigSchema = z.object({
 });
 
 const configSchema = z.object({
-  provider: z.string().default("openrouter"),
-  model: z.string().default("moonshotai/kimi-k2.5"),
-  smallModel: z.string().default("anthropic/claude-3.5-haiku"),
+  provider: z.string().optional(),
+  model: z.string().optional(),
+  smallModel: z.string().optional(),
   apiKey: z.string().optional(),
   temperature: z.number().min(0).max(1).default(0),
   maxTokens: z.number().default(16384),
   daemonUrl: z.string().default("http://localhost:50051"),
   embeddingModel: z.string().default("openai/text-embedding-3-small"),
+  autoCompact: z.boolean().default(true),
+  compactThreshold: z.number().min(0).max(1).default(0.8),
   agents: z.record(z.string(), agentConfigSchema).default({}),
   permissions: z
     .object({
@@ -66,6 +68,11 @@ const configSchema = z.object({
 });
 
 export type KrakenConfig = z.infer<typeof configSchema>;
+
+export interface ValidatedKrakenConfig extends KrakenConfig {
+  provider: string;
+  model: string;
+}
 
 let cachedConfig: KrakenConfig | null = null;
 
@@ -145,6 +152,8 @@ export function loadConfig(): KrakenConfig {
       if (parsed.languageModel?.smallModel)
         rawConfigData.smallModel = parsed.languageModel.smallModel;
       if (parsed.agents) rawConfigData.agents = parsed.agents;
+      if (parsed.autoCompact != null) rawConfigData.autoCompact = parsed.autoCompact;
+      if (parsed.compactThreshold != null) rawConfigData.compactThreshold = parsed.compactThreshold;
     } catch {
       console.warn(`[config] failed to parse ${krakenJsoncPath}, using defaults`);
     }
@@ -180,4 +189,27 @@ export function loadConfig(): KrakenConfig {
 
   cachedConfig = configSchema.parse({ ...rawConfigData, ...environmentOverrides });
   return cachedConfig;
+}
+
+export function validateProviderConfig(): void {
+  const config = loadConfig();
+  if (!config.provider || !config.model) {
+    const homeDirectory = process.env.HOME ?? process.env.USERPROFILE ?? ".";
+    const configPath = join(homeDirectory, ".kraken", "kraken.jsonc");
+    const missing = [!config.provider ? "provider" : null, !config.model ? "model" : null]
+      .filter(Boolean)
+      .join(" and ");
+
+    console.error(`\n  ✖ No ${missing} configured.\n`);
+    console.error(`  Configure a provider and model before starting Kraken.`);
+    console.error(`  Edit ${configPath} and add:\n`);
+    console.error(`    {`);
+    console.error(`      "languageModel": {`);
+    console.error(`        "provider": "openrouter",`);
+    console.error(`        "model": "anthropic/claude-sonnet-4-20250514"`);
+    console.error(`      }`);
+    console.error(`    }\n`);
+    console.error(`  Or set environment variables: KRAKEN_PROVIDER and KRAKEN_MODEL\n`);
+    process.exit(1);
+  }
 }

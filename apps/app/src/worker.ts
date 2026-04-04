@@ -36,7 +36,7 @@ async function runHeadlessWorker(): Promise<void> {
     applyAgentConfigOverrides(config.agents);
   }
 
-  console.log(`[worker] task=${taskId} daemon=${daemonUrl} provider=${config.provider}`);
+  console.log(`[worker] task=${taskId} daemon=${daemonUrl} provider=${config.provider ?? "none"}`);
 
   const task = await daemon.tasks.get(taskId);
   console.log(`[worker] prompt: ${task.name}`);
@@ -116,7 +116,7 @@ async function runHeadlessWorker(): Promise<void> {
     try {
       const workerConfig = loadConfig();
       const costUsd = await estimateCost(
-        workerConfig.model,
+        workerConfig.model ?? "",
         resolvedUsage.promptTokens ?? 0,
         resolvedUsage.completionTokens ?? 0,
       );

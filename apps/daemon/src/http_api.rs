@@ -50,6 +50,8 @@ struct HttpApiState {
     audit_store: Option<Arc<AuditStore>>,
     loop_detector: Option<Arc<LoopDetector>>,
     reload_handle: Option<Arc<ReloadHandle>>,
+    github_client: Option<Arc<crate::github::GitHubClient>>,
+    github_default_repo: Option<String>,
     widget_token: Option<String>,
 }
 
@@ -118,6 +120,8 @@ pub async fn start_http_api_server(
         None,
         None,
         None,
+        None,
+        None,
     )
     .await?;
 
@@ -141,6 +145,8 @@ pub async fn start_http_api_server_with_options(
     audit_store: Option<Arc<AuditStore>>,
     loop_detector: Option<Arc<LoopDetector>>,
     reload_handle: Option<Arc<ReloadHandle>>,
+    github_client: Option<crate::github::GitHubClient>,
+    github_default_repo: Option<String>,
     widget_token: Option<String>,
 ) -> Result<(), String> {
     let http_api_state = HttpApiState {
@@ -156,6 +162,8 @@ pub async fn start_http_api_server_with_options(
         audit_store,
         loop_detector,
         reload_handle,
+        github_client: github_client.map(Arc::new),
+        github_default_repo,
         widget_token,
     };
 
@@ -222,6 +230,23 @@ pub async fn start_http_api_server_with_options(
         )
         .route("/api/channels/send", post(handle_channel_send))
         .route("/api/channels/sessions", get(handle_channel_sessions))
+        .route("/api/github/pulls", get(handle_github_list_prs))
+        .route("/api/github/pulls/{number}", get(handle_github_get_pr))
+        .route("/api/github/pulls", post(handle_github_create_pr))
+        .route(
+            "/api/github/pulls/{number}/merge",
+            post(handle_github_merge_pr),
+        )
+        .route(
+            "/api/github/pulls/{number}/comments",
+            post(handle_github_pr_comment),
+        )
+        .route("/api/github/issues", get(handle_github_list_issues))
+        .route("/api/github/issues", post(handle_github_create_issue))
+        .route(
+            "/api/github/issues/{number}/comments",
+            post(handle_github_issue_comment),
+        )
         .with_state(http_api_state);
 
     if let Some(memory_store) = memory_store {
@@ -1738,6 +1763,218 @@ async fn handle_channel_sessions(State(state): State<HttpApiState>) -> impl Into
     }
 }
 
+// ── GitHub API Handlers ───────────────────────────────────────────────
+
+fn resolve_github(
+    state: &HttpApiState,
+    repo_override: Option<&str>,
+) -> Result<(Arc<crate::github::GitHubClient>, String), (StatusCode, Json<serde_json::Value>)> {
+    let client = state.github_client.as_ref().ok_or((
+        StatusCode::SERVICE_UNAVAILABLE,
+        Json(
+            serde_json::json!({"error": "GitHub not configured. Set github.token in kraken.jsonc"}),
+        ),
+    ))?;
+    let repo = repo_override
+        .map(String::from)
+        .or_else(|| state.github_default_repo.clone())
+        .ok_or((
+            StatusCode::BAD_REQUEST,
+            Json(serde_json::json!({"error": "No repo specified and no defaultRepo configured"})),
+        ))?;
+    Ok((Arc::clone(client), repo))
+}
+
+#[derive(Deserialize)]
+struct GitHubRepoQuery {
+    repo: Option<String>,
+    state: Option<String>,
+}
+
+#[derive(Deserialize)]
+struct GitHubCreatePrBody {
+    repo: Option<String>,
+    title: String,
+    body: Option<String>,
+    head: String,
+    base: Option<String>,
+}
+
+#[derive(Deserialize)]
+struct GitHubCommentBody {
+    repo: Option<String>,
+    body: String,
+}
+
+#[derive(Deserialize)]
+struct GitHubCreateIssueBody {
+    repo: Option<String>,
+    title: String,
+    body: Option<String>,
+}
+
+async fn handle_github_list_prs(
+    State(state): State<HttpApiState>,
+    Query(query): Query<GitHubRepoQuery>,
+) -> impl IntoResponse {
+    let (client, repo) = match resolve_github(&state, query.repo.as_deref()) {
+        Ok(v) => v,
+        Err(e) => return e.into_response(),
+    };
+    let pr_state = query.state.as_deref().unwrap_or("open");
+    match client.list_prs(&repo, pr_state).await {
+        Ok(prs) => Json(serde_json::json!({"pulls": prs})).into_response(),
+        Err(e) => (
+            StatusCode::BAD_GATEWAY,
+            Json(serde_json::json!({"error": e})),
+        )
+            .into_response(),
+    }
+}
+
+async fn handle_github_get_pr(
+    State(state): State<HttpApiState>,
+    Path(number): Path<u64>,
+    Query(query): Query<GitHubRepoQuery>,
+) -> impl IntoResponse {
+    let (client, repo) = match resolve_github(&state, query.repo.as_deref()) {
+        Ok(v) => v,
+        Err(e) => return e.into_response(),
+    };
+    match client.get_pr(&repo, number).await {
+        Ok(pr) => Json(pr).into_response(),
+        Err(e) => (
+            StatusCode::BAD_GATEWAY,
+            Json(serde_json::json!({"error": e})),
+        )
+            .into_response(),
+    }
+}
+
+async fn handle_github_create_pr(
+    State(state): State<HttpApiState>,
+    Json(body): Json<GitHubCreatePrBody>,
+) -> impl IntoResponse {
+    let (client, repo) = match resolve_github(&state, body.repo.as_deref()) {
+        Ok(v) => v,
+        Err(e) => return e.into_response(),
+    };
+    match client
+        .create_pr(
+            &repo,
+            &body.title,
+            body.body.as_deref().unwrap_or(""),
+            &body.head,
+            body.base.as_deref().unwrap_or("main"),
+        )
+        .await
+    {
+        Ok(pr) => Json(pr).into_response(),
+        Err(e) => (
+            StatusCode::BAD_GATEWAY,
+            Json(serde_json::json!({"error": e})),
+        )
+            .into_response(),
+    }
+}
+
+async fn handle_github_merge_pr(
+    State(state): State<HttpApiState>,
+    Path(number): Path<u64>,
+    Query(query): Query<GitHubRepoQuery>,
+) -> impl IntoResponse {
+    let (client, repo) = match resolve_github(&state, query.repo.as_deref()) {
+        Ok(v) => v,
+        Err(e) => return e.into_response(),
+    };
+    match client.merge_pr(&repo, number).await {
+        Ok(result) => Json(result).into_response(),
+        Err(e) => (
+            StatusCode::BAD_GATEWAY,
+            Json(serde_json::json!({"error": e})),
+        )
+            .into_response(),
+    }
+}
+
+async fn handle_github_pr_comment(
+    State(state): State<HttpApiState>,
+    Path(number): Path<u64>,
+    Json(body): Json<GitHubCommentBody>,
+) -> impl IntoResponse {
+    let (client, repo) = match resolve_github(&state, body.repo.as_deref()) {
+        Ok(v) => v,
+        Err(e) => return e.into_response(),
+    };
+    match client.create_pr_comment(&repo, number, &body.body).await {
+        Ok(comment) => Json(comment).into_response(),
+        Err(e) => (
+            StatusCode::BAD_GATEWAY,
+            Json(serde_json::json!({"error": e})),
+        )
+            .into_response(),
+    }
+}
+
+async fn handle_github_list_issues(
+    State(state): State<HttpApiState>,
+    Query(query): Query<GitHubRepoQuery>,
+) -> impl IntoResponse {
+    let (client, repo) = match resolve_github(&state, query.repo.as_deref()) {
+        Ok(v) => v,
+        Err(e) => return e.into_response(),
+    };
+    let issue_state = query.state.as_deref().unwrap_or("open");
+    match client.list_issues(&repo, issue_state).await {
+        Ok(issues) => Json(serde_json::json!({"issues": issues})).into_response(),
+        Err(e) => (
+            StatusCode::BAD_GATEWAY,
+            Json(serde_json::json!({"error": e})),
+        )
+            .into_response(),
+    }
+}
+
+async fn handle_github_create_issue(
+    State(state): State<HttpApiState>,
+    Json(body): Json<GitHubCreateIssueBody>,
+) -> impl IntoResponse {
+    let (client, repo) = match resolve_github(&state, body.repo.as_deref()) {
+        Ok(v) => v,
+        Err(e) => return e.into_response(),
+    };
+    match client
+        .create_issue(&repo, &body.title, body.body.as_deref().unwrap_or(""))
+        .await
+    {
+        Ok(issue) => Json(issue).into_response(),
+        Err(e) => (
+            StatusCode::BAD_GATEWAY,
+            Json(serde_json::json!({"error": e})),
+        )
+            .into_response(),
+    }
+}
+
+async fn handle_github_issue_comment(
+    State(state): State<HttpApiState>,
+    Path(number): Path<u64>,
+    Json(body): Json<GitHubCommentBody>,
+) -> impl IntoResponse {
+    let (client, repo) = match resolve_github(&state, body.repo.as_deref()) {
+        Ok(v) => v,
+        Err(e) => return e.into_response(),
+    };
+    match client.create_issue_comment(&repo, number, &body.body).await {
+        Ok(comment) => Json(comment).into_response(),
+        Err(e) => (
+            StatusCode::BAD_GATEWAY,
+            Json(serde_json::json!({"error": e})),
+        )
+            .into_response(),
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1772,6 +2009,8 @@ mod tests {
             audit_store: None,
             loop_detector: None,
             reload_handle: None,
+            github_client: None,
+            github_default_repo: None,
             widget_token: None,
         };
 

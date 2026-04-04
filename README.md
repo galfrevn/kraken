@@ -9,7 +9,7 @@
 </p>
 
 <p align="center">
-  Kraken understands your codebase, runs tasks on a schedule, watches your files for changes, receives webhooks, and integrates with Telegram and other messaging channels — all while acting autonomously. Think of it as a developer that never sleeps.
+  Kraken understands your codebase, runs tasks on a schedule, watches your files for changes, receives webhooks, integrates with GitHub for PR and issue management, sends notifications across multiple channels, and connects to Telegram, Discord and other messaging platforms — all while acting autonomously. Think of it as a developer that never sleeps.
 </p>
 
 ---
@@ -18,7 +18,7 @@
 
 Most AI coding tools today follow a single interaction model: the developer asks, the agent responds. Tools like [Claude Code](https://github.com/anthropics/claude-code), [OpenCode](https://github.com/anomalyco/opencode), and others have proven that LLM-powered agents can be genuine companions for developers — but they all require a human in the loop.
 
-Kraken takes this further by introducing **persistent autonomy**. Rather than waiting for human input, Kraken can monitor file changes, respond to webhooks, execute scheduled tasks, and notify your team — all while maintaining a rich terminal interface for real-time collaboration when you need it.
+Kraken takes this further by introducing **persistent autonomy**. Rather than waiting for human input, Kraken can monitor file changes, respond to webhooks, execute scheduled tasks, manage GitHub PRs and issues, notify your team across multiple channels, and ask you questions when it needs input — all while maintaining a rich terminal interface for real-time collaboration when you need it.
 
 The TUI is optional. The daemon is the backbone.
 
@@ -36,13 +36,13 @@ The **Daemon** (Rust) handles orchestration, cron scheduling, file watching, web
 
 The **App** (TypeScript/React) contains the agent brain — the LLM execution loop, tool registry, conversation history, and terminal UI. It uses the Vercel AI SDK, OpenTUI for rendering, and SQLite for session storage.
 
-**Channel Workers** (TypeScript) bridge external messaging platforms (Telegram, etc.) with the agent, enabling remote task submission and real-time responses.
+**Channel Workers** (TypeScript) bridge external messaging platforms (Telegram, Discord, etc.) with the agent, enabling remote task submission and real-time responses.
 
 | Service | Language | Port | Role |
 | --- | --- | --- | --- |
-| **Daemon** | Rust | 50051 | Orchestrator, cron, watchers, webhooks, notifications |
+| **Daemon** | Rust | 50051 | Orchestrator, cron, watchers, webhooks, notifications, GitHub integration |
 | **App** | TypeScript | 7899 | TUI, agent brain, tools, sessions, LSP, MCP |
-| **Channels** | TypeScript | — | Messaging adapters (Telegram, etc.) |
+| **Channels** | TypeScript | — | Messaging adapters (Telegram, Discord, etc.) |
 
 ```
 ┌──────────────────────────────────────────────┐
@@ -53,19 +53,20 @@ The **App** (TypeScript/React) contains the agent brain — the LLM execution lo
 │     (Rust)       │      (TypeScript)         │
 │                  │                          │
 │  • Orchestrator  │  • Agent loop            │
-│  • Cron jobs     │  • Tools (19 built-in)   │
+│  • Cron jobs     │  • Tools (27 built-in)   │
 │  • Watchers      │  • LSP diagnostics       │
 │  • Webhooks      │  • MCP servers           │
 │  • Notifications │  • Sub-agents            │
 │  • Multi-repo    │  • Sessions & memory     │
-│                  │  • Audit logging         │
+│  • GitHub API    │  • Audit logging         │
+│  • Channel mgmt  │  • Task tracking         │
 └────────┬─────────┴──────────┬───────────────┘
          │  HTTP REST (localhost)  │
          └────────────────────────┘
                     │
          ┌──────────┴──────────┐
          │   Channel Workers   │
-         │   (Telegram, etc.)  │
+         │  (Telegram, Discord)│
          └─────────────────────┘
 ```
 
@@ -209,14 +210,22 @@ The agent ships with a comprehensive toolset for autonomous development:
 | `memory_save` | Save observations to persistent memory |
 | `memory_search` | Search persistent memory |
 | `memory_context` | Load recent memory for current project |
-| `task_list` | List daemon tasks |
+| `task_list` | List daemon tasks with status filtering |
 | `task_get` | Get task details and output |
 | `task_delete` | Delete pending/cancelled tasks |
 | `webfetch` | Fetch web pages as markdown/text |
 | `websearch` | Search the web for real-time info |
 | `subagent` | Delegate to specialized sub-agents (explore, general) |
-| `question` | Ask the user structured questions with options |
-| `todo` | Create and manage task lists for multi-step work |
+| `question` | Ask the user structured questions with selectable options |
+| `todowrite` | Create and manage task lists for multi-step work |
+| `channel_send` | Send messages to connected channels (Telegram, Discord) |
+| `github_pr_list` | List pull requests on a GitHub repository |
+| `github_pr_get` | Get details of a specific pull request |
+| `github_pr_create` | Create a new pull request |
+| `github_pr_comment` | Post a comment on a PR or issue |
+| `github_pr_merge` | Merge a pull request |
+| `github_issue_list` | List issues on a GitHub repository |
+| `github_issue_create` | Create a new issue on GitHub |
 
 Tools include automatic rate limiting (200 calls/session), audit logging, and LSP diagnostics that run automatically after file edits.
 
@@ -260,6 +269,11 @@ const task = await client.schedule({ prompt: "Run tests", priority: 5 });
 // Query memory
 const results = await client.memorySearch({ query: "api keys" });
 
+// Manage tasks
+await client.tasks.list({ status: "running" });
+await client.tasks.get(taskId);
+await client.tasks.delete(taskId);
+
 // Stream events
 client.onEvent("task_completed", (event) => console.log(event));
 ```
@@ -279,7 +293,7 @@ Skills provide specialized instructions for specific tasks. They're loaded on-de
 - **heartbeat** — Autonomous periodic task execution
 - **daemon** — Daemon management and maintenance
 - **notifications** — Slack, Discord, Email, GitHub notifications
-- **channels** — External messaging adapters (Telegram, etc.)
+- **channels** — External messaging adapters (Telegram, Discord, etc.)
 - **repos** — Multi-repo configuration and management
 - **lsp** — Language Server Protocol integration
 
@@ -328,11 +342,12 @@ cd apps/daemon && cargo test  # Run daemon tests
 ```
 apps/
   app/            TypeScript/React — TUI + agent brain, tools, sessions, LSP, MCP
-  daemon/         Rust — Daemon: orchestrator, cron, watchers, webhooks, multi-repo
+  daemon/         Rust — Daemon: orchestrator, cron, watchers, webhooks, multi-repo, GitHub
 packages/
   configuration/  Shared TypeScript config types
   sdk/            TypeScript SDK for programmatic daemon interaction
   skills/         Skill definitions (memory, triggers, secrets, etc.)
+  visuals/        Remotion visuals and animations
 docs/             Documentation (architecture, tools, config, daemon, roadmap)
 scripts/
   install.sh      End-user installer (macOS/Linux)

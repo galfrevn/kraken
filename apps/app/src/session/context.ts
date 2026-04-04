@@ -6,7 +6,9 @@ const DEFAULT_RESERVE_FOR_SYSTEM = 2_000;
 const DEFAULT_SUMMARIZE_THRESHOLD = 0.75;
 const DEFAULT_KEEP_RECENT_MESSAGES = 10;
 const TOOL_RESULT_MAX_TOKENS = 4_000;
-const SUMMARY_LAST_REASONING_MAX_LENGTH = 500;
+
+const DECAY_MEDIUM_COUNT = 14;
+const DECAY_MEDIUM_MAX_TOKENS = 500;
 
 export function estimateTokens(text: string): number {
   return Math.ceil(text.length / CHARS_PER_TOKEN_ESTIMATE);
@@ -63,17 +65,20 @@ export function manageContextWindow(
     return { messages, wasTruncated: false, originalTokens, finalTokens: originalTokens };
   }
 
-  const truncatedMessages = truncateToolResults(messages);
-  const tokensAfterTruncation = estimateMessageTokens(truncatedMessages);
+  const decayedMessages = decayToolResults(messages, keepRecentMessages);
+  const tokensAfterDecay = estimateMessageTokens(decayedMessages);
 
-  if (tokensAfterTruncation <= availableTokens * summarizeThreshold) {
+  if (tokensAfterDecay <= availableTokens * summarizeThreshold) {
     return {
-      messages: truncatedMessages,
+      messages: decayedMessages,
       wasTruncated: true,
       originalTokens,
-      finalTokens: tokensAfterTruncation,
+      finalTokens: tokensAfterDecay,
     };
   }
+
+  const truncatedMessages = truncateToolResults(decayedMessages);
+  const tokensAfterTruncation = estimateMessageTokens(truncatedMessages);
 
   if (truncatedMessages.length <= keepRecentMessages + 1) {
     return {
@@ -87,17 +92,9 @@ export function manageContextWindow(
   const firstMessage = truncatedMessages[0];
   const recentBoundary = findRoundBoundary(truncatedMessages, keepRecentMessages);
   const recentMessages = truncatedMessages.slice(recentBoundary);
-  const middleMessages = truncatedMessages.slice(1, recentBoundary);
-
-  const summaryText = buildExtractiveSummary(middleMessages);
-  const summaryMessage: CoreMessage = {
-    role: "user",
-    content: `[Previous conversation summary — ${middleMessages.length} messages condensed]\n\n${summaryText}`,
-  };
 
   const managedMessages: CoreMessage[] = [];
   if (firstMessage) managedMessages.push(firstMessage);
-  managedMessages.push(summaryMessage);
   managedMessages.push(...recentMessages);
 
   const finalTokens = estimateMessageTokens(managedMessages);
@@ -139,56 +136,48 @@ function truncateToolResults(messages: CoreMessage[]): CoreMessage[] {
   });
 }
 
-function buildExtractiveSummary(messages: CoreMessage[]): string {
-  const filesRead = new Set<string>();
-  const filesModified = new Set<string>();
-  const commandsRun: string[] = [];
-  let lastAssistantText = "";
+function decayToolResults(messages: CoreMessage[], keepRecentMessages: number): CoreMessage[] {
+  const total = messages.length;
 
-  for (const message of messages) {
-    if (message.role === "assistant") {
-      if (typeof message.content === "string" && message.content) {
-        lastAssistantText = message.content;
-      } else if (Array.isArray(message.content)) {
-        for (const part of message.content as unknown as Array<Record<string, unknown>>) {
-          if (part.type === "text" && typeof part.text === "string") {
-            lastAssistantText = part.text;
-          }
-          if (part.type === "tool-call" && typeof part.toolName === "string") {
-            const args = part.args as Record<string, unknown> | undefined;
-            const filePath =
-              (args?.filePath as string) ?? (args?.path as string) ?? (args?.file as string) ?? "";
-            if (part.toolName === "read" && filePath) filesRead.add(filePath);
-            if ((part.toolName === "write" || part.toolName === "edit") && filePath)
-              filesModified.add(filePath);
-            if (part.toolName === "bash" && typeof args?.command === "string")
-              commandsRun.push(args.command);
-          }
-        }
-      }
+  return messages.map((message, index) => {
+    if (message.role !== "tool" || !Array.isArray(message.content)) return message;
+
+    const age = total - index;
+
+    if (age <= keepRecentMessages) return message;
+
+    if (age <= keepRecentMessages + DECAY_MEDIUM_COUNT) {
+      return truncateSingleToolMessage(message, DECAY_MEDIUM_MAX_TOKENS);
     }
-  }
 
-  const sections: string[] = [];
+    return collapseToolResultToMetadata(message);
+  });
+}
 
-  if (filesRead.size > 0) {
-    sections.push(`Files read: ${[...filesRead].join(", ")}`);
-  }
-  if (filesModified.size > 0) {
-    sections.push(`Files modified: ${[...filesModified].join(", ")}`);
-  }
-  if (commandsRun.length > 0) {
-    const recentCommands = commandsRun.slice(-5);
-    sections.push(`Recent commands: ${recentCommands.join("; ")}`);
-  }
-  if (lastAssistantText) {
-    const truncated = lastAssistantText.slice(0, SUMMARY_LAST_REASONING_MAX_LENGTH);
-    sections.push(`Last assistant reasoning: ${truncated}`);
-  }
+function truncateSingleToolMessage(message: CoreMessage, maxTokens: number): CoreMessage {
+  const parts = message.content as unknown as Array<Record<string, unknown>>;
+  const truncatedContent = parts.map((part) => {
+    if (part.type !== "tool-result" || part.result === undefined) return part;
+    const resultString =
+      typeof part.result === "string" ? part.result : JSON.stringify(part.result);
+    const resultTokens = estimateTokens(resultString);
 
-  if (sections.length === 0) {
-    sections.push(`${messages.length} messages were exchanged (details condensed).`);
-  }
+    if (resultTokens <= maxTokens) return part;
 
-  return sections.join("\n");
+    const maxChars = maxTokens * CHARS_PER_TOKEN_ESTIMATE;
+    return { ...part, result: `${resultString.slice(0, maxChars)}\n[... truncated]` };
+  });
+
+  return { ...message, content: truncatedContent } as unknown as CoreMessage;
+}
+
+function collapseToolResultToMetadata(message: CoreMessage): CoreMessage {
+  const parts = message.content as unknown as Array<Record<string, unknown>>;
+  const collapsedContent = parts.map((part) => {
+    if (part.type !== "tool-result") return part;
+    const toolName = (part.toolName as string) || "unknown";
+    return { ...part, result: `[Tool: ${toolName} — result omitted for context savings]` };
+  });
+
+  return { ...message, content: collapsedContent } as unknown as CoreMessage;
 }
