@@ -4,6 +4,7 @@ mod cron;
 mod daemon;
 mod db;
 mod events;
+mod github;
 mod http_api;
 mod memory_api;
 mod notifications;
@@ -34,6 +35,9 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                 Some(cli::Commands::Start { no_daemon, dev }) => (no_daemon, dev),
                 _ => (false, false),
             };
+            if parsed_cli.r#continue {
+                unsafe { std::env::set_var("KRAKEN_CONTINUE", "1") };
+            }
             cli::start::execute(no_daemon, dev).await
         }
         Some(cli::Commands::Daemon(daemon_command)) => match daemon_command {
@@ -808,6 +812,12 @@ pub async fn run_daemon() -> Result<(), Box<dyn std::error::Error>> {
 
     let reload_handle_for_shutdown = Arc::clone(&reload_handle);
 
+    let github_client = daemon_config
+        .github
+        .resolved_token()
+        .map(github::GitHubClient::new);
+    let github_default_repo = daemon_config.github.default_repo.clone();
+
     let http_api_server_handle = tokio::spawn(async move {
         if let Err(http_api_error) = http_api::start_http_api_server_with_options(
             http_api_task_store,
@@ -824,6 +834,8 @@ pub async fn run_daemon() -> Result<(), Box<dyn std::error::Error>> {
             Some(http_api_audit_store),
             Some(loop_detector),
             Some(Arc::clone(&reload_handle)),
+            github_client,
+            github_default_repo,
             daemon_config.widget.resolved_token(),
         )
         .await

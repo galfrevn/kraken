@@ -41,6 +41,10 @@ pub struct Cli {
     /// Enable verbose logging to stderr
     #[arg(long, global = true)]
     pub verbose: bool,
+
+    /// Resume the most recent session
+    #[arg(long, short = 'c')]
+    pub r#continue: bool,
 }
 
 #[derive(Subcommand)]

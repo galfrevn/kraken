@@ -7,7 +7,7 @@ import { initializeAgents, applyAgentConfigOverrides } from "@/agent/agent.ts";
 import { initializeMcpServers, shutdownMcpServers } from "@/mcp/index.ts";
 import { initializeLsp, shutdownLsp } from "@/lsp/manager.ts";
 import { startDaemonEventBridge, stopDaemonEventBridge } from "@/daemon/events.ts";
-import { loadConfig } from "@/config/index.ts";
+import { loadConfig, validateProviderConfig } from "@/config/index.ts";
 import { Session } from "@/session/index.ts";
 import { App } from "@/tui/app.tsx";
 
@@ -28,6 +28,8 @@ function parseCliFlags(): { continueSession?: boolean; sessionId?: string; promp
       promptParts.push(arg);
     }
   }
+
+  if (process.env.KRAKEN_CONTINUE === "1") continueSession = true;
 
   return {
     continueSession: continueSession || undefined,
@@ -52,6 +54,8 @@ async function main(): Promise<void> {
   initializeAgents();
 
   const config = loadConfig();
+  validateProviderConfig();
+
   if (Object.keys(config.agents).length > 0) {
     applyAgentConfigOverrides(config.agents);
   }
