@@ -259,9 +259,9 @@ export const Session = () => {
         },
       },
       ...getSkillSlashCommands().map((sc) => ({
-        title: sc.skillName,
+        title: `◆ ${sc.skillName}`,
         value: `skill.${sc.skillName}`,
-        description: sc.description,
+        description: `[skill] ${sc.description}`,
         slash: { name: sc.slash.name, aliases: sc.slash.aliases },
         onSelect: () => {
           const skill = loadSkillByName(sc.skillName);
