@@ -6,6 +6,7 @@ export const sessionTable = sqliteTable("session", {
   agentId: text("agent_id").notNull().default("build"),
   model: text("model").notNull().default(""),
   parentId: text("parent_id"),
+  summaryMessageId: text("summary_message_id"),
   timeCreated: integer("time_created", { mode: "timestamp_ms" })
     .notNull()
     .$defaultFn(() => new Date()),
@@ -39,7 +40,9 @@ export const partTable = sqliteTable(
     sessionId: text("session_id")
       .notNull()
       .references(() => sessionTable.id, { onDelete: "cascade" }),
-    type: text("type", { enum: ["text", "tool-call", "tool-result", "reasoning"] }).notNull(),
+    type: text("type", {
+      enum: ["text", "tool-call", "tool-result", "reasoning", "error"],
+    }).notNull(),
     content: text("content").notNull().default(""),
     toolName: text("tool_name"),
     toolCallId: text("tool_call_id"),

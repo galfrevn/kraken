@@ -179,6 +179,12 @@ export const Session = {
         .run();
     }
 
+    database
+      .update(sessionTable)
+      .set({ timeUpdated: now })
+      .where(eq(sessionTable.id, sessionId))
+      .run();
+
     Bus.publish(Events.Message.Created, { sessionId, messageId, role, content: content ?? "" });
     return insertedMessage;
   },

@@ -366,6 +366,7 @@ export const Session = () => {
             const reasoningParts = msg.parts.filter((p) => p.type === "reasoning");
             const toolCallParts = msg.parts.filter((p) => p.type === "tool-call");
             const toolResultParts = msg.parts.filter((p) => p.type === "tool-result");
+            const errorParts = msg.parts.filter((p) => p.type === "error");
 
             const assistantText = textParts.map((p) => p.content).join("\n");
 
@@ -384,6 +385,9 @@ export const Session = () => {
                 state: "completed",
                 resultContent: matchingResult?.content,
               });
+            }
+            for (const e of errorParts) {
+              parts.push({ kind: "error", id: e.id, content: e.content });
             }
 
             hydrated.push({

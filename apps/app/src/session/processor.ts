@@ -11,6 +11,8 @@ import { generateSessionTitle } from "@/session/title.ts";
 import { manageContextWindow, estimateTokens } from "@/session/context.ts";
 import { buildSystemPrompt } from "@/agent/prompt.ts";
 import { logLlmCall } from "@/audit/index.ts";
+import { compactSession } from "@/session/compactor.ts";
+import { loadConfig } from "@/config/index.ts";
 
 interface FilePart {
   path: string;
@@ -24,7 +26,10 @@ interface ProcessUserMessageOptions {
   abortController: AbortController;
 }
 
-function buildCoreMessagesFromHistory(sessionId: string): CoreMessage[] {
+function buildCoreMessagesFromHistory(
+  sessionId: string,
+  summaryMessageId?: string | null,
+): CoreMessage[] {
   const database = getDatabase();
 
   const messagesWithParts = database
@@ -44,9 +49,18 @@ function buildCoreMessagesFromHistory(sessionId: string): CoreMessage[] {
     .orderBy(messageTable.timeCreated, partTable.timeCreated)
     .all();
 
+  let filteredRows = messagesWithParts;
+  if (summaryMessageId) {
+    const summaryRowIndex = filteredRows.findIndex((row) => row.messageId === summaryMessageId);
+    if (summaryRowIndex !== -1) {
+      filteredRows = filteredRows.slice(summaryRowIndex);
+    }
+  }
+
   const coreMessages: CoreMessage[] = [];
   let currentMessageId = "";
   let currentRole = "";
+  let isSummaryMessage = false;
   let userTextParts: string[] = [];
   let assistantContentParts: Array<
     | { type: "text"; text: string }
@@ -62,7 +76,13 @@ function buildCoreMessagesFromHistory(sessionId: string): CoreMessage[] {
   function flushCurrentMessage() {
     if (!currentMessageId) return;
 
-    if (currentRole === "user") {
+    if (isSummaryMessage) {
+      const summaryText = assistantContentParts
+        .filter((p) => p.type === "text")
+        .map((p) => p.text)
+        .join("\n");
+      coreMessages.push({ role: "user", content: summaryText || "" });
+    } else if (currentRole === "user") {
       coreMessages.push({ role: "user", content: userTextParts.join("\n") || "" });
     } else if (currentRole === "assistant") {
       if (assistantContentParts.length > 0) {
@@ -76,13 +96,15 @@ function buildCoreMessagesFromHistory(sessionId: string): CoreMessage[] {
     userTextParts = [];
     assistantContentParts = [];
     toolResultParts = [];
+    isSummaryMessage = false;
   }
 
-  for (const row of messagesWithParts) {
+  for (const row of filteredRows) {
     if (row.messageId !== currentMessageId) {
       flushCurrentMessage();
       currentMessageId = row.messageId;
       currentRole = row.role;
+      isSummaryMessage = summaryMessageId != null && row.messageId === summaryMessageId;
     }
 
     if (!row.partType) continue;
@@ -130,7 +152,7 @@ interface DeferredPartInsert {
   id: string;
   messageId: string;
   sessionId: string;
-  type: "text" | "tool-call" | "tool-result" | "reasoning";
+  type: "text" | "tool-call" | "tool-result" | "reasoning" | "error";
   content?: string;
   toolName?: string;
   toolCallId?: string;
@@ -154,7 +176,12 @@ export async function processUserMessage(options: ProcessUserMessageOptions): Pr
 
   generateSessionTitle(options.sessionId, options.userPrompt);
 
-  let conversationHistory = buildCoreMessagesFromHistory(options.sessionId);
+  const session = Session.get(options.sessionId);
+
+  let conversationHistory = buildCoreMessagesFromHistory(
+    options.sessionId,
+    session?.summaryMessageId,
+  );
 
   if (resolvedFileParts.length > 0) {
     const lastUserMessage = conversationHistory[conversationHistory.length - 1];
@@ -162,8 +189,6 @@ export async function processUserMessage(options: ProcessUserMessageOptions): Pr
       lastUserMessage.content = enrichedPrompt;
     }
   }
-
-  const session = Session.get(options.sessionId);
   const modelContextLength = session?.model
     ? getModelContextLength(session.model)
     : DEFAULT_MODEL_CONTEXT_LENGTH;
@@ -279,7 +304,6 @@ export async function processUserMessage(options: ProcessUserMessageOptions): Pr
         currentSegmentReasoning = "";
         insideThinkTag = false;
         thinkTagChecked = false;
-        reasoningSegmentId = crypto.randomUUID();
         const toolCallPartId = crypto.randomUUID();
         const serializedArgs = JSON.stringify(streamEvent.args);
         deferredPartInserts.push({
@@ -361,8 +385,8 @@ export async function processUserMessage(options: ProcessUserMessageOptions): Pr
           id: crypto.randomUUID(),
           messageId: assistantMessageId,
           sessionId: options.sessionId,
-          type: "text",
-          content: `[error] ${errorContent}`,
+          type: "error",
+          content: errorContent,
           timeCreated: new Date(),
         });
       }
@@ -379,8 +403,8 @@ export async function processUserMessage(options: ProcessUserMessageOptions): Pr
       id: crypto.randomUUID(),
       messageId: assistantMessageId,
       sessionId: options.sessionId,
-      type: "text",
-      content: `[error] ${errorContent}`,
+      type: "error",
+      content: errorContent,
       timeCreated: new Date(),
     });
   }
@@ -435,6 +459,17 @@ export async function processUserMessage(options: ProcessUserMessageOptions): Pr
     });
   }
 
+  if (accumulatedReasoningContent.trim()) {
+    deferredPartInserts.push({
+      id: crypto.randomUUID(),
+      messageId: assistantMessageId,
+      sessionId: options.sessionId,
+      type: "reasoning",
+      content: accumulatedReasoningContent,
+      timeCreated: new Date(),
+    });
+  }
+
   if (!wasAborted && deferredPartInserts.length > 0) {
     const rawDb = database.$client;
     const insertTransaction = rawDb.transaction(() => {
@@ -449,6 +484,32 @@ export async function processUserMessage(options: ProcessUserMessageOptions): Pr
   }
 
   Bus.publish(Events.Session.Updated, { sessionId: options.sessionId });
+
+  if (!wasAborted) {
+    try {
+      const compactConfig = loadConfig();
+      if (compactConfig.autoCompact) {
+        const resolvedUsageForCompact = await streamResult.usage;
+        const compactModelContextLength = session?.model
+          ? getModelContextLength(session.model)
+          : DEFAULT_MODEL_CONTEXT_LENGTH;
+        const usageRatio =
+          (resolvedUsageForCompact.promptTokens + resolvedUsageForCompact.completionTokens) /
+          compactModelContextLength;
+
+        if (usageRatio >= compactConfig.compactThreshold) {
+          const currentSession = Session.get(options.sessionId);
+          const historyForCompact = buildCoreMessagesFromHistory(
+            options.sessionId,
+            currentSession?.summaryMessageId,
+          );
+          await compactSession(options.sessionId, historyForCompact);
+        }
+      }
+    } catch (compactError) {
+      console.error("[compactor] auto-compact failed:", compactError);
+    }
+  }
 }
 
 const FILE_REFERENCE_PATTERN = /(?<!\w)@(\.?[^\s,`]+(?:\.[^\s,`]+)*)/g;

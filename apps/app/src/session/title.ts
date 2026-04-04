@@ -53,6 +53,7 @@ const smallModelsByProvider: Record<string, string[]> = {
 
 function resolveSmallModelCandidates(): LanguageModelV1[] {
   const config = loadConfig();
+  if (!config.provider) return [];
   const modelIds = smallModelsByProvider[config.provider];
   if (!modelIds || modelIds.length === 0) return [];
 
@@ -130,13 +131,15 @@ export async function generateSessionTitle(sessionId: string, userMessage: strin
       generatedTitle = generatedTitle.slice(0, MAX_TITLE_LENGTH) + "...";
     }
 
-    if (generatedTitle) {
-      logTitle("setting title: " + generatedTitle);
-      Session.updateTitle(sessionId, generatedTitle);
-    } else {
-      logTitle("generated title was empty");
+    if (!generatedTitle) {
+      generatedTitle = userMessage.length > 50 ? userMessage.slice(0, 47) + "..." : userMessage;
     }
+
+    logTitle("setting title: " + generatedTitle);
+    Session.updateTitle(sessionId, generatedTitle);
   } catch (titleGenerationError) {
     logTitle("ERROR: " + String(titleGenerationError));
+    const fallback = userMessage.length > 50 ? userMessage.slice(0, 47) + "..." : userMessage;
+    Session.updateTitle(sessionId, fallback);
   }
 }
