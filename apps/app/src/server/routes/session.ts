@@ -46,6 +46,20 @@ sessionRouter.get("/session/:id", async (context) => {
   return context.json(session);
 });
 
+sessionRouter.patch("/session/:id", async (context) => {
+  const sessionId = context.req.param("id");
+  let body: { title?: string };
+  try {
+    body = await context.req.json();
+  } catch {
+    return context.json({ error: "invalid JSON body" }, 400);
+  }
+  if (body.title) {
+    Session.updateTitle(sessionId, body.title);
+  }
+  return context.json({ ok: true });
+});
+
 sessionRouter.delete("/session/:id", async (context) => {
   const sessionId = context.req.param("id");
   if (getActiveMemorySessionId() === sessionId) {

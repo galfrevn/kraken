@@ -152,38 +152,40 @@ export const Session = {
     const messageId = generateId();
     const now = new Date();
 
-    const insertedRows = database
-      .insert(messageTable)
-      .values({
-        id: messageId,
-        sessionId,
-        role,
-        timeCreated: now,
-      })
-      .returning()
-      .all();
-
-    const insertedMessage = insertedRows[0]!;
-
-    if (content) {
+    const rawDb = database.$client;
+    const transaction = rawDb.transaction(() => {
       database
-        .insert(partTable)
-        .values({
-          id: generateId(),
-          messageId,
-          sessionId,
-          type: "text",
-          content,
-          timeCreated: now,
-        })
+        .insert(messageTable)
+        .values({ id: messageId, sessionId, role, timeCreated: now })
         .run();
-    }
 
-    database
-      .update(sessionTable)
-      .set({ timeUpdated: now })
-      .where(eq(sessionTable.id, sessionId))
-      .run();
+      if (content) {
+        database
+          .insert(partTable)
+          .values({
+            id: generateId(),
+            messageId,
+            sessionId,
+            type: "text",
+            content,
+            timeCreated: now,
+          })
+          .run();
+      }
+
+      database
+        .update(sessionTable)
+        .set({ timeUpdated: now })
+        .where(eq(sessionTable.id, sessionId))
+        .run();
+    });
+    transaction();
+
+    const insertedMessage = database
+      .select()
+      .from(messageTable)
+      .where(eq(messageTable.id, messageId))
+      .get()!;
 
     Bus.publish(Events.Message.Created, { sessionId, messageId, role, content: content ?? "" });
     return insertedMessage;

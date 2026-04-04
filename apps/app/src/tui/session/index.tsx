@@ -255,6 +255,12 @@ export const Session = () => {
         },
       },
       {
+        title: "Rename session",
+        value: "session.title",
+        description: "Set session title: /title My Title",
+        slash: { name: "title", aliases: ["rename"] },
+      },
+      {
         title: "Switch theme",
         value: "theme.switch",
         description: "Change the color theme",
@@ -762,6 +768,21 @@ export const Session = () => {
   }, [isProcessing, streamingParts.length, currentModelSelection.modelId, currentAgent]);
 
   async function handlePromptSubmit(userInputText: string) {
+    if (userInputText.startsWith("/title ")) {
+      const newTitle = userInputText.slice(7).trim();
+      if (newTitle && currentSessionId) {
+        sdk.client
+          .fetch(`/session/${currentSessionId}`, {
+            method: "PATCH",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ title: newTitle }),
+          })
+          .catch(() => {});
+        setSessionTitle(newTitle);
+      }
+      return;
+    }
+
     setRevertedMessages([]);
     setDisplayMessages((previousMessages) => [
       ...previousMessages,
