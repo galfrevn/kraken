@@ -1,13 +1,72 @@
 import { tool as vercelTool } from "ai";
+import { readFileSync, existsSync } from "fs";
+import { resolve } from "path";
 import type { ToolDefinition } from "@/tool/tool.ts";
 import type { ToolResult } from "@/tool/tool.ts";
 import { logToolCall } from "@/audit/index.ts";
 import { getLspManager, formatDiagnostics } from "@/lsp/manager.ts";
+import { requestPermission, type PermissionRequest } from "@/tool/permission.ts";
+import { isAllowed } from "@/tool/permission-allowlist.ts";
+import { loadConfig } from "@/config/index.ts";
+import { createUnifiedDiff } from "@/util/diff.ts";
 
 const registeredTools = new Map<string, ToolDefinition>();
 const sessionToolCallCounts = new Map<string, number>();
 
 const DEFAULT_TOOL_CALLS_PER_SESSION = 200;
+const PERMISSION_TOOLS = new Set(["edit", "write", "bash"]);
+
+function needsPermission(
+  toolId: string,
+  args: unknown,
+  context: { workingDirectory: string },
+): boolean {
+  const config = loadConfig();
+  if (config.permissions?.mode !== "ask") return false;
+  if (!PERMISSION_TOOLS.has(toolId)) return false;
+
+  const parsed = args as Record<string, unknown>;
+  const target = (parsed.filePath as string) ?? (parsed.command as string) ?? toolId;
+  const fullTarget = toolId === "bash" ? target : resolve(context.workingDirectory, target);
+
+  return !isAllowed(toolId, fullTarget);
+}
+
+function buildPermissionRequest(
+  toolId: string,
+  args: unknown,
+  context: { workingDirectory: string },
+): PermissionRequest {
+  const parsed = args as Record<string, unknown>;
+  const id = crypto.randomUUID();
+
+  if (toolId === "edit") {
+    const filePath = parsed.filePath as string;
+    const absolutePath = resolve(context.workingDirectory, filePath);
+    let diff: string | undefined;
+    if (existsSync(absolutePath)) {
+      const original = readFileSync(absolutePath, "utf-8");
+      const oldStr = parsed.oldString as string;
+      const newStr = parsed.newString as string;
+      if (original.includes(oldStr)) {
+        const updated = original.replace(oldStr, newStr);
+        diff = createUnifiedDiff(filePath, original, updated);
+      }
+    }
+    return { id, toolId, filepath: filePath, diff };
+  }
+
+  if (toolId === "write") {
+    const filePath = parsed.filePath as string;
+    return { id, toolId, filepath: filePath };
+  }
+
+  if (toolId === "bash") {
+    return { id, toolId, command: parsed.command as string };
+  }
+
+  return { id, toolId };
+}
 
 export function registerTool(toolDefinition: ToolDefinition): void {
   registeredTools.set(toolDefinition.id, toolDefinition);
@@ -39,6 +98,14 @@ export function resolveToolsForAiSdk(context: {
           };
         }
         sessionToolCallCounts.set(context.sessionId, currentCount + 1);
+
+        if (needsPermission(toolId, args, context)) {
+          const request = buildPermissionRequest(toolId, args, context);
+          const approved = await requestPermission(context.sessionId, context.messageId, request);
+          if (!approved) {
+            return { title: toolId, content: "Permission denied by user." };
+          }
+        }
 
         const startTime = performance.now();
         let success = true;
@@ -125,6 +192,16 @@ import { websearchTool } from "@/tool/websearch.ts";
 import { subagentTool } from "@/tool/subagent.ts";
 import { questionTool } from "@/tool/question.ts";
 import { todoWriteTool } from "@/tool/todo.ts";
+import { channelSendTool } from "@/tool/channel-send.ts";
+import {
+  githubPrListTool,
+  githubPrGetTool,
+  githubPrCreateTool,
+  githubPrCommentTool,
+  githubPrMergeTool,
+  githubIssueListTool,
+  githubIssueCreateTool,
+} from "@/tool/github.ts";
 
 export function initializeBuiltinTools(): void {
   registerTool(bashTool);
@@ -146,4 +223,12 @@ export function initializeBuiltinTools(): void {
   registerTool(subagentTool);
   registerTool(questionTool);
   registerTool(todoWriteTool);
+  registerTool(channelSendTool);
+  registerTool(githubPrListTool);
+  registerTool(githubPrGetTool);
+  registerTool(githubPrCreateTool);
+  registerTool(githubPrCommentTool);
+  registerTool(githubPrMergeTool);
+  registerTool(githubIssueListTool);
+  registerTool(githubIssueCreateTool);
 }

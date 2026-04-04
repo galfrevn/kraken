@@ -69,6 +69,11 @@ export const Events = {
   Todo: {
     Updated: "todo.updated",
   },
+  Permission: {
+    Required: "permission.required",
+    Approved: "permission.approved",
+    Rejected: "permission.rejected",
+  },
   Lsp: {
     ServerStarted: "lsp.server.started",
     DiagnosticsUpdated: "lsp.diagnostics.updated",

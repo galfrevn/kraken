@@ -45,6 +45,11 @@ const configSchema = z.object({
   daemonUrl: z.string().default("http://localhost:50051"),
   embeddingModel: z.string().default("openai/text-embedding-3-small"),
   agents: z.record(z.string(), agentConfigSchema).default({}),
+  permissions: z
+    .object({
+      mode: z.enum(["auto", "ask"]).default("auto"),
+    })
+    .default({ mode: "auto" }),
   lsp: z
     .union([
       z.literal(false),

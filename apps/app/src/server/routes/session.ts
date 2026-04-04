@@ -7,6 +7,7 @@ import {
   getActiveMemorySessionId,
 } from "@/session/memory.ts";
 import { replyToQuestion, rejectQuestion } from "@/tool/question.ts";
+import { replyToPermission } from "@/tool/permission.ts";
 
 export const sessionRouter = new Hono();
 
@@ -133,6 +134,19 @@ sessionRouter.post("/session/:id/question/reply", async (context) => {
 
   const rejected = rejectQuestion(sessionId);
   return context.json({ ok: rejected });
+});
+
+sessionRouter.post("/session/:id/permission/reply", async (context) => {
+  const sessionId = context.req.param("id");
+  let body: { approved?: boolean };
+  try {
+    body = await context.req.json();
+  } catch {
+    return context.json({ error: "invalid JSON body" }, 400);
+  }
+
+  const replied = replyToPermission(sessionId, body.approved ?? false);
+  return context.json({ ok: replied });
 });
 
 sessionRouter.post("/session/:id/cancel", (context) => {

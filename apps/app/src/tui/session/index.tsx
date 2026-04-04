@@ -22,6 +22,9 @@ import { SessionPickerContent } from "@/tui/session/_components/session-picker.t
 import { QuestionPrompt } from "@/tui/session/_components/question.tsx";
 import { EmptyState } from "@/tui/session/_components/empty-state.tsx";
 import { StatusFooter } from "@/tui/session/_components/status-footer.tsx";
+import { PermissionPrompt } from "@/tui/session/_components/permission.tsx";
+import type { PermissionRequest } from "@/tool/permission.ts";
+import { addAllowRule } from "@/tool/permission-allowlist.ts";
 import type { FileChange } from "@/tui/session/_components/files-sidebar.tsx";
 import { getPrimaryAgents, type AgentColor } from "@/agent/agent.ts";
 import type { ThemeColors } from "@/tui/_context/theme.tsx";
@@ -140,6 +143,7 @@ export const Session = () => {
   >([]);
   const [modifiedFiles, setModifiedFiles] = useState<FileChange[]>([]);
   const [revertedMessages, setRevertedMessages] = useState<DisplayMessage[]>([]);
+  const [pendingPermission, setPendingPermission] = useState<PermissionRequest | null>(null);
 
   const primaryAgents = getPrimaryAgents();
   const [currentAgentIndex, setCurrentAgentIndex] = useState(0);
@@ -599,6 +603,20 @@ export const Session = () => {
         setPendingQuestion(null);
       }
 
+      if (eventType === "permission.required") {
+        const permPayload = eventData as {
+          sessionId?: string;
+          request?: PermissionRequest;
+        };
+        if (permPayload.sessionId === currentSessionId && permPayload.request) {
+          setPendingPermission(permPayload.request);
+        }
+      }
+
+      if (eventType === "permission.approved" || eventType === "permission.rejected") {
+        setPendingPermission(null);
+      }
+
       if (eventType === "todo.updated") {
         const todoPayload = eventData as {
           sessionId?: string;
@@ -861,7 +879,32 @@ export const Session = () => {
         revertedCount={revertedMessages.filter((m) => m.role === "user").length}
       />
 
-      {pendingQuestion ? (
+      {pendingPermission ? (
+        <PermissionPrompt
+          request={pendingPermission}
+          agentColor={currentAgentColor}
+          onApprove={() => {
+            sdk.client
+              .post(`/session/${currentSessionId}/permission/reply`, { approved: true })
+              .catch(() => {});
+            setPendingPermission(null);
+          }}
+          onApproveAlways={() => {
+            const target = pendingPermission.filepath ?? pendingPermission.command ?? "";
+            addAllowRule(pendingPermission.toolId, target);
+            sdk.client
+              .post(`/session/${currentSessionId}/permission/reply`, { approved: true })
+              .catch(() => {});
+            setPendingPermission(null);
+          }}
+          onReject={() => {
+            sdk.client
+              .post(`/session/${currentSessionId}/permission/reply`, { approved: false })
+              .catch(() => {});
+            setPendingPermission(null);
+          }}
+        />
+      ) : pendingQuestion ? (
         <QuestionPrompt
           questions={pendingQuestion.questions}
           agentColor={currentAgentColor}
