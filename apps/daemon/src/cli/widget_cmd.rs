@@ -10,12 +10,29 @@ use crate::daemon::config::DaemonConfig;
 
 use super::WidgetCommands;
 
+fn load_env_file() {
+    let env_path = kraken_dir().join(".env");
+    if let Ok(contents) = std::fs::read_to_string(&env_path) {
+        for line in contents.lines() {
+            let trimmed = line.trim();
+            if trimmed.is_empty() || trimmed.starts_with('#') {
+                continue;
+            }
+            if let Some((key, value)) = trimmed.split_once('=') {
+                // Safety: called before any threads are spawned in CLI commands
+                unsafe { std::env::set_var(key.trim(), value.trim()) };
+            }
+        }
+    }
+}
+
 const WIDGET_SCRIPT_FILENAME: &str = "widget.js";
 
 pub async fn execute(
     command: WidgetCommands,
     json_mode: bool,
 ) -> Result<(), Box<dyn std::error::Error>> {
+    load_env_file();
     match command {
         WidgetCommands::Setup => handle_setup(json_mode).await,
         WidgetCommands::Status => handle_status(json_mode).await,
@@ -157,7 +174,7 @@ async fn handle_setup(json_mode: bool) -> Result<(), Box<dyn std::error::Error>>
     println!("  3. Paste the script above (already in your clipboard)");
     println!(
         "  4. Run {} to get your public URL",
-        style("kraken widget tunnel").cyan()
+        style("kraken widget tunnel start").cyan()
     );
     println!("  5. Set the KRAKEN_URL in the script to the tunnel URL");
     println!("  6. Go to your iPhone home screen, long press to edit");
@@ -255,7 +272,7 @@ async fn handle_status(json_mode: bool) -> Result<(), Box<dyn std::error::Error>
         println!(
             "  {} Tunnel not running. Start with: {}",
             style("●").dim(),
-            style("kraken widget tunnel").cyan()
+            style("kraken widget tunnel start").cyan()
         );
     }
 
@@ -360,7 +377,7 @@ async fn handle_tunnel(_json_mode: bool) -> Result<(), Box<dyn std::error::Error
             println!("  {} {}", style("→").dim(), style(&url).cyan());
             println!(
                 "\n  Stop with: {}",
-                style("kraken widget tunnel stop").cyan()
+                style("kraken widget tunnel start stop").cyan()
             );
             return Ok(());
         }

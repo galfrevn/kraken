@@ -102,7 +102,7 @@ function createWidget(data) {
       name.lineLimit = 1;
       r.addSpacer();
       const cost = r.addText(task.cost || "");
-      cost.font = Font.regularMonospacedSystemFont(9);
+      cost.font = Font.mediumMonospacedSystemFont(9);
       cost.textColor = COLORS.muted;
       w.addSpacer(2);
     }
