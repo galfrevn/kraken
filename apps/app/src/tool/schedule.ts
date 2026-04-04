@@ -31,7 +31,7 @@ export const scheduleTool = defineTool({
       .optional()
       .describe("Repeat every N seconds after completion (e.g. 3600 for hourly, 86400 for daily)."),
   }),
-  async execute(args, _context) {
+  async execute(args, context) {
     try {
       const result = await getDaemon().schedule({
         prompt: args.prompt,
@@ -41,6 +41,8 @@ export const scheduleTool = defineTool({
         run_at: args.run_at,
         cron_expression: args.cron_expression,
         repeat_interval_seconds: args.repeat_interval_seconds,
+        channel_type: context.channelType,
+        channel_chat_id: context.channelChatId,
       });
 
       const schedulingDetails = formatSchedulingDetails(args);

@@ -11,6 +11,8 @@ export interface ToolContext {
   messageId: string;
   workingDirectory: string;
   abortSignal: AbortSignal;
+  channelType?: string;
+  channelChatId?: string;
 }
 
 export interface ToolDefinition<TParameters extends z.ZodType = z.ZodType> {

@@ -4,6 +4,7 @@ use std::sync::atomic::{AtomicU32, Ordering};
 use std::time::Duration;
 
 use axum::Router;
+use axum::Json;
 use axum::extract::{Path, Query, State};
 use axum::http::StatusCode;
 use axum::response::IntoResponse;
@@ -60,6 +61,8 @@ struct ScheduleTaskRequestBody {
     run_at: Option<String>,
     cron_expression: Option<String>,
     repeat_interval_seconds: Option<i64>,
+    channel_type: Option<String>,
+    channel_chat_id: Option<String>,
 }
 
 #[derive(Deserialize)]
@@ -204,6 +207,14 @@ pub async fn start_http_api_server_with_options(
             get(handle_audit_by_session),
         )
         .route("/api/audit/summary", get(handle_audit_summary))
+        .route("/api/pairing", get(handle_list_pairing_requests))
+        .route("/api/pairing/approve", post(handle_approve_pairing))
+        .route("/api/pairing/reject", post(handle_reject_pairing))
+        .route("/api/users", get(handle_list_users).post(handle_add_user))
+        .route(
+            "/api/users/{channel}/{platform_id}",
+            delete(handle_remove_user),
+        )
         .with_state(http_api_state);
 
     if let Some(memory_store) = memory_store {
@@ -292,6 +303,8 @@ async fn handle_schedule_task_request(
             request_body.run_at.as_deref(),
             request_body.cron_expression.as_deref(),
             request_body.repeat_interval_seconds,
+            request_body.channel_type.as_deref(),
+            request_body.channel_chat_id.as_deref(),
         )
         .await
     {
@@ -1323,6 +1336,228 @@ async fn handle_event_stream_request(
     Ok(Sse::new(event_stream).keep_alive(
         KeepAlive::new().interval(Duration::from_secs(SSE_KEEP_ALIVE_INTERVAL_SECONDS)),
     ))
+}
+
+// ── Pairing & Users API ───────────────────────────────────────────────
+
+#[derive(Deserialize)]
+struct PairingQuery {
+    channel: Option<String>,
+}
+
+#[derive(Deserialize)]
+struct PairingActionBody {
+    channel: String,
+    code: String,
+}
+
+#[derive(Deserialize)]
+struct AddUserBody {
+    channel: String,
+    #[serde(rename = "platformId")]
+    platform_id: String,
+    #[serde(rename = "displayName")]
+    display_name: Option<String>,
+}
+
+async fn handle_list_pairing_requests(
+    State(state): State<HttpApiState>,
+    Query(query): Query<PairingQuery>,
+) -> impl IntoResponse {
+    let channel = query.channel.as_deref().unwrap_or("telegram");
+    let Some(reload_handle) = &state.reload_handle else {
+        return Json(serde_json::json!({"error": "daemon not fully initialized"})).into_response();
+    };
+    match reload_handle.channel_user_store.get_pending_requests(channel).await {
+        Ok(requests) => {
+            let entries: Vec<serde_json::Value> = requests
+                .into_iter()
+                .map(|r| {
+                    serde_json::json!({
+                        "code": r.pairing_code,
+                        "platformId": r.platform_id,
+                        "displayName": r.display_name,
+                        "expiresAt": r.expires_at,
+                    })
+                })
+                .collect();
+            Json(serde_json::json!({"requests": entries})).into_response()
+        }
+        Err(err) => (
+            StatusCode::INTERNAL_SERVER_ERROR,
+            Json(serde_json::json!({"error": err})),
+        )
+            .into_response(),
+    }
+}
+
+async fn handle_approve_pairing(
+    State(state): State<HttpApiState>,
+    Json(body): Json<PairingActionBody>,
+) -> impl IntoResponse {
+    let Some(reload_handle) = &state.reload_handle else {
+        return (
+            StatusCode::INTERNAL_SERVER_ERROR,
+            Json(serde_json::json!({"error": "daemon not fully initialized"})),
+        )
+            .into_response();
+    };
+    let code = body.code.to_uppercase();
+    match reload_handle
+        .channel_user_store
+        .approve_pairing(&body.channel, &code)
+        .await
+    {
+        Ok(user) => Json(serde_json::json!({
+            "status": "approved",
+            "platformId": user.platform_id,
+            "displayName": user.display_name,
+            "channel": user.channel_type,
+        }))
+        .into_response(),
+        Err(err) => (
+            StatusCode::BAD_REQUEST,
+            Json(serde_json::json!({"error": err})),
+        )
+            .into_response(),
+    }
+}
+
+async fn handle_reject_pairing(
+    State(state): State<HttpApiState>,
+    Json(body): Json<PairingActionBody>,
+) -> impl IntoResponse {
+    let Some(reload_handle) = &state.reload_handle else {
+        return (
+            StatusCode::INTERNAL_SERVER_ERROR,
+            Json(serde_json::json!({"error": "daemon not fully initialized"})),
+        )
+            .into_response();
+    };
+    let code = body.code.to_uppercase();
+    match reload_handle
+        .channel_user_store
+        .reject_pairing(&body.channel, &code)
+        .await
+    {
+        Ok(request) => Json(serde_json::json!({
+            "status": "rejected",
+            "platformId": request.platform_id,
+            "channel": request.channel_type,
+        }))
+        .into_response(),
+        Err(err) => (
+            StatusCode::BAD_REQUEST,
+            Json(serde_json::json!({"error": err})),
+        )
+            .into_response(),
+    }
+}
+
+async fn handle_list_users(
+    State(state): State<HttpApiState>,
+    Query(query): Query<PairingQuery>,
+) -> impl IntoResponse {
+    let Some(reload_handle) = &state.reload_handle else {
+        return Json(serde_json::json!({"error": "daemon not fully initialized"})).into_response();
+    };
+    match reload_handle
+        .channel_user_store
+        .list_authorized(query.channel.as_deref())
+        .await
+    {
+        Ok(users) => {
+            let entries: Vec<serde_json::Value> = users
+                .into_iter()
+                .map(|u| {
+                    serde_json::json!({
+                        "channelType": u.channel_type,
+                        "platformId": u.platform_id,
+                        "displayName": u.display_name,
+                        "authorizedAt": u.authorized_at,
+                        "authorizedBy": u.authorized_by,
+                    })
+                })
+                .collect();
+            Json(serde_json::json!({"users": entries})).into_response()
+        }
+        Err(err) => (
+            StatusCode::INTERNAL_SERVER_ERROR,
+            Json(serde_json::json!({"error": err})),
+        )
+            .into_response(),
+    }
+}
+
+async fn handle_add_user(
+    State(state): State<HttpApiState>,
+    Json(body): Json<AddUserBody>,
+) -> impl IntoResponse {
+    let Some(reload_handle) = &state.reload_handle else {
+        return (
+            StatusCode::INTERNAL_SERVER_ERROR,
+            Json(serde_json::json!({"error": "daemon not fully initialized"})),
+        )
+            .into_response();
+    };
+    match reload_handle
+        .channel_user_store
+        .authorize_user(
+            &body.channel,
+            &body.platform_id,
+            body.display_name.as_deref(),
+            "api",
+        )
+        .await
+    {
+        Ok(user) => Json(serde_json::json!({
+            "status": "authorized",
+            "platformId": user.platform_id,
+            "displayName": user.display_name,
+            "channel": user.channel_type,
+        }))
+        .into_response(),
+        Err(err) => (
+            StatusCode::INTERNAL_SERVER_ERROR,
+            Json(serde_json::json!({"error": err})),
+        )
+            .into_response(),
+    }
+}
+
+async fn handle_remove_user(
+    State(state): State<HttpApiState>,
+    Path((channel, platform_id)): Path<(String, String)>,
+) -> impl IntoResponse {
+    let Some(reload_handle) = &state.reload_handle else {
+        return (
+            StatusCode::INTERNAL_SERVER_ERROR,
+            Json(serde_json::json!({"error": "daemon not fully initialized"})),
+        )
+            .into_response();
+    };
+    match reload_handle
+        .channel_user_store
+        .revoke_user(&channel, &platform_id)
+        .await
+    {
+        Ok(true) => Json(serde_json::json!({
+            "status": "revoked",
+            "platformId": platform_id,
+            "channel": channel,
+        }))
+        .into_response(),
+        Ok(false) => (
+            StatusCode::NOT_FOUND,
+            Json(serde_json::json!({"error": format!("user '{}' not found on '{}'", platform_id, channel)})),
+        )
+            .into_response(),
+        Err(err) => (
+            StatusCode::INTERNAL_SERVER_ERROR,
+            Json(serde_json::json!({"error": err})),
+        )
+            .into_response(),
+    }
 }
 
 #[cfg(test)]

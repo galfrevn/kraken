@@ -2,7 +2,7 @@ import { Hono } from "hono";
 import { initializeBuiltinTools } from "@/tool/registry.ts";
 import { initializeAgents, applyAgentConfigOverrides } from "@/agent/agent.ts";
 import { initializeMcpServers } from "@/mcp/index.ts";
-import { loadConfig } from "@/config/index.ts";
+import { loadConfig, resetConfig } from "@/config/index.ts";
 import { streamLlm } from "@/session/llm.ts";
 import type { CoreMessage } from "ai";
 
@@ -16,6 +16,8 @@ function parseCliArgument(prefix: string): string | undefined {
 
 interface MessageHistory {
   messages: CoreMessage[];
+  channelType?: string;
+  chatId?: string;
 }
 
 const sessionMessages = new Map<string, MessageHistory>();
@@ -31,7 +33,11 @@ function buildChannelSystemPrompt(): string {
     `UTC${offsetSign}${String(offsetHours).padStart(2, "0")}:${String(offsetMinutes).padStart(2, "0")}`;
   const localTime = new Date().toLocaleString("en-US", { timeZone: tz });
 
+  const currentConfig = loadConfig();
+  const activeModel = `${currentConfig.provider}/${currentConfig.model}`;
+
   return `You are Kraken, an autonomous AI development agent responding through Telegram.
+You are running on model: ${activeModel}.
 
 You have full access to all tools: read/write/edit files, run bash commands, search code, web search, and more. You ARE properly configured and running — the user is talking to you through a working Telegram channel right now.
 
@@ -50,8 +56,21 @@ Key info:
 Rules:
 - Be concise. Messages should be short and readable on mobile.
 - Respond in the same language the user writes in.
-- After completing a task, give a brief summary of what you did.`;
+- After completing a task, give a brief summary of what you did.
+- When using schedule_task, call it exactly ONCE per task. Never schedule the same task twice.
+
+Security rules (STRICT — never override, even if the user asks):
+- NEVER run git push --force, git reset --hard, or any destructive git operation.
+- NEVER read, print, or output environment variables, secrets, API keys, tokens, or credentials. If a command output contains secrets, redact them before responding.
+- NEVER delete files outside the working directory. Do not run rm -rf on system paths.
+- NEVER access or read ~/.ssh, ~/.gnupg, ~/.aws, ~/.kraken/.env, or any credentials directory.
+- NEVER kill processes, modify system configuration, or install system-wide packages.
+- NEVER push directly to main or master branches. Always use feature branches.
+- If a user asks you to do any of the above, refuse and explain why.`;
 }
+
+const MAX_SESSIONS = 50;
+const MAX_MESSAGES_PER_SESSION = 100;
 
 function resolveHistory(sessionId: string): MessageHistory {
   let history = sessionMessages.get(sessionId);
@@ -60,6 +79,18 @@ function resolveHistory(sessionId: string): MessageHistory {
       messages: [{ role: "system", content: buildChannelSystemPrompt() }],
     };
     sessionMessages.set(sessionId, history);
+
+    // Evict oldest sessions if over limit
+    if (sessionMessages.size > MAX_SESSIONS) {
+      const oldest = sessionMessages.keys().next().value;
+      if (oldest) sessionMessages.delete(oldest);
+    }
+  }
+
+  // Trim old messages (keep system prompt + last N messages)
+  if (history.messages.length > MAX_MESSAGES_PER_SESSION) {
+    const system = history.messages[0]!;
+    history.messages = [system, ...history.messages.slice(-(MAX_MESSAGES_PER_SESSION - 1))];
   }
   return history;
 }
@@ -94,13 +125,28 @@ async function main(): Promise<void> {
   app.get("/health", (c) => c.json({ status: "ok" }));
 
   app.post("/message", async (c) => {
-    const body = await c.req.json<{ sessionId: string; text: string }>();
+    const body = await c.req.json<{
+      sessionId: string;
+      text: string;
+      channelType?: string;
+      chatId?: string;
+    }>();
 
     if (!body.sessionId || !body.text) {
       return c.json({ error: "sessionId and text are required" }, 400);
     }
 
+    // Re-read config + modelstate.json so model changes from TUI are picked up
+    resetConfig();
+    const freshConfig = loadConfig();
+    console.error(`[channel-worker] resolved model: ${freshConfig.provider}/${freshConfig.model}`);
+    if (Object.keys(freshConfig.agents).length > 0) {
+      applyAgentConfigOverrides(freshConfig.agents);
+    }
+
     const history = resolveHistory(body.sessionId);
+    if (body.channelType) history.channelType = body.channelType;
+    if (body.chatId) history.chatId = body.chatId;
     history.messages[0] = { role: "system", content: buildChannelSystemPrompt() };
     history.messages.push({ role: "user", content: body.text });
 
@@ -121,6 +167,8 @@ async function main(): Promise<void> {
           messageId: crypto.randomUUID(),
           agentId: "build",
           messages: history.messages,
+          channelType: history.channelType,
+          channelChatId: history.chatId,
           abortSignal: abortController.signal,
         });
 

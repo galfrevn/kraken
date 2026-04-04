@@ -212,26 +212,38 @@ pub fn diff_configs(old: &DaemonConfig, new: &DaemonConfig) -> Vec<ConfigChange>
             detail: "telegram adapter".into(),
         }),
         (true, true) => {
-            let old_owner = old
-                .channels
-                .telegram
-                .as_ref()
-                .map(|t| t.owner_id)
-                .unwrap_or(0);
-            let new_owner = new
-                .channels
-                .telegram
-                .as_ref()
-                .map(|t| t.owner_id)
-                .unwrap_or(0);
-            if old_owner != new_owner {
+            let old_config = old.channels.telegram.as_ref().unwrap();
+            let new_config = new.channels.telegram.as_ref().unwrap();
+            let old_policy = old_config.effective_dm_policy();
+            let new_policy = new_config.effective_dm_policy();
+            let old_allow = old_config.effective_allow_from();
+            let new_allow = new_config.effective_allow_from();
+
+            if old_policy != new_policy || old_allow != new_allow {
                 changes.push(ConfigChange {
                     section: "channels.telegram".into(),
                     change_type: "modified".into(),
-                    detail: format!("owner_id: {old_owner} → {new_owner}"),
+                    detail: format!("dm_policy: {old_policy:?} → {new_policy:?}"),
                 });
             }
         }
+        _ => {}
+    }
+
+    // Discord channel changes
+    let old_has_discord = old.channels.discord.as_ref().map(|d| d.enabled).unwrap_or(false);
+    let new_has_discord = new.channels.discord.as_ref().map(|d| d.enabled).unwrap_or(false);
+    match (old_has_discord, new_has_discord) {
+        (false, true) => changes.push(ConfigChange {
+            section: "channels.discord".into(),
+            change_type: "added".into(),
+            detail: "discord adapter".into(),
+        }),
+        (true, false) => changes.push(ConfigChange {
+            section: "channels.discord".into(),
+            change_type: "removed".into(),
+            detail: "discord adapter".into(),
+        }),
         _ => {}
     }
 
@@ -248,7 +260,8 @@ pub struct ReloadHandle {
     pub database_pool: db::DatabasePool,
     pub event_broadcaster: EventBroadcaster,
     pub daemon_port: u16,
-    pub channel_router_handle: RwLock<Option<Arc<channels::router::ChannelRouterHandle>>>,
+    pub channel_router_handle: Arc<RwLock<Option<Arc<channels::router::ChannelRouterHandle>>>>,
+    pub channel_user_store: Arc<db::channel_users::ChannelUserStore>,
 }
 
 impl ReloadHandle {
@@ -263,7 +276,8 @@ impl ReloadHandle {
         database_pool: db::DatabasePool,
         event_broadcaster: EventBroadcaster,
         daemon_port: u16,
-        initial_channel_router: Option<Arc<channels::router::ChannelRouterHandle>>,
+        channel_router_handle: Arc<RwLock<Option<Arc<channels::router::ChannelRouterHandle>>>>,
+        channel_user_store: Arc<db::channel_users::ChannelUserStore>,
     ) -> Self {
         Self {
             notification_dispatcher,
@@ -275,7 +289,8 @@ impl ReloadHandle {
             database_pool,
             event_broadcaster,
             daemon_port,
-            channel_router_handle: RwLock::new(initial_channel_router),
+            channel_router_handle,
+            channel_user_store,
         }
     }
 
@@ -301,6 +316,7 @@ impl ReloadHandle {
             &self.cron_engine,
             &self.file_watcher_engine,
             &self.trigger_engine,
+            &self.channel_router_handle,
         )
         .await?;
 
@@ -357,14 +373,29 @@ impl ReloadHandle {
             session_store,
             worker_manager,
             self.event_broadcaster.clone(),
-        );
+        )
+        .with_command_context(Arc::clone(&self.channel_user_store), self.daemon_port);
 
         if let Some(telegram_config) = new_config.channels.resolved_telegram() {
+            let allow_from = telegram_config.effective_allow_from();
             let telegram_adapter = channels::telegram::TelegramAdapter::new(
                 telegram_config.token,
-                telegram_config.owner_id,
-            );
+                telegram_config.dm_policy,
+                allow_from,
+            )
+            .with_user_store(Arc::clone(&self.channel_user_store));
             channel_router.add_adapter(Box::new(telegram_adapter));
+        }
+
+        if let Some(discord_config) = new_config.channels.resolved_discord() {
+            let discord_adapter = channels::discord::DiscordAdapter::new(
+                discord_config.token,
+                discord_config.dm_policy,
+                discord_config.allow_from,
+                discord_config.allowed_channels,
+            )
+            .with_user_store(Arc::clone(&self.channel_user_store));
+            channel_router.add_adapter(Box::new(discord_adapter));
         }
 
         match channel_router.start().await {
@@ -392,6 +423,7 @@ pub async fn reload_configuration_from_disk(
     cron_engine: &CronEngine,
     file_watcher_engine: &FileWatcherEngine,
     trigger_engine: &TriggerEngine,
+    channel_router_handle: &Arc<RwLock<Option<Arc<channels::router::ChannelRouterHandle>>>>,
 ) -> Result<ReloadResult, String> {
     info!("reloading configuration from disk");
 
@@ -492,7 +524,13 @@ pub async fn reload_configuration_from_disk(
         )
         .await;
 
-    let reloaded_notification_dispatcher = reloaded_daemon_config.notifications.build_dispatcher();
+    let mut reloaded_notification_dispatcher =
+        reloaded_daemon_config.notifications.build_dispatcher();
+    reloaded_notification_dispatcher.add_channel(Box::new(
+        crate::notifications::channel_reply::ChannelReplyNotificationChannel::new(
+            Arc::clone(channel_router_handle),
+        ),
+    ));
     let reloaded_notification_channel_count = reloaded_notification_dispatcher.channel_count();
 
     reloadable_notification_dispatcher

@@ -6,6 +6,8 @@ export interface ScheduleRequest {
   run_at?: string;
   cron_expression?: string;
   repeat_interval_seconds?: number;
+  channel_type?: string;
+  channel_chat_id?: string;
 }
 
 export interface ScheduleResponse {

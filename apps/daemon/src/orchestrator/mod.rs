@@ -159,6 +159,21 @@ impl Orchestrator {
                 );
             }
 
+            if task_from_store.trigger_payload.as_deref() == Some("channel_reply") {
+                if let (Some(channel_type), Some(chat_id)) =
+                    (&task_from_store.trigger_type, &task_from_store.trigger_id)
+                {
+                    completed_task_details
+                        .insert("reply_channel_type".to_string(), channel_type.clone());
+                    completed_task_details
+                        .insert("reply_chat_id".to_string(), chat_id.clone());
+                    if let Some(output) = &task_from_store.output {
+                        completed_task_details
+                            .insert("reply_output".to_string(), output.clone());
+                    }
+                }
+            }
+
             if let Some(artifacts_json) = &task_from_store.artifacts
                 && let Ok(parsed_artifacts) =
                     serde_json::from_str::<serde_json::Value>(artifacts_json)
@@ -228,6 +243,17 @@ impl Orchestrator {
                 failed_task_details.insert("error".to_string(), error_message.clone());
             }
 
+            if task_from_store.trigger_payload.as_deref() == Some("channel_reply") {
+                if let (Some(channel_type), Some(chat_id)) =
+                    (&task_from_store.trigger_type, &task_from_store.trigger_id)
+                {
+                    failed_task_details
+                        .insert("reply_channel_type".to_string(), channel_type.clone());
+                    failed_task_details
+                        .insert("reply_chat_id".to_string(), chat_id.clone());
+                }
+            }
+
             let failed_summary = format!(
                 "Task '{}' failed with exit code {}",
                 task_from_store.name, exit_code
@@ -284,6 +310,16 @@ impl Orchestrator {
             return;
         };
 
+        let (reply_channel_type, reply_chat_id) =
+            if completed_task.trigger_payload.as_deref() == Some("channel_reply") {
+                (
+                    completed_task.trigger_type.as_deref(),
+                    completed_task.trigger_id.as_deref(),
+                )
+            } else {
+                (None, None)
+            };
+
         match self
             .task_store
             .create_task_with_schedule(
@@ -295,6 +331,8 @@ impl Orchestrator {
                 Some(&next_run_at),
                 completed_task.cron_expression.as_deref(),
                 completed_task.repeat_interval_seconds,
+                reply_channel_type,
+                reply_chat_id,
             )
             .await
         {
@@ -374,7 +412,7 @@ impl Orchestrator {
     }
 
     fn cleanup_stale_worktrees(&self) {
-        let repository_root = PathBuf::from(".");
+        let repository_root = std::env::current_dir().unwrap_or_else(|_| PathBuf::from("."));
         if !repository_root.join(".git").exists() {
             return;
         }
@@ -715,6 +753,20 @@ impl Orchestrator {
                     &stale_worker_working_directory,
                 )
                 .await;
+
+                let task_base_dir = self
+                    .task_store
+                    .get_task(stale_task_id)
+                    .await
+                    .and_then(|t| t.workdir)
+                    .unwrap_or_else(|| ".".to_string());
+
+                self.cleanup_worktree_after_worker_exit(
+                    stale_task_id,
+                    HEARTBEAT_TIMEOUT_EXIT_CODE,
+                    &stale_worker_working_directory,
+                    &task_base_dir,
+                );
             }
         }
 
@@ -879,11 +931,11 @@ impl Orchestrator {
                         error = %worktree_creation_error,
                         "failed to create worktree, falling back to base directory"
                     );
-                    base_directory
+                    base_directory.clone()
                 }
             }
         } else {
-            base_directory
+            base_directory.clone()
         };
 
         let worker_result = WorkerProcess::spawn(
@@ -975,6 +1027,26 @@ impl Orchestrator {
                         error = %status_error,
                         "failed to update status for spawn failure"
                     );
+                }
+
+                // Clean up worktree if one was created before the spawn failure
+                if worker_directory != base_directory {
+                    let worktree_path = PathBuf::from(&worker_directory);
+                    let branch_prefix = self.branch_prefix.clone();
+                    let base_dir = base_directory.clone();
+                    tokio::task::spawn_blocking(move || {
+                        let worktree_manager =
+                            WorktreeManager::new(&PathBuf::from(&base_dir), &branch_prefix);
+                        if let Err(removal_error) =
+                            worktree_manager.remove_worktree(&worktree_path)
+                        {
+                            warn!(
+                                worktree_path = %worktree_path.display(),
+                                error = %removal_error,
+                                "failed to remove worktree after spawn failure"
+                            );
+                        }
+                    });
                 }
             }
         }

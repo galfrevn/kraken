@@ -20,6 +20,8 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let parsed_cli = cli::Cli::parse();
     let json_mode = parsed_cli.json;
 
+    // SAFETY: set_var must happen before any threads are spawned.
+    // At this point we are still single-threaded (before tokio runtime starts work).
     if parsed_cli.verbose && std::env::var("RUST_LOG").is_err() {
         unsafe {
             std::env::set_var("RUST_LOG", "kraken_daemon=debug");
@@ -71,6 +73,12 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         }
         Some(cli::Commands::Channel(channel_command)) => {
             cli::channel_cmd::execute(channel_command, json_mode).await
+        }
+        Some(cli::Commands::Pairing(pairing_command)) => {
+            cli::channel_cmd::execute_pairing(pairing_command, json_mode).await
+        }
+        Some(cli::Commands::Users(users_command)) => {
+            cli::channel_cmd::execute_users(users_command, json_mode).await
         }
         Some(cli::Commands::Mcp(mcp_command)) => {
             cli::mcp_cmd::execute(mcp_command, json_mode).await
@@ -202,6 +210,9 @@ pub async fn run_daemon() -> Result<(), Box<dyn std::error::Error>> {
     use daemon::config::DaemonConfig;
     use daemon::reload::ReloadableNotificationDispatcher;
 
+    // SAFETY: Load .env variables before any async tasks are spawned.
+    // set_var is unsafe in multi-threaded contexts, but at this point the
+    // tokio runtime is running only the current task on the main thread.
     let dotenv_path = std::env::var("DOTENV_PATH")
         .ok()
         .map(std::path::PathBuf::from)
@@ -448,7 +459,15 @@ pub async fn run_daemon() -> Result<(), Box<dyn std::error::Error>> {
         );
     }
 
-    let notification_dispatcher = daemon_config.notifications.build_dispatcher();
+    let shared_channel_router_handle: Arc<tokio::sync::RwLock<Option<Arc<channels::router::ChannelRouterHandle>>>> =
+        Arc::new(tokio::sync::RwLock::new(None));
+
+    let mut notification_dispatcher = daemon_config.notifications.build_dispatcher();
+    notification_dispatcher.add_channel(Box::new(
+        notifications::channel_reply::ChannelReplyNotificationChannel::new(
+            Arc::clone(&shared_channel_router_handle),
+        ),
+    ));
     info!(
         notification_channel_count = notification_dispatcher.channel_count(),
         "notification dispatcher built from configuration"
@@ -460,14 +479,79 @@ pub async fn run_daemon() -> Result<(), Box<dyn std::error::Error>> {
         .current_dispatcher()
         .await;
 
-    let initial_channel_router_handle: Option<Arc<channels::router::ChannelRouterHandle>> =
-        if daemon_config.channels.has_any_enabled() {
+    // Initialize channel user store (shared across channel router and reload)
+    let channel_user_store = Arc::new(db::channel_users::ChannelUserStore::new(
+        Arc::clone(&daemon_state.database_pool),
+    ));
+    if let Err(init_error) = channel_user_store.initialize().await {
+        error!(error = %init_error, "failed to initialize channel users tables");
+        return Err(format!("failed to initialize channel users: {init_error}").into());
+    }
+
+    // Migrate legacy owner_id to channel_authorized_users
+    if let Some(telegram_config) = &daemon_config.channels.telegram {
+        if let Some(owner_id) = telegram_config.owner_id {
+            if owner_id != 0 {
+                let platform_id = owner_id.to_string();
+                match channel_user_store
+                    .is_authorized("telegram", &platform_id)
+                    .await
+                {
+                    Ok(false) => {
+                        match channel_user_store
+                            .authorize_user("telegram", &platform_id, None, "migration")
+                            .await
+                        {
+                            Ok(_) => {
+                                info!(
+                                    owner_id = owner_id,
+                                    "migrated legacy ownerId to authorized users"
+                                );
+                            }
+                            Err(err) => {
+                                warn!(error = %err, "failed to migrate legacy ownerId");
+                            }
+                        }
+                    }
+                    Ok(true) => { /* already migrated */ }
+                    Err(err) => {
+                        warn!(error = %err, "failed to check owner_id migration status");
+                    }
+                }
+            }
+        }
+    }
+
+    // Spawn periodic cleanup of expired pairing requests (every 10 minutes)
+    let cleanup_shutdown_receiver = daemon_state.shutdown_receiver.clone();
+    let cleanup_task_handle = {
+        let cleanup_store = Arc::clone(&channel_user_store);
+        let mut shutdown_rx = cleanup_shutdown_receiver;
+        tokio::spawn(async move {
+            let mut interval = tokio::time::interval(std::time::Duration::from_secs(600));
+            loop {
+                tokio::select! {
+                    _ = interval.tick() => {
+                        if let Err(err) = cleanup_store.cleanup_expired().await {
+                            warn!(error = %err, "failed to cleanup expired pairing requests");
+                        }
+                    }
+                    _ = shutdown_rx.changed() => {
+                        info!("pairing cleanup task shutting down");
+                        break;
+                    }
+                }
+            }
+        })
+    };
+
+    if daemon_config.channels.has_any_enabled() {
             let channel_session_store = Arc::new(db::channel_sessions::ChannelSessionStore::new(
                 Arc::clone(&daemon_state.database_pool),
             ));
             if let Err(init_error) = channel_session_store.initialize().await {
                 error!(error = %init_error, "failed to initialize channel sessions table");
-                None
+                return Err(format!("failed to initialize channel sessions: {init_error}").into());
             } else {
                 let channel_worker_script_candidates = [
                     "apps/app/src/channel-worker.ts",
@@ -492,31 +576,44 @@ pub async fn run_daemon() -> Result<(), Box<dyn std::error::Error>> {
                     channel_session_store,
                     Arc::clone(&channel_worker_manager),
                     event_broadcaster.clone(),
-                );
+                )
+                .with_command_context(Arc::clone(&channel_user_store), daemon_port);
 
                 if let Some(telegram_config) = daemon_config.channels.resolved_telegram() {
+                    let allow_from = telegram_config.effective_allow_from();
                     let telegram_adapter = channels::telegram::TelegramAdapter::new(
                         telegram_config.token,
-                        telegram_config.owner_id,
-                    );
+                        telegram_config.dm_policy,
+                        allow_from,
+                    )
+                    .with_user_store(Arc::clone(&channel_user_store));
                     channel_router.add_adapter(Box::new(telegram_adapter));
+                }
+
+                if let Some(discord_config) = daemon_config.channels.resolved_discord() {
+                    let discord_adapter = channels::discord::DiscordAdapter::new(
+                        discord_config.token,
+                        discord_config.dm_policy,
+                        discord_config.allow_from,
+                        discord_config.allowed_channels,
+                    )
+                    .with_user_store(Arc::clone(&channel_user_store));
+                    channel_router.add_adapter(Box::new(discord_adapter));
                 }
 
                 match channel_router.start().await {
                     Ok(handle) => {
                         info!("channel router started");
-                        Some(handle)
+                        *shared_channel_router_handle.write().await = Some(handle);
                     }
                     Err(start_error) => {
                         error!(error = %start_error, "failed to start channel router");
-                        None
                     }
                 }
             }
         } else {
             info!("no channels configured, skipping channel router");
-            None
-        };
+        }
 
     let reload_handle = Arc::new(daemon::reload::ReloadHandle::new(
         Arc::clone(&reloadable_notification_dispatcher),
@@ -528,7 +625,8 @@ pub async fn run_daemon() -> Result<(), Box<dyn std::error::Error>> {
         daemon_state.database_pool.clone(),
         event_broadcaster.clone(),
         daemon_port,
-        initial_channel_router_handle,
+        Arc::clone(&shared_channel_router_handle),
+        Arc::clone(&channel_user_store),
     ));
 
     let worker_script_candidates = vec!["apps/app/src/worker.ts", "../app/src/worker.ts"];
@@ -788,6 +886,13 @@ pub async fn run_daemon() -> Result<(), Box<dyn std::error::Error>> {
             channel_handle.shutdown().await;
             info!("channel router stopped");
         }
+    }
+
+    if let Err(cleanup_join_error) = cleanup_task_handle.await {
+        error!(
+            error = %cleanup_join_error,
+            "pairing cleanup task panicked during shutdown"
+        );
     }
 
     cron_engine.shutdown();

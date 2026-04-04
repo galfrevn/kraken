@@ -16,6 +16,8 @@ interface StreamLlmOptions {
   agentId: string;
   messages: CoreMessage[];
   abortSignal?: AbortSignal;
+  channelType?: string;
+  channelChatId?: string;
 }
 
 export async function streamLlm(options: StreamLlmOptions) {
@@ -28,6 +30,8 @@ export async function streamLlm(options: StreamLlmOptions) {
     messageId: options.messageId,
     workingDirectory: process.cwd(),
     abortSignal: options.abortSignal ?? AbortSignal.timeout(DEFAULT_ABORT_TIMEOUT_MILLISECONDS),
+    channelType: options.channelType,
+    channelChatId: options.channelChatId,
   });
 
   const mcpTools = await getMcpTools();

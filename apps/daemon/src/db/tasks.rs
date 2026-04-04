@@ -122,6 +122,8 @@ impl TaskStore {
             None,
             None,
             None,
+            None,
+            None,
         )
         .await
     }
@@ -137,6 +139,8 @@ impl TaskStore {
         run_at: Option<&str>,
         cron_expression: Option<&str>,
         repeat_interval_seconds: Option<i64>,
+        reply_channel_type: Option<&str>,
+        reply_chat_id: Option<&str>,
     ) -> Result<DaemonTask, String> {
         let task_id = Uuid::new_v4().to_string();
         let task_name = name.to_string();
@@ -146,12 +150,23 @@ impl TaskStore {
         let task_run_at = run_at.map(normalize_run_at_to_utc);
         let task_cron_expression = cron_expression.map(|s| s.to_string());
 
+        let (trigger_type, trigger_id, trigger_payload) =
+            if let (Some(channel_type), Some(chat_id)) = (reply_channel_type, reply_chat_id) {
+                (
+                    Some(channel_type.to_string()),
+                    Some(chat_id.to_string()),
+                    Some("channel_reply".to_string()),
+                )
+            } else {
+                (None, None, None)
+            };
+
         let connection = self.database_pool.lock().await;
 
         connection
             .execute(
-                "INSERT INTO daemon_tasks (id, name, description, priority, agent, workdir, run_at, cron_expression, repeat_interval_seconds)
-                 VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9)",
+                "INSERT INTO daemon_tasks (id, name, description, priority, agent, workdir, run_at, cron_expression, repeat_interval_seconds, trigger_type, trigger_id, trigger_payload)
+                 VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12)",
                 params![
                     task_id,
                     task_name,
@@ -161,7 +176,10 @@ impl TaskStore {
                     task_workdir,
                     task_run_at,
                     task_cron_expression,
-                    repeat_interval_seconds
+                    repeat_interval_seconds,
+                    trigger_type,
+                    trigger_id,
+                    trigger_payload,
                 ],
             )
             .map_err(|error| format!("failed to insert task: {error}"))?;
@@ -357,9 +375,9 @@ impl TaskStore {
             .execute(
                 "UPDATE daemon_tasks
                  SET exit_code = ?1,
-                     output = ?2,
-                     error_message = ?3,
-                     artifacts = ?4,
+                     output = COALESCE(?2, output),
+                     error_message = COALESCE(?3, error_message),
+                     artifacts = COALESCE(?4, artifacts),
                      updated_at = datetime('now')
                  WHERE id = ?5",
                 params![exit_code, output, error_message, artifacts_json, task_id],

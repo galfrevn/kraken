@@ -6,15 +6,16 @@ use tokio::time::Instant;
 use tracing::{debug, error, info, warn};
 
 use crate::db::channel_sessions::ChannelSessionStore;
+use crate::db::channel_users::ChannelUserStore;
 use crate::events::{DaemonEvent, DaemonEventType, EventBroadcaster};
 
-use super::telegram::markdown_to_telegram_html;
+use super::commands::{self, CommandContext};
 use super::types::{ChannelAdapter, InboundMessage, MessageContent};
 use super::worker_manager::{ChannelWorkerManager, StreamEvent};
 
 type AdapterMap = HashMap<String, Arc<dyn ChannelAdapter>>;
 
-const MAX_TELEGRAM_MESSAGE_LENGTH: usize = 4096;
+const MAX_MESSAGE_LENGTH: usize = 2000; // Conservative limit (Discord=2000, Telegram=4096)
 const DRAFT_UPDATE_INTERVAL_MS: u64 = 300;
 const MIN_CHARS_BEFORE_DRAFT: usize = 15;
 
@@ -23,6 +24,8 @@ pub struct ChannelRouter {
     session_store: Arc<ChannelSessionStore>,
     worker_manager: Arc<ChannelWorkerManager>,
     event_broadcaster: EventBroadcaster,
+    user_store: Option<Arc<ChannelUserStore>>,
+    daemon_port: u16,
 }
 
 impl ChannelRouter {
@@ -36,7 +39,19 @@ impl ChannelRouter {
             session_store,
             worker_manager,
             event_broadcaster,
+            user_store: None,
+            daemon_port: 50051,
         }
+    }
+
+    pub fn with_command_context(
+        mut self,
+        user_store: Arc<ChannelUserStore>,
+        daemon_port: u16,
+    ) -> Self {
+        self.user_store = Some(user_store);
+        self.daemon_port = daemon_port;
+        self
     }
 
     pub fn add_adapter(&mut self, adapter: Box<dyn ChannelAdapter>) {
@@ -79,6 +94,13 @@ impl ChannelRouter {
         let session_store = self.session_store;
         let worker_manager = self.worker_manager;
         let event_broadcaster = self.event_broadcaster;
+        let command_ctx = self.user_store.map(|user_store| {
+            Arc::new(CommandContext {
+                session_store: Arc::clone(&session_store),
+                user_store,
+                daemon_port: self.daemon_port,
+            })
+        });
 
         tokio::spawn(async move {
             process_inbound_messages(
@@ -87,6 +109,7 @@ impl ChannelRouter {
                 worker_manager,
                 event_broadcaster,
                 shared_adapters,
+                command_ctx,
             )
             .await;
         });
@@ -120,6 +143,10 @@ impl ChannelRouterHandle {
     pub fn adapter_types(&self) -> Vec<&str> {
         self.adapters.values().map(|a| a.channel_type()).collect()
     }
+
+    pub fn get_adapter(&self, channel_type: &str) -> Option<Arc<dyn ChannelAdapter>> {
+        self.adapters.get(channel_type).cloned()
+    }
 }
 
 async fn process_inbound_messages(
@@ -128,6 +155,7 @@ async fn process_inbound_messages(
     worker_manager: Arc<ChannelWorkerManager>,
     event_broadcaster: EventBroadcaster,
     adapters: Arc<AdapterMap>,
+    command_ctx: Option<Arc<CommandContext>>,
 ) {
     info!("channel message processor started");
 
@@ -136,6 +164,7 @@ async fn process_inbound_messages(
         let worker_manager = Arc::clone(&worker_manager);
         let event_broadcaster = event_broadcaster.clone();
         let adapters = Arc::clone(&adapters);
+        let command_ctx = command_ctx.clone();
 
         tokio::spawn(async move {
             handle_single_message(
@@ -144,6 +173,7 @@ async fn process_inbound_messages(
                 worker_manager,
                 event_broadcaster,
                 adapters,
+                command_ctx,
             )
             .await;
         });
@@ -158,9 +188,33 @@ async fn handle_single_message(
     worker_manager: Arc<ChannelWorkerManager>,
     event_broadcaster: EventBroadcaster,
     adapters: Arc<AdapterMap>,
+    command_ctx: Option<Arc<CommandContext>>,
 ) {
     let channel_type = &inbound.channel_type;
     let chat_id = &inbound.chat_id;
+
+    // Intercept slash commands before sending to the LLM
+    if let Some(command) = commands::parse_slash_command(&inbound.text) {
+        if let Some(ref ctx) = command_ctx {
+            if let Some(response) =
+                commands::handle_builtin_command(&command, ctx, channel_type, chat_id).await
+            {
+                info!(
+                    channel_type = channel_type,
+                    chat_id = chat_id,
+                    command = command.name,
+                    "handled slash command"
+                );
+                if let Some(adapter) = adapters.get(channel_type) {
+                    let _ = adapter
+                        .send_message(chat_id, MessageContent::Html(response))
+                        .await;
+                }
+                return;
+            }
+        }
+        // Unknown command — fall through to LLM
+    }
 
     info!(
         channel_type = channel_type,
@@ -228,7 +282,7 @@ async fn handle_single_message(
     });
 
     let response = match worker_manager
-        .send_message_stream(&session.session_id, &inbound.text)
+        .send_message_stream(&session.session_id, &inbound.text, channel_type, chat_id)
         .await
     {
         Ok(rx) => stream_response_to_channel(adapter, chat_id, rx, &typing_cancel).await,
@@ -301,7 +355,7 @@ async fn stream_response_to_channel(
 
                 if should_send {
                     let draft_text =
-                        truncate_to_char_boundary(&accumulated, MAX_TELEGRAM_MESSAGE_LENGTH);
+                        truncate_to_char_boundary(&accumulated, MAX_MESSAGE_LENGTH);
                     match adapter
                         .send_draft(chat_id, draft_id, draft_text, None)
                         .await
@@ -341,19 +395,10 @@ async fn stream_response_to_channel(
 
     typing_cancel.cancel();
 
-    let html = markdown_to_telegram_html(&accumulated);
-
-    if html.len() <= MAX_TELEGRAM_MESSAGE_LENGTH {
-        let _ = adapter
-            .send_message(chat_id, MessageContent::Html(html))
-            .await;
-    } else {
-        for chunk in split_html_message(&html, MAX_TELEGRAM_MESSAGE_LENGTH) {
-            let _ = adapter
-                .send_message(chat_id, MessageContent::Html(chunk))
-                .await;
-        }
-    }
+    // Send as Text — each adapter converts to its native format (HTML for Telegram, markdown for Discord)
+    let _ = adapter
+        .send_message(chat_id, MessageContent::Text(accumulated.clone()))
+        .await;
 
     accumulated
 }
@@ -369,24 +414,6 @@ fn truncate_to_char_boundary(s: &str, max: usize) -> &str {
     &s[..end]
 }
 
-fn split_html_message(text: &str, max_len: usize) -> Vec<String> {
-    let mut chunks = Vec::new();
-    let mut remaining = text;
-
-    while remaining.len() > max_len {
-        let split_at = remaining[..max_len]
-            .rfind('\n')
-            .unwrap_or_else(|| remaining[..max_len].rfind(' ').unwrap_or(max_len));
-        chunks.push(remaining[..split_at].to_string());
-        remaining = remaining[split_at..].trim_start();
-    }
-
-    if !remaining.is_empty() {
-        chunks.push(remaining.to_string());
-    }
-
-    chunks
-}
 
 fn publish_channel_event(
     event_broadcaster: &EventBroadcaster,

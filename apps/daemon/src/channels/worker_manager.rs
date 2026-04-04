@@ -50,7 +50,7 @@ impl ChannelWorkerManager {
             .arg(format!("--port={}", self.worker_port))
             .arg(format!("--daemon-url={}", self.daemon_url))
             .current_dir(&self.working_directory)
-            .stdout(Stdio::piped())
+            .stdout(Stdio::null())
             .stderr(Stdio::inherit())
             .spawn()
             .map_err(|error| format!("failed to spawn channel worker: {error}"))?;
@@ -143,6 +143,8 @@ impl ChannelWorkerManager {
         &self,
         session_id: &str,
         text: &str,
+        channel_type: &str,
+        chat_id: &str,
     ) -> Result<mpsc::Receiver<StreamEvent>, String> {
         let url = format!("{}/message", self.worker_url());
         let client = reqwest::Client::new();
@@ -150,6 +152,8 @@ impl ChannelWorkerManager {
         let body = serde_json::json!({
             "sessionId": session_id,
             "text": text,
+            "channelType": channel_type,
+            "chatId": chat_id,
         });
 
         let mut response = client

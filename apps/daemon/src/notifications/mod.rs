@@ -1,3 +1,4 @@
+pub mod channel_reply;
 pub mod discord;
 pub mod dispatcher;
 pub mod email;
