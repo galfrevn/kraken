@@ -20,6 +20,7 @@ import { ToolCallDisplay } from "@/tui/session/_components/tool.tsx";
 import { ThemePickerContent } from "@/tui/session/_components/theme.tsx";
 import { SessionPickerContent } from "@/tui/session/_components/session-picker.tsx";
 import { QuestionPrompt } from "@/tui/session/_components/question.tsx";
+import { EmptyState } from "@/tui/session/_components/empty-state.tsx";
 import { getPrimaryAgents, type AgentColor } from "@/agent/agent.ts";
 import type { ThemeColors } from "@/tui/_context/theme.tsx";
 
@@ -701,6 +702,7 @@ export const Session = () => {
           },
         }}
       >
+        {displayMessages.length === 0 && !isProcessing && <EmptyState />}
         {displayMessages.map((displayMessage) => (
           <box key={displayMessage.id} flexDirection="column">
             {displayMessage.role === "user" ? (

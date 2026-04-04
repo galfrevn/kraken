@@ -1,5 +1,5 @@
-import { useEffect, useState, useCallback } from "react";
-import { useTerminalDimensions, useKeyboard, useRenderer } from "@opentui/react";
+import { useState, useEffect, useCallback } from "react";
+import { useKeyboard, useRenderer } from "@opentui/react";
 import { useDialog } from "@opentui-ui/dialog/react";
 import { useRoute } from "@/tui/_context/route.tsx";
 import { useSdk } from "@/tui/_context/sdk.tsx";
@@ -8,25 +8,24 @@ import { useModels } from "@/tui/_context/models.tsx";
 import { useCommands } from "@/tui/_context/commands.tsx";
 import { ModelPickerContent } from "@/tui/session/_components/model.tsx";
 import { ThemePickerContent } from "@/tui/session/_components/theme.tsx";
+import { SessionPickerContent } from "@/tui/session/_components/session-picker.tsx";
 import type { ModelSelection } from "@/models/types.ts";
 import { getPrimaryAgents, type AgentColor } from "@/agent/agent.ts";
 import type { ThemeColors } from "@/tui/_context/theme.tsx";
+
+import { SessionLayout } from "@/tui/session/_components/layout.tsx";
+import { SessionPrompt } from "@/tui/session/_components/prompt.tsx";
+import { EmptyState } from "@/tui/session/_components/empty-state.tsx";
+
 function resolveAgentColor(colorKey: AgentColor | undefined, themeColors: ThemeColors): string {
   if (!colorKey) return themeColors.secondary;
   return themeColors[colorKey] ?? themeColors.secondary;
 }
 
-import { Logo } from "@/tui/home/_components/logo.tsx";
-import { Prompt } from "@/tui/home/_components/prompt.tsx";
-import { Shortcuts } from "@/tui/home/_components/shortcuts.tsx";
-import { Tip } from "@/tui/home/_components/tip.tsx";
-import { Footer } from "@/tui/home/_components/footer.tsx";
-
 export const Home = () => {
   const { theme } = useTheme();
   const route = useRoute();
   const sdk = useSdk();
-  const terminalDimensions = useTerminalDimensions();
   const renderer = useRenderer();
   const dialog = useDialog();
   const { selectModel } = useModels();
@@ -35,7 +34,6 @@ export const Home = () => {
   const primaryAgents = getPrimaryAgents();
   const [currentAgentIndex, setCurrentAgentIndex] = useState(0);
   const currentAgent = primaryAgents[currentAgentIndex] ?? primaryAgents[0]!;
-
   const currentAgentColor = resolveAgentColor(currentAgent.color, theme);
 
   const handleToggleAgent = useCallback(() => {
@@ -51,8 +49,6 @@ export const Home = () => {
         slash: { name: "sessions", aliases: ["resume", "continue"] },
         onSelect: () => {
           (async () => {
-            const { SessionPickerContent } =
-              await import("@/tui/session/_components/session-picker.tsx");
             const selectedSession = await dialog.choice<{ id: string }>({
               content: (choiceContext) => (
                 <SessionPickerContent {...choiceContext} sdk={sdk} theme={theme} />
@@ -159,49 +155,26 @@ export const Home = () => {
   }
 
   return (
-    <box
-      flexDirection="column"
-      alignItems="center"
-      width={terminalDimensions.width}
-      height={terminalDimensions.height}
-      backgroundColor={theme.background}
-      paddingLeft={2}
-      paddingRight={2}
+    <SessionLayout
+      sidebarProperties={{
+        sessionTitle: "New Session",
+        tokenCount: 0,
+        tokenPercentage: 0,
+        estimatedCost: 0,
+        agentName: currentAgent.name,
+        agentColor: currentAgentColor,
+      }}
     >
-      <box flexGrow={1} minHeight={0} />
-      <box height={4} minHeight={0} flexShrink={1} />
-      <Logo />
-      <box height={1} minHeight={0} flexShrink={1} />
-      <Prompt
+      <EmptyState />
+
+      <SessionPrompt
         onSubmit={handlePromptSubmit}
+        disabled={false}
+        isProcessing={false}
         agentName={currentAgent.name}
         agentColor={currentAgentColor}
         onToggleAgent={handleToggleAgent}
       />
-      <box
-        height={4}
-        minHeight={0}
-        width="100%"
-        maxWidth={75}
-        alignItems="center"
-        paddingTop={1}
-        flexShrink={1}
-      >
-        <Shortcuts />
-      </box>
-      <box
-        height={4}
-        minHeight={0}
-        width="100%"
-        maxWidth={75}
-        alignItems="center"
-        paddingTop={1}
-        flexShrink={1}
-      >
-        <Tip />
-      </box>
-      <box flexGrow={1} minHeight={0} />
-      <Footer />
-    </box>
+    </SessionLayout>
   );
 };
