@@ -1,3 +1,5 @@
+use std::process::Command;
+
 use console::style;
 use dialoguer::Password;
 use tabled::{Table, Tabled};
@@ -5,7 +7,7 @@ use tabled::{Table, Tabled};
 use crate::cli::ProviderCommands;
 use crate::cli::env_helpers::{read_env_map, resolve_env_file_path, write_env_map};
 
-const KNOWN_PROVIDERS: &[(&str, &str)] = &[("openrouter", "OPENROUTER_API_KEY")];
+const KNOWN_PROVIDERS: &[(&str, &str)] = &[("openrouter", "OPENROUTER_API_KEY"), ("copilot", "")];
 const MASK_MIN_LENGTH: usize = 8;
 const MASK_VISIBLE_PREFIX: usize = 4;
 
@@ -13,8 +15,8 @@ const MASK_VISIBLE_PREFIX: usize = 4;
 struct ProviderRow {
     #[tabled(rename = "Provider")]
     name: String,
-    #[tabled(rename = "Env Variable")]
-    env_var: String,
+    #[tabled(rename = "Auth")]
+    auth_type: String,
     #[tabled(rename = "Configured")]
     configured: String,
 }
@@ -31,6 +33,24 @@ fn mask_key(api_key: &str) -> String {
     )
 }
 
+fn is_copilot_configured() -> bool {
+    let home = dirs_next::home_dir().unwrap_or_default();
+    let auth_path = home.join(".kraken").join("auth.json");
+    if !auth_path.exists() {
+        return false;
+    }
+    match std::fs::read_to_string(&auth_path) {
+        Ok(contents) => {
+            if let Ok(json) = serde_json::from_str::<serde_json::Value>(&contents) {
+                json.get("copilot").is_some()
+            } else {
+                false
+            }
+        }
+        Err(_) => false,
+    }
+}
+
 pub async fn execute(
     command: ProviderCommands,
     json_mode: bool,
@@ -45,43 +65,49 @@ pub async fn execute(
 fn handle_list(json_mode: bool) -> Result<(), Box<dyn std::error::Error>> {
     let env_path = resolve_env_file_path();
     let env_map = read_env_map(&env_path);
+    let copilot_ok = is_copilot_configured();
 
     if json_mode {
-        let providers: Vec<serde_json::Value> = KNOWN_PROVIDERS
-            .iter()
-            .map(|(name, env_var)| {
-                let is_configured = env_map.contains_key(*env_var);
-                serde_json::json!({
-                    "provider": name,
-                    "env_var": env_var,
-                    "configured": is_configured,
-                    "key_preview": if is_configured {
-                        env_map.get(*env_var).map(|key_value| mask_key(key_value))
-                    } else {
-                        None
-                    },
-                })
-            })
-            .collect();
+        let providers = serde_json::json!([
+            {
+                "provider": "openrouter",
+                "configured": env_map.contains_key("OPENROUTER_API_KEY"),
+                "auth": "api_key",
+            },
+            {
+                "provider": "copilot",
+                "configured": copilot_ok,
+                "auth": "oauth",
+            }
+        ]);
         println!("{}", serde_json::json!({ "providers": providers }));
         return Ok(());
     }
 
-    let rows: Vec<ProviderRow> = KNOWN_PROVIDERS
-        .iter()
-        .map(|(name, env_var)| {
-            let configured = if let Some(key) = env_map.get(*env_var) {
-                format!("{} ({})", style("yes").green(), mask_key(key))
-            } else {
-                style("no").red().to_string()
-            };
-            ProviderRow {
-                name: name.to_string(),
-                env_var: env_var.to_string(),
-                configured,
-            }
-        })
-        .collect();
+    let openrouter_configured = if let Some(key) = env_map.get("OPENROUTER_API_KEY") {
+        format!("{} ({})", style("yes").green(), mask_key(key))
+    } else {
+        style("no").red().to_string()
+    };
+
+    let copilot_configured = if copilot_ok {
+        style("yes").green().to_string()
+    } else {
+        style("no").red().to_string()
+    };
+
+    let rows = vec![
+        ProviderRow {
+            name: "openrouter".to_string(),
+            auth_type: "API Key".to_string(),
+            configured: openrouter_configured,
+        },
+        ProviderRow {
+            name: "copilot".to_string(),
+            auth_type: "OAuth".to_string(),
+            configured: copilot_configured,
+        },
+    ];
 
     println!("{}", Table::new(&rows));
     Ok(())
@@ -89,16 +115,15 @@ fn handle_list(json_mode: bool) -> Result<(), Box<dyn std::error::Error>> {
 
 fn handle_configure(provider: String, json_mode: bool) -> Result<(), Box<dyn std::error::Error>> {
     let provider_lower = provider.to_lowercase();
-    let entry = KNOWN_PROVIDERS
-        .iter()
-        .find(|(name, _)| *name == provider_lower);
 
-    let Some((provider_name, env_var)) = entry else {
-        let supported_names: Vec<&str> = KNOWN_PROVIDERS.iter().map(|(name, _)| *name).collect();
+    if provider_lower == "copilot" {
+        return handle_copilot_login(json_mode);
+    }
+
+    if provider_lower != "openrouter" {
         let message = format!(
-            "Unknown provider '{}'. Supported: {}",
-            provider,
-            supported_names.join(", ")
+            "Unknown provider '{}'. Supported: openrouter, copilot",
+            provider
         );
         if json_mode {
             println!("{}", serde_json::json!({ "error": message }));
@@ -106,26 +131,23 @@ fn handle_configure(provider: String, json_mode: bool) -> Result<(), Box<dyn std
             eprintln!("{}", style(message).red());
         }
         return Ok(());
-    };
+    }
 
+    let env_var = "OPENROUTER_API_KEY";
     let env_path = resolve_env_file_path();
     let mut env_map = read_env_map(&env_path);
 
-    let already_configured = env_map.contains_key(*env_var);
+    let already_configured = env_map.contains_key(env_var);
     if already_configured && !json_mode {
         println!(
-            "{} {} already has a key configured ({}). It will be overwritten.",
+            "{} openrouter already has a key configured ({}). It will be overwritten.",
             style("Note:").yellow().bold(),
-            style(provider_name).cyan(),
-            mask_key(&env_map[*env_var])
+            mask_key(&env_map[env_var])
         );
     }
 
     let api_key: String = Password::new()
-        .with_prompt(format!(
-            "Enter your {} API key (saved to ~/.kraken/.env as {})",
-            provider_name, env_var
-        ))
+        .with_prompt("Enter your OpenRouter API key (saved to ~/.kraken/.env)")
         .interact()?;
 
     if api_key.is_empty() {
@@ -147,8 +169,7 @@ fn handle_configure(provider: String, json_mode: bool) -> Result<(), Box<dyn std
         println!(
             "{}",
             serde_json::json!({
-                "provider": provider_name,
-                "env_var": env_var,
+                "provider": "openrouter",
                 "status": if already_configured { "updated" } else { "configured" },
             })
         );
@@ -156,15 +177,35 @@ fn handle_configure(provider: String, json_mode: bool) -> Result<(), Box<dyn std
         let action = if already_configured {
             "Updated"
         } else {
-            "Saved"
+            "Configured"
         };
-        println!(
-            "{} {} {} in {}",
-            style("✓").green().bold(),
-            action,
-            style(env_var).cyan(),
-            style("~/.kraken/.env").cyan()
-        );
+        println!("  {} {} openrouter", style("✓").green().bold(), action);
+    }
+
+    Ok(())
+}
+
+fn handle_copilot_login(json_mode: bool) -> Result<(), Box<dyn std::error::Error>> {
+    if json_mode {
+        return Err("copilot login requires interactive mode".into());
+    }
+
+    let script_candidates = [
+        "apps/app/src/cli/copilot-login.ts",
+        "../app/src/cli/copilot-login.ts",
+        "src/cli/copilot-login.ts",
+    ];
+
+    let script_path = script_candidates
+        .iter()
+        .find(|p| std::path::Path::new(p).exists())
+        .map(|p| p.to_string())
+        .unwrap_or_else(|| "apps/app/src/cli/copilot-login.ts".to_string());
+
+    let status = Command::new("bun").arg("run").arg(&script_path).status()?;
+
+    if !status.success() {
+        return Err("Copilot login failed".into());
     }
 
     Ok(())
@@ -172,16 +213,41 @@ fn handle_configure(provider: String, json_mode: bool) -> Result<(), Box<dyn std
 
 fn handle_remove(provider: String, json_mode: bool) -> Result<(), Box<dyn std::error::Error>> {
     let provider_lower = provider.to_lowercase();
-    let entry = KNOWN_PROVIDERS
-        .iter()
-        .find(|(name, _)| *name == provider_lower);
 
-    let Some((provider_name, env_var)) = entry else {
-        let supported_names: Vec<&str> = KNOWN_PROVIDERS.iter().map(|(name, _)| *name).collect();
+    if provider_lower == "copilot" {
+        let home = dirs_next::home_dir().unwrap_or_default();
+        let auth_path = home.join(".kraken").join("auth.json");
+        if auth_path.exists() {
+            if let Ok(contents) = std::fs::read_to_string(&auth_path) {
+                if let Ok(mut json) = serde_json::from_str::<serde_json::Value>(&contents) {
+                    if let Some(obj) = json.as_object_mut() {
+                        obj.remove("copilot");
+                        let _ = std::fs::write(
+                            &auth_path,
+                            serde_json::to_string_pretty(&json).unwrap_or_default(),
+                        );
+                    }
+                }
+            }
+        }
+        if json_mode {
+            println!(
+                "{}",
+                serde_json::json!({ "provider": "copilot", "status": "removed" })
+            );
+        } else {
+            println!(
+                "  {} Removed copilot authentication",
+                style("✓").green().bold()
+            );
+        }
+        return Ok(());
+    }
+
+    if provider_lower != "openrouter" {
         let message = format!(
-            "Unknown provider '{}'. Supported: {}",
-            provider,
-            supported_names.join(", ")
+            "Unknown provider '{}'. Supported: openrouter, copilot",
+            provider
         );
         if json_mode {
             println!("{}", serde_json::json!({ "error": message }));
@@ -189,39 +255,29 @@ fn handle_remove(provider: String, json_mode: bool) -> Result<(), Box<dyn std::e
             eprintln!("{}", style(message).red());
         }
         return Ok(());
-    };
+    }
 
+    let env_var = "OPENROUTER_API_KEY";
     let env_path = resolve_env_file_path();
     let mut env_map = read_env_map(&env_path);
 
-    if env_map.remove(*env_var).is_none() {
-        let message = format!("No API key found for '{}'", provider);
+    if env_map.remove(env_var).is_some() {
+        write_env_map(&env_path, &env_map)?;
         if json_mode {
-            println!("{}", serde_json::json!({ "error": message }));
+            println!(
+                "{}",
+                serde_json::json!({ "provider": "openrouter", "status": "removed" })
+            );
         } else {
-            eprintln!("{}", style(message).yellow());
+            println!("  {} Removed openrouter API key", style("✓").green().bold());
         }
-        return Ok(());
-    }
-
-    write_env_map(&env_path, &env_map)?;
-
-    if json_mode {
+    } else if json_mode {
         println!(
             "{}",
-            serde_json::json!({
-                "provider": provider_name,
-                "env_var": env_var,
-                "status": "removed",
-            })
+            serde_json::json!({ "provider": "openrouter", "status": "not_configured" })
         );
     } else {
-        println!(
-            "{} Removed {} from {}",
-            style("✓").green().bold(),
-            style(env_var).cyan(),
-            style("~/.kraken/.env").cyan()
-        );
+        println!("  openrouter was not configured");
     }
 
     Ok(())

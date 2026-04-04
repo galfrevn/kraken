@@ -5,7 +5,6 @@ import { eventRouter } from "@/server/routes/event.ts";
 import { sessionRouter } from "@/server/routes/session.ts";
 import { modelsRouter } from "@/server/routes/models.ts";
 import { filesRouter } from "@/server/routes/files.ts";
-import { startModelsDevRefreshInterval } from "@/models/modelsdev.ts";
 
 const DEFAULT_SERVER_PORT = 7899;
 const SERVER_IDLE_TIMEOUT_SECONDS = 255;
@@ -20,8 +19,6 @@ export async function startServer(): Promise<{ url: string }> {
   app.route("/", sessionRouter);
   app.route("/", modelsRouter);
   app.route("/", filesRouter);
-
-  startModelsDevRefreshInterval();
 
   const port = parseInt(process.env.KRAKEN_APP_PORT ?? String(DEFAULT_SERVER_PORT), 10);
 
