@@ -149,6 +149,7 @@ export const Session = () => {
   const [revertedMessages, setRevertedMessages] = useState<DisplayMessage[]>([]);
   const [pendingPermission, setPendingPermission] = useState<PermissionRequest | null>(null);
   const [commandPaletteOpen, setCommandPaletteOpen] = useState(false);
+  const [parentSessionId, setParentSessionId] = useState<string | null>(null);
 
   const primaryAgents = getPrimaryAgents();
   const [currentAgentIndex, setCurrentAgentIndex] = useState(0);
@@ -321,6 +322,10 @@ export const Session = () => {
       renderer.destroy();
       process.exit(0);
     }
+    if (keyEvent.name === "escape" && !isProcessing && parentSessionId) {
+      route.goToSession(parentSessionId);
+      return;
+    }
     if (keyEvent.ctrl && keyEvent.name === "z") {
       handleUndo();
     }
@@ -409,9 +414,10 @@ export const Session = () => {
           setDisplayMessages(hydrated);
           const sessionData = await sdk.client
             .fetch(`/session/${currentSessionId}`)
-            .then((r) => r.json() as Promise<{ title?: string }>)
+            .then((r) => r.json() as Promise<{ title?: string; parentId?: string }>)
             .catch(() => null);
           if (sessionData?.title) setSessionTitle(sessionData.title);
+          if (sessionData?.parentId) setParentSessionId(sessionData.parentId);
         }
       })
       .catch(() => {});
@@ -839,7 +845,7 @@ export const Session = () => {
   return (
     <SessionLayout
       sidebarProperties={{
-        sessionTitle,
+        sessionTitle: parentSessionId ? `↩ ${sessionTitle}` : sessionTitle,
         tokenCount: totalTokenCount,
         tokenPercentage,
         estimatedCost: totalEstimatedCost,
@@ -883,6 +889,7 @@ export const Session = () => {
                             toolInput={part.toolInput}
                             state={part.state}
                             resultContent={part.resultContent}
+                            onNavigateToSession={(sid) => route.goToSession(sid)}
                           />
                         );
                       }
@@ -938,6 +945,7 @@ export const Session = () => {
                     state={part.state}
                     resultContent={part.resultContent}
                     liveOutput={part.liveOutput}
+                    onNavigateToSession={(sid) => route.goToSession(sid)}
                   />
                 );
               }

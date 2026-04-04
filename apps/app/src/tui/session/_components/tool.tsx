@@ -93,12 +93,18 @@ function resolveFiletype(ext: string): string {
   return FILETYPE_MAP[ext] ?? ext;
 }
 
+function extractChildSessionId(content: string): string | null {
+  const match = content.match(/<!--session:([a-f0-9-]+)-->/);
+  return match?.[1] ?? null;
+}
+
 interface ToolCallDisplayProperties {
   toolName: string;
   toolInput?: string;
   state: "running" | "completed" | "error";
   resultContent?: string;
   liveOutput?: string;
+  onNavigateToSession?: (sessionId: string) => void;
 }
 
 function extractDiff(content: string): { text: string; diff: string | null; filetype: string } {
@@ -114,6 +120,7 @@ export const ToolCallDisplay = ({
   state,
   resultContent,
   liveOutput,
+  onNavigateToSession,
 }: ToolCallDisplayProperties) => {
   const { theme } = useTheme();
   const { width: termWidth } = useTerminalDimensions();
@@ -150,6 +157,37 @@ export const ToolCallDisplay = ({
         <box paddingTop={1} paddingLeft={2}>
           <text fg={theme.textMuted} content={visibleOutput} />
         </box>
+      </box>
+    );
+  }
+
+  if (toolName === "subagent" && resultContent) {
+    const childSessionId = extractChildSessionId(resultContent);
+    const isRunning = state === "running";
+
+    return (
+      <box
+        flexDirection="column"
+        marginTop={1}
+        paddingLeft={3}
+        flexShrink={0}
+        border={["left"] as const}
+        customBorderChars={{ ...EMPTY_BORDER_CHARACTERS, vertical: "│" }}
+        borderColor={isRunning ? theme.warning : theme.borderSubtle}
+        onMouseUp={
+          childSessionId && onNavigateToSession
+            ? () => onNavigateToSession(childSessionId)
+            : undefined
+        }
+      >
+        <box flexDirection="row" gap={1}>
+          <text fg={iconColor} content="◈" />
+          <text fg={theme.text} content={label} attributes={TextAttributes.BOLD} />
+          {isRunning && <text fg={theme.warning} content="running..." />}
+        </box>
+        {childSessionId && !isRunning && (
+          <text fg={theme.textMuted} content="  click to view sub-session" />
+        )}
       </box>
     );
   }

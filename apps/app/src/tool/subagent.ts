@@ -80,7 +80,7 @@ export const subagentTool = defineTool({
 
       return {
         title: `${agentDefinition.name}: ${args.prompt.slice(0, 50)}`,
-        content: fullText || "(sub-agent returned no output)",
+        content: `<!--session:${childSession.id}-->\n${fullText || "(sub-agent returned no output)"}`,
         metadata: { childSessionId: childSession.id, agent: args.agent },
       };
     } catch (error) {
