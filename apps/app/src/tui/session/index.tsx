@@ -34,6 +34,7 @@ import type { ThemeColors } from "@/tui/_context/theme.tsx";
 type StreamingPart =
   | { kind: "reasoning"; id: string; content: string }
   | { kind: "text"; id: string; content: string }
+  | { kind: "error"; id: string; content: string }
   | {
       kind: "tool-call";
       id: string;
@@ -485,17 +486,14 @@ export const Session = () => {
 
       if (eventType === "part.updated" && eventRecord.type === "error") {
         const errorContent = (eventRecord.content as string) ?? "Unknown error";
+        const cleanError = errorContent
+          .replace(/^AI_APICallError:\s*/, "")
+          .replace(/^Error:\s*/, "");
         setStreamingParts((prev) => [
           ...prev,
-          { kind: "text" as const, id: crypto.randomUUID(), content: `Error: ${errorContent}` },
+          { kind: "error" as const, id: crypto.randomUUID(), content: cleanError },
         ]);
         setIsProcessing(false);
-        toast.show({
-          variant: "error",
-          title: "Request failed",
-          message: errorContent.length > 120 ? errorContent.slice(0, 120) + "..." : errorContent,
-          duration: 8000,
-        });
       }
 
       if (eventType === "part.updated" && eventRecord.type === "reasoning") {
@@ -872,6 +870,13 @@ export const Session = () => {
                           />
                         );
                       }
+                      if (part.kind === "error") {
+                        return (
+                          <box key={part.id} paddingLeft={3} paddingY={1}>
+                            <text fg={theme.error} content={`✖ ${part.content}`} />
+                          </box>
+                        );
+                      }
                       return null;
                     })
                   : displayMessage.text && (
@@ -913,6 +918,13 @@ export const Session = () => {
               }
               if (part.kind === "text") {
                 return <AssistantMessage key={part.id} messageText={part.content} isStreaming />;
+              }
+              if (part.kind === "error") {
+                return (
+                  <box key={part.id} paddingLeft={3} paddingY={1}>
+                    <text fg={theme.error} content={`✖ ${part.content}`} />
+                  </box>
+                );
               }
               return null;
             })}
