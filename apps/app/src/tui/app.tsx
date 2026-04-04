@@ -15,14 +15,14 @@ export const App = () => {
         <ModelsProvider>
           <DaemonStatusProvider>
             <ToastProvider>
-              <DialogProvider>
-                <RouteProvider>
-                  <CommandsProvider>
+              <CommandsProvider>
+                <DialogProvider>
+                  <RouteProvider>
                     <Router />
                     <ToastOverlay />
-                  </CommandsProvider>
-                </RouteProvider>
-              </DialogProvider>
+                  </RouteProvider>
+                </DialogProvider>
+              </CommandsProvider>
             </ToastProvider>
           </DaemonStatusProvider>
         </ModelsProvider>
