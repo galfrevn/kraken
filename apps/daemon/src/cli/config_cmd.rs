@@ -153,13 +153,15 @@ fn navigate_json_dot_path_mut<'a>(
     let path_segments: Vec<&str> = dot_path.split('.').collect();
     let mut current_value = root_value;
 
-    for segment in path_segments {
-        match current_value {
-            JsonValue::Object(object_map) => {
-                current_value = object_map.get_mut(segment)?;
-            }
-            _ => return None,
+    for segment in &path_segments {
+        if !current_value.is_object() {
+            return None;
         }
+        let obj = current_value.as_object_mut().unwrap();
+        if !obj.contains_key(*segment) {
+            obj.insert(segment.to_string(), JsonValue::Object(Default::default()));
+        }
+        current_value = obj.get_mut(*segment).unwrap();
     }
 
     Some(current_value)
