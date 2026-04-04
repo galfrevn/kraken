@@ -10,7 +10,7 @@ use crate::daemon::config::DaemonConfig;
 
 use super::WidgetCommands;
 
-const WIDGET_SCRIPT_FILENAME: &str = "kraken-widget.js";
+const WIDGET_SCRIPT_FILENAME: &str = "widget.js";
 
 pub async fn execute(
     command: WidgetCommands,
@@ -94,11 +94,6 @@ async fn handle_setup(json_mode: bool) -> Result<(), Box<dyn std::error::Error>>
     );
 
     let script_path = ensure_widget_script();
-    println!(
-        "  {} Scriptable widget at {}",
-        style("✓").green().bold(),
-        style(script_path.display()).cyan()
-    );
 
     let daemon_port = DaemonConfig::load(None)
         .map(|c| c.services.daemon_port)
@@ -127,20 +122,81 @@ async fn handle_setup(json_mode: bool) -> Result<(), Box<dyn std::error::Error>>
         }
     }
 
-    println!("\n{}", style("Next steps:").bold());
+    // Copy script to clipboard
+    let script_content = std::fs::read_to_string(&script_path).unwrap_or_default();
+    let patched = script_content.replace(
+        "const KRAKEN_TOKEN = \"YOUR_TOKEN_HERE\";",
+        &format!("const KRAKEN_TOKEN = \"{}\";", token.trim()),
+    );
+    let copied = copy_to_clipboard(&patched);
+
+    println!("\n{}", style("Widget script:").bold());
+    println!("{}", style("─".repeat(60)).dim());
+    println!("{patched}");
+    println!("{}", style("─".repeat(60)).dim());
+
+    if copied {
+        println!(
+            "\n  {} Script copied to clipboard!",
+            style("✓").green().bold()
+        );
+    }
+
+    println!("\n{}", style("Setup on iPhone:").bold());
     println!(
-        "  1. Start a tunnel:        {}",
+        "  1. Install {} from the App Store",
+        style("Scriptable").cyan()
+    );
+    println!(
+        "  2. Open Scriptable, tap {} to create a new script",
+        style("+").bold()
+    );
+    println!("  3. Paste the script above (already in your clipboard)");
+    println!(
+        "  4. Run {} to get your public URL",
         style("kraken widget tunnel").cyan()
     );
-    println!("  2. Copy the tunnel URL");
+    println!("  5. Set the KRAKEN_URL in the script to the tunnel URL");
+    println!("  6. Go to your iPhone home screen, long press to edit");
     println!(
-        "  3. Open {} in Scriptable on your iPhone",
-        style(script_path.display()).cyan()
+        "  7. Tap {}, search {}",
+        style("+").bold(),
+        style("Scriptable").cyan()
     );
-    println!("  4. Set KRAKEN_URL and KRAKEN_TOKEN in the script");
-    println!("  5. Add a Scriptable widget to your home screen\n");
+    println!(
+        "  8. Add a {} widget and select this script",
+        style("Medium").bold()
+    );
+    println!();
 
     Ok(())
+}
+
+fn copy_to_clipboard(text: &str) -> bool {
+    use std::io::Write;
+    let mut cmd = if cfg!(target_os = "macos") {
+        Command::new("pbcopy")
+    } else if cfg!(target_os = "linux") {
+        let mut c = Command::new("xclip");
+        c.arg("-selection").arg("clipboard");
+        c
+    } else {
+        return false;
+    };
+
+    let Ok(mut child) = cmd
+        .stdin(std::process::Stdio::piped())
+        .stdout(std::process::Stdio::null())
+        .spawn()
+    else {
+        return false;
+    };
+
+    if let Some(ref mut stdin) = child.stdin {
+        let _ = stdin.write_all(text.as_bytes());
+    }
+
+    child.wait().map(|s| s.success()).unwrap_or(false)
 }
 
 async fn handle_status(json_mode: bool) -> Result<(), Box<dyn std::error::Error>> {
@@ -183,15 +239,8 @@ async fn handle_status(json_mode: bool) -> Result<(), Box<dyn std::error::Error>
         style("●").green(),
         style("enabled").green()
     );
-
-    let script_path = ensure_widget_script();
     println!(
-        "  {} Scriptable script: {}",
-        style("→").dim(),
-        style(script_path.display()).cyan()
-    );
-    println!(
-        "  {} Start a tunnel:    {}",
+        "  {} Start a tunnel: {}",
         style("→").dim(),
         style("kraken widget tunnel").cyan()
     );
