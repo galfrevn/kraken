@@ -3,7 +3,8 @@ import type { LanguageModelV1 } from "ai";
 import { loadAuth, saveAuth, hasAuth } from "./auth.ts";
 import type { ModelInfo } from "@/models/types.ts";
 
-const COPILOT_CLIENT_ID = "Iv23libWXQ5jqeD4k0DL";
+// VS Code Copilot client ID — gives access to full model catalog
+const COPILOT_CLIENT_ID = "Ov23li8tweQw6odWQebz";
 const COPILOT_BASE_URL = "https://api.githubcopilot.com";
 const DEVICE_CODE_URL = "https://github.com/login/device/code";
 const ACCESS_TOKEN_URL = "https://github.com/login/oauth/access_token";
@@ -102,6 +103,7 @@ export async function copilotListModels(): Promise<ModelInfo[]> {
       data: Array<{
         id: string;
         name: string;
+        vendor?: string;
         model_picker_enabled?: boolean;
         capabilities?: {
           limits?: {
@@ -114,13 +116,17 @@ export async function copilotListModels(): Promise<ModelInfo[]> {
       }>;
     };
 
-    return data.data.map((m) => ({
-      id: m.id,
-      name: m.name || m.id,
-      providerId: "copilot",
-      providerName: "GitHub Copilot",
-      contextLength: m.capabilities?.limits?.max_context_window_tokens,
-    }));
+    return data.data.map((m) => {
+      const vendor = m.vendor?.replace("Azure OpenAI", "OpenAI") ?? "";
+      const displayName = vendor ? `${vendor}: ${m.name || m.id}` : m.name || m.id;
+      return {
+        id: m.id,
+        name: displayName,
+        providerId: "copilot",
+        providerName: "GitHub Copilot",
+        contextLength: m.capabilities?.limits?.max_context_window_tokens,
+      };
+    });
   } catch {
     return [];
   }
