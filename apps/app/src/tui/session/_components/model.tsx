@@ -98,14 +98,12 @@ export const ModelPickerContent = ({ resolve }: ModelPickerContentProperties) =>
     if (keyEvent.name === "up") moveSelection(-1);
     else if (keyEvent.name === "down") moveSelection(1);
     else if (keyEvent.name === "escape") {
-      if (stage === "model") {
-        setStage("provider");
-        setSelectedProviderId(null);
-        setSearchQuery("");
-        setSelectedIndex(0);
-      } else {
-        resolve(undefined as unknown as ModelSelection);
-      }
+      resolve(undefined as unknown as ModelSelection);
+    } else if (keyEvent.name === "left" && stage === "model" && !searchQuery) {
+      setStage("provider");
+      setSelectedProviderId(null);
+      setSearchQuery("");
+      setSelectedIndex(0);
     } else if (keyEvent.name === "return") {
       if (stage === "provider") {
         const provider = providerOptions[selectedIndex];
@@ -200,7 +198,7 @@ export const ModelPickerContent = ({ resolve }: ModelPickerContentProperties) =>
             <text fg={theme.textMuted} content="/" />
             <text attributes={TextAttributes.BOLD} fg={theme.text} content="Select model" />
           </box>
-          <text fg={theme.textMuted} content="esc back" />
+          <text fg={theme.textMuted} content="← back  esc close" />
         </box>
       </box>
       <box paddingX={4} paddingTop={1}>
