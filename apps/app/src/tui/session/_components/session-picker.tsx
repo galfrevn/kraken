@@ -18,7 +18,7 @@ export const SessionPickerContent = ({ resolve, sdk, theme }: SessionPickerPrope
   const [selectedIndex, setSelectedIndex] = useState(0);
   const [loading, setLoading] = useState(true);
 
-  useEffect(() => {
+  const fetchSessions = useCallback(() => {
     sdk.client
       .fetch("/session")
       .then(async (response) => {
@@ -42,12 +42,24 @@ export const SessionPickerContent = ({ resolve, sdk, theme }: SessionPickerPrope
         setLoading(false);
       })
       .catch(() => setLoading(false));
-  }, []);
+  }, [sdk]);
+
+  useEffect(() => {
+    fetchSessions();
+  }, [fetchSessions]);
 
   const selectCurrent = useCallback(() => {
     const session = sessions[selectedIndex];
     if (session) resolve({ id: session.id });
   }, [sessions, selectedIndex, resolve]);
+
+  const deleteCurrent = useCallback(() => {
+    const session = sessions[selectedIndex];
+    if (!session) return;
+    sdk.client.fetch(`/session/${session.id}`, { method: "DELETE" }).catch(() => {});
+    setSessions((prev) => prev.filter((s) => s.id !== session.id));
+    setSelectedIndex((i) => Math.min(i, sessions.length - 2));
+  }, [sessions, selectedIndex, sdk]);
 
   useKeyboard((keyEvent) => {
     if (keyEvent.name === "up" || (keyEvent.ctrl && keyEvent.name === "k")) {
@@ -58,6 +70,8 @@ export const SessionPickerContent = ({ resolve, sdk, theme }: SessionPickerPrope
       selectCurrent();
     } else if (keyEvent.name === "escape") {
       resolve(undefined as unknown as { id: string });
+    } else if (keyEvent.name === "d" || keyEvent.name === "backspace") {
+      deleteCurrent();
     }
   });
 
@@ -90,25 +104,35 @@ export const SessionPickerContent = ({ resolve, sdk, theme }: SessionPickerPrope
             <box
               key={session.id}
               paddingX={1}
-              backgroundColor={isSelected ? theme.backgroundElement : undefined}
+              backgroundColor={isSelected ? theme.accent : undefined}
               onMouseUp={() => {
                 setSelectedIndex(index);
                 selectCurrent();
               }}
             >
               <text>
-                <span fg={isSelected ? theme.primary : theme.text}>{isSelected ? "▸ " : "  "}</span>
-                <span fg={isSelected ? theme.text : theme.textMuted}>
+                <span fg={isSelected ? theme.background : theme.text}>
                   {session.title.length > 60 ? session.title.slice(0, 57) + "..." : session.title}
                 </span>
-                <span fg={theme.textMuted}> · {timeAgo}</span>
+                <span fg={isSelected ? theme.background : theme.textMuted}> · {timeAgo}</span>
               </text>
             </box>
           );
         })}
       </scrollbox>
-      <box paddingTop={1} paddingLeft={1}>
-        <text fg={theme.textMuted} content="↑↓ navigate · enter select · esc cancel" />
+      <box paddingTop={1} paddingLeft={1} flexDirection="row" gap={2}>
+        <box flexDirection="row" gap={1}>
+          <text fg={theme.text} content="enter" />
+          <text fg={theme.textMuted} content="select" />
+        </box>
+        <box flexDirection="row" gap={1}>
+          <text fg={theme.text} content="d" />
+          <text fg={theme.textMuted} content="delete" />
+        </box>
+        <box flexDirection="row" gap={1}>
+          <text fg={theme.text} content="esc" />
+          <text fg={theme.textMuted} content="close" />
+        </box>
       </box>
     </box>
   );
