@@ -27,8 +27,12 @@ export const memorySaveTool = defineTool({
   }),
   async execute(args, context) {
     try {
-      const embeddingText = `${args.title} ${args.content}`;
-      const embedding = await generateEmbedding(embeddingText);
+      let embedding: number[] | null = null;
+      try {
+        embedding = await generateEmbedding(`${args.title} ${args.content}`);
+      } catch {
+        // embedding is optional, continue without it
+      }
 
       const observation = await getDaemon().memory.observations.create({
         session_id: context.sessionId,

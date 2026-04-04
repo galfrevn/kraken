@@ -27,7 +27,12 @@ export const memorySearchTool = defineTool({
         };
       }
 
-      const queryEmbedding = await generateEmbedding(args.query);
+      let queryEmbedding: number[] | null = null;
+      try {
+        queryEmbedding = await generateEmbedding(args.query);
+      } catch {
+        // embedding is optional
+      }
 
       const results = await getDaemon().memory.search({
         q: args.query,
