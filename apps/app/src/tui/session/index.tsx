@@ -21,7 +21,6 @@ import { ThemePickerContent } from "@/tui/session/_components/theme.tsx";
 import { SessionPickerContent } from "@/tui/session/_components/session-picker.tsx";
 import { QuestionPrompt } from "@/tui/session/_components/question.tsx";
 import { EmptyState } from "@/tui/session/_components/empty-state.tsx";
-import { StatusFooter } from "@/tui/session/_components/status-footer.tsx";
 import { PermissionPrompt } from "@/tui/session/_components/permission.tsx";
 import type { PermissionRequest } from "@/tool/permission.ts";
 import { addAllowRule } from "@/tool/permission-allowlist.ts";
@@ -888,12 +887,6 @@ export const Session = () => {
         )}
       </scrollbox>
 
-      <StatusFooter
-        undoAvailable={displayMessages.length > 0 && !isProcessing}
-        redoAvailable={revertedMessages.length > 0 && !isProcessing}
-        revertedCount={revertedMessages.filter((m) => m.role === "user").length}
-      />
-
       {pendingPermission ? (
         <PermissionPrompt
           request={pendingPermission}
@@ -942,6 +935,8 @@ export const Session = () => {
           agentName={currentAgent.name}
           agentColor={currentAgentColor}
           onToggleAgent={handleToggleAgent}
+          undoAvailable={displayMessages.length > 0 && !isProcessing}
+          redoAvailable={revertedMessages.length > 0 && !isProcessing}
           onInterrupt={() => {
             sdk.client.post(`/session/${currentSessionId}/cancel`, {}).catch(() => {});
             if (finalizationTimerRef.current) {

@@ -26,6 +26,8 @@ interface SessionPromptProperties {
   agentName: string;
   agentColor?: string;
   onToggleAgent?: () => void;
+  undoAvailable?: boolean;
+  redoAvailable?: boolean;
 }
 
 export const SessionPrompt = ({
@@ -36,6 +38,8 @@ export const SessionPrompt = ({
   agentName,
   agentColor,
   onToggleAgent,
+  undoAvailable,
+  redoAvailable,
 }: SessionPromptProperties) => {
   const { theme } = useTheme();
   const { currentModelDisplayName, currentProviderDisplayName } = useModels();
@@ -235,6 +239,18 @@ export const SessionPrompt = ({
               <text fg={theme.text} content="ctrl+p" />
               <text fg={theme.textMuted} content="commands" />
             </box>
+            {undoAvailable && (
+              <box flexDirection="row" gap={1}>
+                <text fg={theme.text} content="ctrl+z" />
+                <text fg={theme.textMuted} content="undo" />
+              </box>
+            )}
+            {redoAvailable && (
+              <box flexDirection="row" gap={1}>
+                <text fg={theme.text} content="ctrl+y" />
+                <text fg={theme.textMuted} content="redo" />
+              </box>
+            )}
           </>
         )}
       </box>
