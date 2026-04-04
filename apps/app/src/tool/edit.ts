@@ -1,9 +1,10 @@
 import { z } from "zod";
 import { readFileSync, writeFileSync, existsSync } from "node:fs";
-import { resolve } from "node:path";
+import { resolve, extname } from "node:path";
 import { defineTool } from "@/tool/tool.ts";
 import { isBlockedFilePath, BLOCKED_FILE_ACCESS_MESSAGE } from "@/tool/security.ts";
 import { fileCache, toolResultCache } from "@/cache/index.ts";
+import { createUnifiedDiff } from "@/util/diff.ts";
 
 export const editTool = defineTool({
   id: "edit",
@@ -47,9 +48,11 @@ export const editTool = defineTool({
     fileCache.invalidate(absolutePath);
     toolResultCache.invalidateByPath(absolutePath);
 
+    const diff = createUnifiedDiff(args.filePath, originalContent, updatedContent);
+
     return {
       title: `Edited ${args.filePath}`,
-      content: `Replaced 1 occurrence in ${absolutePath}`,
+      content: `Replaced 1 occurrence in ${absolutePath}\n<!--diff:${extname(args.filePath).slice(1)}-->\n${diff}\n<!--/diff-->`,
       metadata: { path: absolutePath },
     };
   },

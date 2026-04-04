@@ -7,6 +7,7 @@ import { TextAttributes } from "@opentui/core";
 import { useTheme } from "@/tui/_context/theme.tsx";
 import { useDaemonStatus } from "@/daemon/status.tsx";
 import { TodoDisplay } from "@/tui/session/_components/todo.tsx";
+import { FilesSidebar, type FileChange } from "@/tui/session/_components/files-sidebar.tsx";
 import { Bus, Events } from "@/bus/index.ts";
 import { getLspManager } from "@/lsp/manager.ts";
 
@@ -53,6 +54,7 @@ export interface SidebarProperties {
   agentName?: string;
   agentColor?: string;
   todos?: TodoSidebarItem[];
+  modifiedFiles?: FileChange[];
 }
 
 export const Sidebar = ({
@@ -63,6 +65,7 @@ export const Sidebar = ({
   agentName,
   agentColor,
   todos,
+  modifiedFiles,
 }: SidebarProperties) => {
   const { theme } = useTheme();
   const daemonStatus = useDaemonStatus();
@@ -112,6 +115,8 @@ export const Sidebar = ({
         <text fg={theme.textMuted} content={formattedPercentage} />
         <text fg={theme.textMuted} content={`${formattedCost} spent`} />
       </box>
+
+      {modifiedFiles && modifiedFiles.length > 0 && <FilesSidebar files={modifiedFiles} />}
 
       <box flexDirection="column" marginTop={1}>
         <text fg={theme.text} attributes={TextAttributes.BOLD} content="LSP" />

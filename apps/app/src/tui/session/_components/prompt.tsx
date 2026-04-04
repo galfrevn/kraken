@@ -9,6 +9,7 @@ import {
 } from "@/tui/session/_components/autocomplete.tsx";
 import { EMPTY_BORDER_CHARACTERS } from "@/tui/_theme/borders.ts";
 import { createFrames, createColors } from "@/tui/_ui/spinner.ts";
+import { appendToHistory, createHistoryNavigator } from "@/tui/_ui/prompt-history.ts";
 
 const SESSION_PROMPT_MAX_HEIGHT = 6;
 
@@ -44,6 +45,7 @@ export const SessionPrompt = ({
   const textareaReference = useRef<TextareaRenderable>(null);
   const anchorBoxReference = useRef<BoxRenderable>(null);
   const autocompleteCallbackReference = useRef<AutocompleteCallbackReference | null>(null);
+  const historyRef = useRef(createHistoryNavigator());
 
   const handleTextareaSubmit = () => {
     if (autocompleteCallbackReference.current?.visible) return;
@@ -51,6 +53,8 @@ export const SessionPrompt = ({
     if (!currentTextarea) return;
     const trimmedInputText = currentTextarea.plainText.trim();
     if (trimmedInputText && !disabled) {
+      appendToHistory(trimmedInputText);
+      historyRef.current.reset();
       onSubmit(trimmedInputText);
       currentTextarea.clear();
       setResetKey((previousKey) => previousKey + 1);
@@ -60,6 +64,21 @@ export const SessionPrompt = ({
   useKeyboard((keyEvent) => {
     if (keyEvent.name === "escape" && isProcessing && onInterrupt) {
       onInterrupt();
+    }
+    if (disabled || isProcessing) return;
+    if (keyEvent.name === "up" && keyEvent.ctrl) {
+      const entry = historyRef.current.move(-1, currentTextareaValue);
+      if (entry !== null && textareaReference.current) {
+        textareaReference.current.clear();
+        textareaReference.current.insertText(entry);
+      }
+    }
+    if (keyEvent.name === "down" && keyEvent.ctrl) {
+      const entry = historyRef.current.move(1, currentTextareaValue);
+      if (entry !== null && textareaReference.current) {
+        textareaReference.current.clear();
+        textareaReference.current.insertText(entry);
+      }
     }
   });
 

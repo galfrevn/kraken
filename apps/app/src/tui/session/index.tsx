@@ -21,6 +21,7 @@ import { ThemePickerContent } from "@/tui/session/_components/theme.tsx";
 import { SessionPickerContent } from "@/tui/session/_components/session-picker.tsx";
 import { QuestionPrompt } from "@/tui/session/_components/question.tsx";
 import { EmptyState } from "@/tui/session/_components/empty-state.tsx";
+import type { FileChange } from "@/tui/session/_components/files-sidebar.tsx";
 import { getPrimaryAgents, type AgentColor } from "@/agent/agent.ts";
 import type { ThemeColors } from "@/tui/_context/theme.tsx";
 
@@ -136,6 +137,7 @@ export const Session = () => {
       priority?: "high" | "medium" | "low";
     }>
   >([]);
+  const [modifiedFiles, setModifiedFiles] = useState<FileChange[]>([]);
 
   const primaryAgents = getPrimaryAgents();
   const [currentAgentIndex, setCurrentAgentIndex] = useState(0);
@@ -462,6 +464,45 @@ export const Session = () => {
         const toolCallId = (eventRecord.toolCallId as string) ?? "";
         const resultContent = (eventRecord.content as string) ?? "";
 
+        const matchingTool = streamingParts.find(
+          (p) => p.kind === "tool-call" && p.toolCallId === toolCallId,
+        );
+        if (
+          matchingTool &&
+          matchingTool.kind === "tool-call" &&
+          (matchingTool.toolName === "edit" || matchingTool.toolName === "write")
+        ) {
+          try {
+            const args = JSON.parse(matchingTool.toolInput ?? "{}") as { filePath?: string };
+            if (args.filePath) {
+              const diffMatch = resultContent.match(/<!--diff:\w*-->\n([\s\S]*?)\n<!--\/diff-->/);
+              let additions = 0;
+              let deletions = 0;
+              if (diffMatch?.[1]) {
+                for (const line of diffMatch[1].split("\n")) {
+                  if (line.startsWith("+") && !line.startsWith("+++")) additions++;
+                  if (line.startsWith("-") && !line.startsWith("---")) deletions++;
+                }
+              }
+              setModifiedFiles((prev) => {
+                const existing = prev.find((f) => f.path === args.filePath);
+                if (existing) {
+                  return prev.map((f) =>
+                    f.path === args.filePath
+                      ? {
+                          ...f,
+                          additions: f.additions + additions,
+                          deletions: f.deletions + deletions,
+                        }
+                      : f,
+                  );
+                }
+                return [...prev, { path: args.filePath!, additions, deletions }];
+              });
+            }
+          } catch {}
+        }
+
         const applyToolResult = () => {
           setStreamingParts((prev) =>
             prev.map((p) =>
@@ -686,6 +727,7 @@ export const Session = () => {
         agentName: currentAgent.name,
         agentColor: currentAgentColor,
         todos: sessionTodos,
+        modifiedFiles,
       }}
     >
       <scrollbox

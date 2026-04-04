@@ -5,6 +5,7 @@ import { SdkProvider } from "@/tui/_context/sdk.tsx";
 import { ThemeProvider } from "@/tui/_context/theme.tsx";
 import { CommandsProvider } from "@/tui/_context/commands.tsx";
 import { DaemonStatusProvider } from "@/daemon/status.tsx";
+import { ToastProvider, ToastOverlay } from "@/tui/_ui/toast.tsx";
 import { Router } from "@/tui/router.tsx";
 
 export const App = () => {
@@ -13,13 +14,16 @@ export const App = () => {
       <ThemeProvider>
         <ModelsProvider>
           <DaemonStatusProvider>
-            <DialogProvider>
-              <RouteProvider>
-                <CommandsProvider>
-                  <Router />
-                </CommandsProvider>
-              </RouteProvider>
-            </DialogProvider>
+            <ToastProvider>
+              <DialogProvider>
+                <RouteProvider>
+                  <CommandsProvider>
+                    <Router />
+                    <ToastOverlay />
+                  </CommandsProvider>
+                </RouteProvider>
+              </DialogProvider>
+            </ToastProvider>
           </DaemonStatusProvider>
         </ModelsProvider>
       </ThemeProvider>
