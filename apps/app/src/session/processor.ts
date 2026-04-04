@@ -26,7 +26,7 @@ interface ProcessUserMessageOptions {
   abortController: AbortController;
 }
 
-function buildCoreMessagesFromHistory(
+export function buildCoreMessagesFromHistory(
   sessionId: string,
   summaryMessageId?: string | null,
 ): CoreMessage[] {

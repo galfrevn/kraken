@@ -18,6 +18,7 @@ import {
 } from "@/tui/session/_components/message.tsx";
 import { ToolCallDisplay } from "@/tui/session/_components/tool.tsx";
 import { ThemePickerContent } from "@/tui/session/_components/theme.tsx";
+import { WorkersContent } from "@/tui/session/_components/workers.tsx";
 import { SessionPickerContent } from "@/tui/session/_components/session-picker.tsx";
 import { QuestionPrompt } from "@/tui/session/_components/question.tsx";
 import { EmptyState } from "@/tui/session/_components/empty-state.tsx";
@@ -27,7 +28,7 @@ import { addAllowRule } from "@/tool/permission-allowlist.ts";
 import type { FileChange } from "@/tui/session/_components/files-sidebar.tsx";
 import { getSkillSlashCommands, loadSkillByName, formatSkillContent } from "@/skill/index.ts";
 import { useToast } from "@/tui/_ui/toast.tsx";
-import { CommandPalette } from "@/tui/session/_components/command-palette.tsx";
+import { CommandPaletteContent } from "@/tui/session/_components/command-palette.tsx";
 import { getPrimaryAgents, type AgentColor } from "@/agent/agent.ts";
 import type { ThemeColors } from "@/tui/_context/theme.tsx";
 
@@ -106,6 +107,15 @@ export const Session = () => {
     setIsDialogOpen(false);
   }, [dialog]);
 
+  const openWorkerHealth = useCallback(async () => {
+    setIsDialogOpen(true);
+    await dialog.choice<void>({
+      content: (choiceContext) => <WorkersContent {...choiceContext} />,
+      size: "large",
+    });
+    setIsDialogOpen(false);
+  }, [dialog]);
+
   const openSessionPicker = useCallback(async () => {
     setIsDialogOpen(true);
     const selectedSession = await dialog.choice<{ id: string }>({
@@ -119,6 +129,18 @@ export const Session = () => {
       route.goToSession(selectedSession.id);
     }
   }, [dialog, sdk, theme, route]);
+
+  const openCommandPalette = useCallback(async () => {
+    setIsDialogOpen(true);
+    const selectedCommand = await dialog.choice<string>({
+      content: ({ resolve }) => <CommandPaletteContent resolve={(v) => resolve(v as string)} />,
+      size: "large",
+    });
+    setIsDialogOpen(false);
+    if (selectedCommand) {
+      commands.trigger(selectedCommand);
+    }
+  }, [dialog, commands]);
 
   const [displayMessages, setDisplayMessages] = useState<DisplayMessage[]>([]);
   const [isProcessing, setIsProcessing] = useState(false);
@@ -148,7 +170,6 @@ export const Session = () => {
   const [modifiedFiles, setModifiedFiles] = useState<FileChange[]>([]);
   const [revertedMessages, setRevertedMessages] = useState<DisplayMessage[]>([]);
   const [pendingPermission, setPendingPermission] = useState<PermissionRequest | null>(null);
-  const [commandPaletteOpen, setCommandPaletteOpen] = useState(false);
   const [parentSessionId, setParentSessionId] = useState<string | null>(null);
 
   const primaryAgents = getPrimaryAgents();
@@ -270,6 +291,39 @@ export const Session = () => {
           openThemePicker();
         },
       },
+      {
+        title: "Compact session",
+        value: "session.compact",
+        description: "Summarize conversation to save context",
+        slash: { name: "compact" },
+        onSelect: () => {
+          sdk.client
+            .post(`/session/${currentSessionId}/compact`, {})
+            .then(() => {
+              toast.show({
+                variant: "success",
+                title: "Session compacted",
+                message: "Conversation summarized to save context",
+              });
+            })
+            .catch(() => {
+              toast.show({
+                variant: "error",
+                title: "Failed to compact session",
+                message: "Could not compact the session",
+              });
+            });
+        },
+      },
+      {
+        title: "Worker health",
+        value: "daemon.workers",
+        description: "View daemon workers and task status",
+        slash: { name: "workers", aliases: ["health", "tasks"] },
+        onSelect: () => {
+          openWorkerHealth();
+        },
+      },
       ...getSkillSlashCommands().map((sc) => ({
         title: `◆ ${sc.skillName}`,
         value: `skill.${sc.skillName}`,
@@ -316,7 +370,7 @@ export const Session = () => {
       openModelPicker();
     }
     if (keyEvent.ctrl && keyEvent.name === "p") {
-      setCommandPaletteOpen(true);
+      openCommandPalette();
     }
     if (keyEvent.ctrl && keyEvent.name === "c") {
       renderer.destroy();
@@ -984,9 +1038,7 @@ export const Session = () => {
         )}
       </scrollbox>
 
-      {commandPaletteOpen ? (
-        <CommandPalette onClose={() => setCommandPaletteOpen(false)} />
-      ) : pendingPermission ? (
+      {pendingPermission ? (
         <PermissionPrompt
           request={pendingPermission}
           agentColor={currentAgentColor}

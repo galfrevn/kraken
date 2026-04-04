@@ -3,6 +3,7 @@ import { basename } from "node:path";
 import { defineTool } from "@/tool/tool.ts";
 import { getDaemon } from "@/daemon/client.ts";
 import { generateEmbedding } from "@/provider/embedding.ts";
+import { scheduleEmbeddingRetry } from "@/tool/memory/embedding-queue.ts";
 import { DaemonError, DaemonConnectionError } from "@kraken/sdk";
 
 export const memorySaveTool = defineTool({
@@ -44,6 +45,17 @@ export const memorySaveTool = defineTool({
         topic_key: args.topic_key,
         embedding: embedding ?? undefined,
       });
+
+      if (!embedding) {
+        scheduleEmbeddingRetry({
+          title: args.title,
+          content: args.content,
+          type: args.type ?? "learning",
+          scope: args.scope,
+          topicKey: args.topic_key ?? `auto/${observation.id}`,
+          sessionId: context.sessionId,
+        });
+      }
 
       const action = observation.revision_count > 1 ? "updated" : "saved";
 

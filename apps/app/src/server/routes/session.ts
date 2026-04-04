@@ -1,6 +1,7 @@
 import { Hono } from "hono";
 import { Session } from "@/session/index.ts";
-import { processUserMessage } from "@/session/processor.ts";
+import { processUserMessage, buildCoreMessagesFromHistory } from "@/session/processor.ts";
+import { compactSession } from "@/session/compactor.ts";
 import {
   startMemorySession,
   endMemorySession,
@@ -161,6 +162,16 @@ sessionRouter.post("/session/:id/permission/reply", async (context) => {
 
   const replied = replyToPermission(sessionId, body.approved ?? false);
   return context.json({ ok: replied });
+});
+
+sessionRouter.post("/session/:id/compact", async (context) => {
+  const sessionId = context.req.param("id");
+  const session = await Session.get(sessionId);
+  if (!session) return context.json({ error: "not found" }, 404);
+
+  const messages = buildCoreMessagesFromHistory(sessionId, session.summaryMessageId);
+  await compactSession(sessionId, messages);
+  return context.json({ ok: true });
 });
 
 sessionRouter.post("/session/:id/cancel", (context) => {
