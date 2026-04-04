@@ -86,6 +86,9 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         Some(cli::Commands::Provider(provider_command)) => {
             cli::provider_cmd::execute(provider_command, json_mode).await
         }
+        Some(cli::Commands::Widget(widget_command)) => {
+            cli::widget_cmd::execute(widget_command, json_mode).await
+        }
         Some(cli::Commands::Audit {
             session,
             file,

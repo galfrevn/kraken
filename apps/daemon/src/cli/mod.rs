@@ -18,6 +18,7 @@ pub mod stop;
 pub mod task_cmd;
 pub mod trigger_cmd;
 pub mod uninstall;
+pub mod widget_cmd;
 
 use clap::{Parser, Subcommand};
 
@@ -171,6 +172,10 @@ pub enum Commands {
 
     /// Print the shell command to add kraken to your PATH
     SetupPath,
+
+    /// Manage the iOS widget and tunnel
+    #[command(subcommand)]
+    Widget(WidgetCommands),
 
     /// Remove kraken configuration and data from this machine
     #[command(
@@ -480,4 +485,12 @@ pub enum ProviderCommands {
         /// Provider name (e.g. openrouter)
         provider: String,
     },
+}
+
+#[derive(Subcommand)]
+pub enum WidgetCommands {
+    /// Configure the iOS widget token and enable the widget API
+    Setup,
+    /// Show current widget status and tunnel instructions
+    Status,
 }
