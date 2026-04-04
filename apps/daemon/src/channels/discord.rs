@@ -3,11 +3,11 @@ use std::sync::Arc;
 
 use async_trait::async_trait;
 use dashmap::DashMap;
+use serenity::Client;
 use serenity::all::{
-    ChannelId, Command, Context, CreateCommand, CreateCommandOption, CommandOptionType,
+    ChannelId, Command, CommandOptionType, Context, CreateCommand, CreateCommandOption,
     EditMessage, EventHandler, GatewayIntents, Message, MessageId, Ready,
 };
-use serenity::Client;
 use tokio::sync::{mpsc, watch};
 use tracing::{error, info, warn};
 
@@ -168,11 +168,19 @@ impl EventHandler for DiscordHandler {
 
         // Register slash commands
         let commands = vec![
-            CreateCommand::new("task").description("Run a background task")
-                .add_option(CreateCommandOption::new(CommandOptionType::String, "prompt", "What to do").required(true)),
+            CreateCommand::new("task")
+                .description("Run a background task")
+                .add_option(
+                    CreateCommandOption::new(CommandOptionType::String, "prompt", "What to do")
+                        .required(true),
+                ),
             CreateCommand::new("new").description("Start a new conversation"),
-            CreateCommand::new("model").description("Show or change model")
-                .add_option(CreateCommandOption::new(CommandOptionType::String, "name", "Model name").required(false)),
+            CreateCommand::new("model")
+                .description("Show or change model")
+                .add_option(
+                    CreateCommandOption::new(CommandOptionType::String, "name", "Model name")
+                        .required(false),
+                ),
             CreateCommand::new("cost").description("Show usage and costs"),
             CreateCommand::new("status").description("Show daemon status"),
             CreateCommand::new("repos").description("List configured repos"),
@@ -231,7 +239,11 @@ impl EventHandler for DiscordHandler {
                             }
 
                             match store
-                                .create_pairing_request("discord", &platform_id, Some(&display_name))
+                                .create_pairing_request(
+                                    "discord",
+                                    &platform_id,
+                                    Some(&display_name),
+                                )
                                 .await
                             {
                                 Ok(code) => {
@@ -288,10 +300,7 @@ impl ChannelAdapter for DiscordAdapter {
         "discord"
     }
 
-    async fn start(
-        &self,
-        message_tx: mpsc::Sender<InboundMessage>,
-    ) -> Result<(), ChannelError> {
+    async fn start(&self, message_tx: mpsc::Sender<InboundMessage>) -> Result<(), ChannelError> {
         let token = self.token.clone();
         let dm_policy = self.dm_policy;
         let allow_from = self.allow_from.clone();

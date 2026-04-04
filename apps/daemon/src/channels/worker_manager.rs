@@ -145,6 +145,7 @@ impl ChannelWorkerManager {
         text: &str,
         channel_type: &str,
         chat_id: &str,
+        agent_id: &str,
     ) -> Result<mpsc::Receiver<StreamEvent>, String> {
         let url = format!("{}/message", self.worker_url());
         let client = reqwest::Client::new();
@@ -154,6 +155,7 @@ impl ChannelWorkerManager {
             "text": text,
             "channelType": channel_type,
             "chatId": chat_id,
+            "agentId": agent_id,
         });
 
         let mut response = client

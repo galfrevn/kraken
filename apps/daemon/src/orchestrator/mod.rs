@@ -159,18 +159,15 @@ impl Orchestrator {
                 );
             }
 
-            if task_from_store.trigger_payload.as_deref() == Some("channel_reply") {
-                if let (Some(channel_type), Some(chat_id)) =
+            if task_from_store.trigger_payload.as_deref() == Some("channel_reply")
+                && let (Some(channel_type), Some(chat_id)) =
                     (&task_from_store.trigger_type, &task_from_store.trigger_id)
-                {
-                    completed_task_details
-                        .insert("reply_channel_type".to_string(), channel_type.clone());
-                    completed_task_details
-                        .insert("reply_chat_id".to_string(), chat_id.clone());
-                    if let Some(output) = &task_from_store.output {
-                        completed_task_details
-                            .insert("reply_output".to_string(), output.clone());
-                    }
+            {
+                completed_task_details
+                    .insert("reply_channel_type".to_string(), channel_type.clone());
+                completed_task_details.insert("reply_chat_id".to_string(), chat_id.clone());
+                if let Some(output) = &task_from_store.output {
+                    completed_task_details.insert("reply_output".to_string(), output.clone());
                 }
             }
 
@@ -243,15 +240,12 @@ impl Orchestrator {
                 failed_task_details.insert("error".to_string(), error_message.clone());
             }
 
-            if task_from_store.trigger_payload.as_deref() == Some("channel_reply") {
-                if let (Some(channel_type), Some(chat_id)) =
+            if task_from_store.trigger_payload.as_deref() == Some("channel_reply")
+                && let (Some(channel_type), Some(chat_id)) =
                     (&task_from_store.trigger_type, &task_from_store.trigger_id)
-                {
-                    failed_task_details
-                        .insert("reply_channel_type".to_string(), channel_type.clone());
-                    failed_task_details
-                        .insert("reply_chat_id".to_string(), chat_id.clone());
-                }
+            {
+                failed_task_details.insert("reply_channel_type".to_string(), channel_type.clone());
+                failed_task_details.insert("reply_chat_id".to_string(), chat_id.clone());
             }
 
             let failed_summary = format!(
@@ -1037,8 +1031,7 @@ impl Orchestrator {
                     tokio::task::spawn_blocking(move || {
                         let worktree_manager =
                             WorktreeManager::new(&PathBuf::from(&base_dir), &branch_prefix);
-                        if let Err(removal_error) =
-                            worktree_manager.remove_worktree(&worktree_path)
+                        if let Err(removal_error) = worktree_manager.remove_worktree(&worktree_path)
                         {
                             warn!(
                                 worktree_path = %worktree_path.display(),

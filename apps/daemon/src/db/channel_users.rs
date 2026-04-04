@@ -150,11 +150,7 @@ impl ChannelUserStore {
         Ok(user)
     }
 
-    pub async fn revoke_user(
-        &self,
-        channel_type: &str,
-        platform_id: &str,
-    ) -> Result<bool, String> {
+    pub async fn revoke_user(&self, channel_type: &str, platform_id: &str) -> Result<bool, String> {
         let connection = self.pool.lock().await;
         let rows_affected = connection
             .execute(
@@ -511,10 +507,7 @@ impl ChannelUserStore {
         Ok(rows_affected)
     }
 
-    pub async fn authorized_count(
-        &self,
-        channel_type: &str,
-    ) -> Result<usize, String> {
+    pub async fn authorized_count(&self, channel_type: &str) -> Result<usize, String> {
         let connection = self.pool.lock().await;
         let count: i64 = connection
             .query_row(

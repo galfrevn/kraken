@@ -49,6 +49,7 @@ pub async fn handle_builtin_command(
         "status" => Some(handle_status(ctx.daemon_port).await),
         "users" => Some(handle_users(ctx, channel_type).await),
         "task" => Some(handle_task(ctx, &command.args, channel_type, chat_id).await),
+        "agent" => Some(handle_agent(ctx, &command.args, channel_type, chat_id).await),
         "repos" => Some(handle_repos(ctx.daemon_port).await),
         "cost" => Some(handle_cost(ctx.daemon_port).await),
         _ => None,
@@ -62,6 +63,7 @@ fn handle_help() -> String {
         "<b>Chat</b>",
         "/new — Start a new conversation",
         "/model — Show or change current model",
+        "/agent — Show or switch agent (build/plan)",
         "",
         "<b>Tasks</b>",
         "/task &lt;prompt&gt; — Run a background task",
@@ -77,7 +79,11 @@ fn handle_help() -> String {
 }
 
 async fn handle_new(ctx: &CommandContext, channel_type: &str, chat_id: &str) -> String {
-    match ctx.session_store.delete_by_channel(channel_type, chat_id).await {
+    match ctx
+        .session_store
+        .delete_by_channel(channel_type, chat_id)
+        .await
+    {
         Ok(true) => {
             info!(channel_type, chat_id, "session reset via /new command");
             "Session reset. Starting fresh.".to_string()
@@ -99,9 +105,7 @@ async fn handle_model(args: &str) -> String {
                     let provider = parsed["current"]["providerId"]
                         .as_str()
                         .unwrap_or("unknown");
-                    let model = parsed["current"]["modelId"]
-                        .as_str()
-                        .unwrap_or("unknown");
+                    let model = parsed["current"]["modelId"].as_str().unwrap_or("unknown");
                     format!("Current model: <b>{provider}/{model}</b>")
                 }
                 Err(err) => {
@@ -114,7 +118,7 @@ async fn handle_model(args: &str) -> String {
     } else {
         // Change model
         let (provider, model_id) = if let Some((p, m)) = args.split_once('/') {
-            (p.to_string(), format!("{m}"))
+            (p.to_string(), m.to_string())
         } else {
             ("openrouter".to_string(), args.to_string())
         };
@@ -133,7 +137,10 @@ async fn handle_model(args: &str) -> String {
             let _ = std::fs::create_dir_all(parent);
         }
 
-        match std::fs::write(&modelstate_path, serde_json::to_string_pretty(&new_state).unwrap()) {
+        match std::fs::write(
+            &modelstate_path,
+            serde_json::to_string_pretty(&new_state).unwrap(),
+        ) {
             Ok(_) => {
                 info!(model = args, "model changed via /model command");
                 format!("Model changed to: <b>{args}</b>")
@@ -196,6 +203,54 @@ async fn handle_users(ctx: &CommandContext, channel_type: &str) -> String {
     }
 }
 
+const VALID_AGENTS: &[&str] = &["build", "plan"];
+
+async fn handle_agent(
+    ctx: &CommandContext,
+    args: &str,
+    channel_type: &str,
+    chat_id: &str,
+) -> String {
+    if args.is_empty() {
+        // Show current agent
+        let session = ctx
+            .session_store
+            .get_or_create_session(channel_type, chat_id)
+            .await;
+        let current = session
+            .ok()
+            .and_then(|s| s.metadata)
+            .and_then(|m| serde_json::from_str::<serde_json::Value>(&m).ok())
+            .and_then(|v| v["agent"].as_str().map(String::from))
+            .unwrap_or_else(|| "build".to_string());
+
+        return format!(
+            "Current agent: <b>{current}</b>\nAvailable: {}",
+            VALID_AGENTS.join(", ")
+        );
+    }
+
+    let agent = args.trim().to_lowercase();
+    if !VALID_AGENTS.contains(&agent.as_str()) {
+        return format!(
+            "Unknown agent <b>{agent}</b>. Available: {}",
+            VALID_AGENTS.join(", ")
+        );
+    }
+
+    let metadata = serde_json::json!({ "agent": agent }).to_string();
+    if let Err(err) = ctx
+        .session_store
+        .update_metadata(channel_type, chat_id, &metadata)
+        .await
+    {
+        return format!("Failed to update agent: {err}");
+    }
+
+    info!(agent = agent, "agent changed via /agent command");
+    format!("Agent changed to: <b>{agent}</b>")
+}
+
 async fn handle_task(
     ctx: &CommandContext,
     args: &str,
@@ -207,8 +262,6 @@ async fn handle_task(
                 Options: --repo=name --agent=build|plan"
             .to_string();
     }
-
-    const VALID_AGENTS: &[&str] = &["build", "plan"];
 
     // Parse optional flags from args
     let mut repo_name: Option<String> = None;
@@ -242,18 +295,21 @@ async fn handle_task(
     let config = DaemonConfig::load(None).unwrap_or_default();
 
     // Validate repo name if specified
-    if let Some(ref name) = repo_name {
-        if !config.repos.iter().any(|r| r.name.eq_ignore_ascii_case(name)) {
-            let available: Vec<&str> = config.repos.iter().map(|r| r.name.as_str()).collect();
-            return if available.is_empty() {
-                format!("Repo <b>{name}</b> not found. No repos configured. See /repos")
-            } else {
-                format!(
-                    "Repo <b>{name}</b> not found. Available: {}",
-                    available.join(", ")
-                )
-            };
-        }
+    if let Some(ref name) = repo_name
+        && !config
+            .repos
+            .iter()
+            .any(|r| r.name.eq_ignore_ascii_case(name))
+    {
+        let available: Vec<&str> = config.repos.iter().map(|r| r.name.as_str()).collect();
+        return if available.is_empty() {
+            format!("Repo <b>{name}</b> not found. No repos configured. See /repos")
+        } else {
+            format!(
+                "Repo <b>{name}</b> not found. Available: {}",
+                available.join(", ")
+            )
+        };
     }
 
     let workdir = config.resolve_repo_path(repo_name.as_deref());

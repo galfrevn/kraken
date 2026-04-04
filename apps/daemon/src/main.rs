@@ -459,14 +459,15 @@ pub async fn run_daemon() -> Result<(), Box<dyn std::error::Error>> {
         );
     }
 
-    let shared_channel_router_handle: Arc<tokio::sync::RwLock<Option<Arc<channels::router::ChannelRouterHandle>>>> =
-        Arc::new(tokio::sync::RwLock::new(None));
+    let shared_channel_router_handle: Arc<
+        tokio::sync::RwLock<Option<Arc<channels::router::ChannelRouterHandle>>>,
+    > = Arc::new(tokio::sync::RwLock::new(None));
 
     let mut notification_dispatcher = daemon_config.notifications.build_dispatcher();
     notification_dispatcher.add_channel(Box::new(
-        notifications::channel_reply::ChannelReplyNotificationChannel::new(
-            Arc::clone(&shared_channel_router_handle),
-        ),
+        notifications::channel_reply::ChannelReplyNotificationChannel::new(Arc::clone(
+            &shared_channel_router_handle,
+        )),
     ));
     info!(
         notification_channel_count = notification_dispatcher.channel_count(),
@@ -480,44 +481,43 @@ pub async fn run_daemon() -> Result<(), Box<dyn std::error::Error>> {
         .await;
 
     // Initialize channel user store (shared across channel router and reload)
-    let channel_user_store = Arc::new(db::channel_users::ChannelUserStore::new(
-        Arc::clone(&daemon_state.database_pool),
-    ));
+    let channel_user_store = Arc::new(db::channel_users::ChannelUserStore::new(Arc::clone(
+        &daemon_state.database_pool,
+    )));
     if let Err(init_error) = channel_user_store.initialize().await {
         error!(error = %init_error, "failed to initialize channel users tables");
         return Err(format!("failed to initialize channel users: {init_error}").into());
     }
 
     // Migrate legacy owner_id to channel_authorized_users
-    if let Some(telegram_config) = &daemon_config.channels.telegram {
-        if let Some(owner_id) = telegram_config.owner_id {
-            if owner_id != 0 {
-                let platform_id = owner_id.to_string();
+    if let Some(telegram_config) = &daemon_config.channels.telegram
+        && let Some(owner_id) = telegram_config.owner_id
+        && owner_id != 0
+    {
+        let platform_id = owner_id.to_string();
+        match channel_user_store
+            .is_authorized("telegram", &platform_id)
+            .await
+        {
+            Ok(false) => {
                 match channel_user_store
-                    .is_authorized("telegram", &platform_id)
+                    .authorize_user("telegram", &platform_id, None, "migration")
                     .await
                 {
-                    Ok(false) => {
-                        match channel_user_store
-                            .authorize_user("telegram", &platform_id, None, "migration")
-                            .await
-                        {
-                            Ok(_) => {
-                                info!(
-                                    owner_id = owner_id,
-                                    "migrated legacy ownerId to authorized users"
-                                );
-                            }
-                            Err(err) => {
-                                warn!(error = %err, "failed to migrate legacy ownerId");
-                            }
-                        }
+                    Ok(_) => {
+                        info!(
+                            owner_id = owner_id,
+                            "migrated legacy ownerId to authorized users"
+                        );
                     }
-                    Ok(true) => { /* already migrated */ }
                     Err(err) => {
-                        warn!(error = %err, "failed to check owner_id migration status");
+                        warn!(error = %err, "failed to migrate legacy ownerId");
                     }
                 }
+            }
+            Ok(true) => { /* already migrated */ }
+            Err(err) => {
+                warn!(error = %err, "failed to check owner_id migration status");
             }
         }
     }
@@ -546,74 +546,74 @@ pub async fn run_daemon() -> Result<(), Box<dyn std::error::Error>> {
     };
 
     if daemon_config.channels.has_any_enabled() {
-            let channel_session_store = Arc::new(db::channel_sessions::ChannelSessionStore::new(
-                Arc::clone(&daemon_state.database_pool),
-            ));
-            if let Err(init_error) = channel_session_store.initialize().await {
-                error!(error = %init_error, "failed to initialize channel sessions table");
-                return Err(format!("failed to initialize channel sessions: {init_error}").into());
-            } else {
-                let channel_worker_script_candidates = [
-                    "apps/app/src/channel-worker.ts",
-                    "../app/src/channel-worker.ts",
-                    "src/channel-worker.ts",
-                ];
-                let channel_worker_script_path = channel_worker_script_candidates
-                    .iter()
-                    .find(|path| std::path::Path::new(path).exists())
-                    .map(|path| path.to_string())
-                    .unwrap_or_else(|| "apps/app/src/channel-worker.ts".to_string());
+        let channel_session_store = Arc::new(db::channel_sessions::ChannelSessionStore::new(
+            Arc::clone(&daemon_state.database_pool),
+        ));
+        if let Err(init_error) = channel_session_store.initialize().await {
+            error!(error = %init_error, "failed to initialize channel sessions table");
+            return Err(format!("failed to initialize channel sessions: {init_error}").into());
+        } else {
+            let channel_worker_script_candidates = [
+                "apps/app/src/channel-worker.ts",
+                "../app/src/channel-worker.ts",
+                "src/channel-worker.ts",
+            ];
+            let channel_worker_script_path = channel_worker_script_candidates
+                .iter()
+                .find(|path| std::path::Path::new(path).exists())
+                .map(|path| path.to_string())
+                .unwrap_or_else(|| "apps/app/src/channel-worker.ts".to_string());
 
-                let channel_worker_manager =
-                    Arc::new(channels::worker_manager::ChannelWorkerManager::new(
-                        channel_worker_script_path,
-                        format!("http://localhost:{daemon_port}"),
-                        ".".to_string(),
-                        daemon_config.channels.worker_port,
-                    ));
+            let channel_worker_manager =
+                Arc::new(channels::worker_manager::ChannelWorkerManager::new(
+                    channel_worker_script_path,
+                    format!("http://localhost:{daemon_port}"),
+                    ".".to_string(),
+                    daemon_config.channels.worker_port,
+                ));
 
-                let mut channel_router = channels::router::ChannelRouter::new(
-                    channel_session_store,
-                    Arc::clone(&channel_worker_manager),
-                    event_broadcaster.clone(),
+            let mut channel_router = channels::router::ChannelRouter::new(
+                channel_session_store,
+                Arc::clone(&channel_worker_manager),
+                event_broadcaster.clone(),
+            )
+            .with_command_context(Arc::clone(&channel_user_store), daemon_port);
+
+            if let Some(telegram_config) = daemon_config.channels.resolved_telegram() {
+                let allow_from = telegram_config.effective_allow_from();
+                let telegram_adapter = channels::telegram::TelegramAdapter::new(
+                    telegram_config.token,
+                    telegram_config.dm_policy,
+                    allow_from,
                 )
-                .with_command_context(Arc::clone(&channel_user_store), daemon_port);
+                .with_user_store(Arc::clone(&channel_user_store));
+                channel_router.add_adapter(Box::new(telegram_adapter));
+            }
 
-                if let Some(telegram_config) = daemon_config.channels.resolved_telegram() {
-                    let allow_from = telegram_config.effective_allow_from();
-                    let telegram_adapter = channels::telegram::TelegramAdapter::new(
-                        telegram_config.token,
-                        telegram_config.dm_policy,
-                        allow_from,
-                    )
-                    .with_user_store(Arc::clone(&channel_user_store));
-                    channel_router.add_adapter(Box::new(telegram_adapter));
+            if let Some(discord_config) = daemon_config.channels.resolved_discord() {
+                let discord_adapter = channels::discord::DiscordAdapter::new(
+                    discord_config.token,
+                    discord_config.dm_policy,
+                    discord_config.allow_from,
+                    discord_config.allowed_channels,
+                )
+                .with_user_store(Arc::clone(&channel_user_store));
+                channel_router.add_adapter(Box::new(discord_adapter));
+            }
+
+            match channel_router.start().await {
+                Ok(handle) => {
+                    info!("channel router started");
+                    *shared_channel_router_handle.write().await = Some(handle);
                 }
-
-                if let Some(discord_config) = daemon_config.channels.resolved_discord() {
-                    let discord_adapter = channels::discord::DiscordAdapter::new(
-                        discord_config.token,
-                        discord_config.dm_policy,
-                        discord_config.allow_from,
-                        discord_config.allowed_channels,
-                    )
-                    .with_user_store(Arc::clone(&channel_user_store));
-                    channel_router.add_adapter(Box::new(discord_adapter));
-                }
-
-                match channel_router.start().await {
-                    Ok(handle) => {
-                        info!("channel router started");
-                        *shared_channel_router_handle.write().await = Some(handle);
-                    }
-                    Err(start_error) => {
-                        error!(error = %start_error, "failed to start channel router");
-                    }
+                Err(start_error) => {
+                    error!(error = %start_error, "failed to start channel router");
                 }
             }
-        } else {
-            info!("no channels configured, skipping channel router");
         }
+    } else {
+        info!("no channels configured, skipping channel router");
+    }
 
     let reload_handle = Arc::new(daemon::reload::ReloadHandle::new(
         Arc::clone(&reloadable_notification_dispatcher),

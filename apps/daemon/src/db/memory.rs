@@ -20,7 +20,11 @@ const PRUNING_SOFT_DELETE_RETENTION_DAYS: i64 = 30;
 const MAX_LIMIT: i64 = 1000;
 
 fn clamp_limit(limit: i64, default: i64) -> i64 {
-    if limit <= 0 { default } else { limit.min(MAX_LIMIT) }
+    if limit <= 0 {
+        default
+    } else {
+        limit.min(MAX_LIMIT)
+    }
 }
 
 #[derive(Debug, Clone, serde::Serialize)]
@@ -642,7 +646,10 @@ impl MemoryStore {
             return Ok(Vec::new());
         }
 
-        let limit = clamp_limit(options.limit.unwrap_or(DEFAULT_SEARCH_LIMIT), DEFAULT_SEARCH_LIMIT);
+        let limit = clamp_limit(
+            options.limit.unwrap_or(DEFAULT_SEARCH_LIMIT),
+            DEFAULT_SEARCH_LIMIT,
+        );
 
         let mut where_clauses = vec![
             "memory_observations_fts MATCH ?1".to_string(),
@@ -712,8 +719,14 @@ impl MemoryStore {
     ) -> SqlResult<ContextResponse> {
         let connection = self.pool.lock().await;
 
-        let session_limit = clamp_limit(session_limit.unwrap_or(DEFAULT_CONTEXT_SESSION_LIMIT), DEFAULT_CONTEXT_SESSION_LIMIT);
-        let observation_limit = clamp_limit(observation_limit.unwrap_or(DEFAULT_CONTEXT_OBSERVATION_LIMIT), DEFAULT_CONTEXT_OBSERVATION_LIMIT);
+        let session_limit = clamp_limit(
+            session_limit.unwrap_or(DEFAULT_CONTEXT_SESSION_LIMIT),
+            DEFAULT_CONTEXT_SESSION_LIMIT,
+        );
+        let observation_limit = clamp_limit(
+            observation_limit.unwrap_or(DEFAULT_CONTEXT_OBSERVATION_LIMIT),
+            DEFAULT_CONTEXT_OBSERVATION_LIMIT,
+        );
 
         let sessions = if let Some(project_name) = project {
             let mut statement = connection.prepare(
@@ -783,8 +796,14 @@ impl MemoryStore {
             row_to_observation,
         )?;
 
-        let before_limit = clamp_limit(before.unwrap_or(DEFAULT_TIMELINE_RANGE), DEFAULT_TIMELINE_RANGE);
-        let after_limit = clamp_limit(after.unwrap_or(DEFAULT_TIMELINE_RANGE), DEFAULT_TIMELINE_RANGE);
+        let before_limit = clamp_limit(
+            before.unwrap_or(DEFAULT_TIMELINE_RANGE),
+            DEFAULT_TIMELINE_RANGE,
+        );
+        let after_limit = clamp_limit(
+            after.unwrap_or(DEFAULT_TIMELINE_RANGE),
+            DEFAULT_TIMELINE_RANGE,
+        );
 
         let mut before_statement = connection.prepare(
             "SELECT id, session_id, type, title, content, project, scope, topic_key,
@@ -877,7 +896,10 @@ impl MemoryStore {
 
     pub async fn hybrid_search(&self, options: SearchOptions) -> SqlResult<Vec<SearchResult>> {
         let connection = self.pool.lock().await;
-        let limit = clamp_limit(options.limit.unwrap_or(DEFAULT_SEARCH_LIMIT), DEFAULT_SEARCH_LIMIT);
+        let limit = clamp_limit(
+            options.limit.unwrap_or(DEFAULT_SEARCH_LIMIT),
+            DEFAULT_SEARCH_LIMIT,
+        );
 
         let mut fts_ranked: Vec<(i64, f64)> = Vec::new();
         let sanitized_query = sanitize_fts_query(&options.query);

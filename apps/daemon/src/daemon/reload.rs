@@ -231,8 +231,18 @@ pub fn diff_configs(old: &DaemonConfig, new: &DaemonConfig) -> Vec<ConfigChange>
     }
 
     // Discord channel changes
-    let old_has_discord = old.channels.discord.as_ref().map(|d| d.enabled).unwrap_or(false);
-    let new_has_discord = new.channels.discord.as_ref().map(|d| d.enabled).unwrap_or(false);
+    let old_has_discord = old
+        .channels
+        .discord
+        .as_ref()
+        .map(|d| d.enabled)
+        .unwrap_or(false);
+    let new_has_discord = new
+        .channels
+        .discord
+        .as_ref()
+        .map(|d| d.enabled)
+        .unwrap_or(false);
     match (old_has_discord, new_has_discord) {
         (false, true) => changes.push(ConfigChange {
             section: "channels.discord".into(),
@@ -527,9 +537,9 @@ pub async fn reload_configuration_from_disk(
     let mut reloaded_notification_dispatcher =
         reloaded_daemon_config.notifications.build_dispatcher();
     reloaded_notification_dispatcher.add_channel(Box::new(
-        crate::notifications::channel_reply::ChannelReplyNotificationChannel::new(
-            Arc::clone(channel_router_handle),
-        ),
+        crate::notifications::channel_reply::ChannelReplyNotificationChannel::new(Arc::clone(
+            channel_router_handle,
+        )),
     ));
     let reloaded_notification_channel_count = reloaded_notification_dispatcher.channel_count();
 

@@ -194,26 +194,23 @@ async fn handle_single_message(
     let chat_id = &inbound.chat_id;
 
     // Intercept slash commands before sending to the LLM
-    if let Some(command) = commands::parse_slash_command(&inbound.text) {
-        if let Some(ref ctx) = command_ctx {
-            if let Some(response) =
-                commands::handle_builtin_command(&command, ctx, channel_type, chat_id).await
-            {
-                info!(
-                    channel_type = channel_type,
-                    chat_id = chat_id,
-                    command = command.name,
-                    "handled slash command"
-                );
-                if let Some(adapter) = adapters.get(channel_type) {
-                    let _ = adapter
-                        .send_message(chat_id, MessageContent::Html(response))
-                        .await;
-                }
-                return;
-            }
+    if let Some(command) = commands::parse_slash_command(&inbound.text)
+        && let Some(ref ctx) = command_ctx
+        && let Some(response) =
+            commands::handle_builtin_command(&command, ctx, channel_type, chat_id).await
+    {
+        info!(
+            channel_type = channel_type,
+            chat_id = chat_id,
+            command = command.name,
+            "handled slash command"
+        );
+        if let Some(adapter) = adapters.get(channel_type) {
+            let _ = adapter
+                .send_message(chat_id, MessageContent::Html(response))
+                .await;
         }
-        // Unknown command — fall through to LLM
+        return;
     }
 
     info!(
@@ -281,8 +278,22 @@ async fn handle_single_message(
         }
     });
 
+    // Resolve agent from session metadata (set via /agent command)
+    let agent_id = session
+        .metadata
+        .as_deref()
+        .and_then(|m| serde_json::from_str::<serde_json::Value>(m).ok())
+        .and_then(|v| v["agent"].as_str().map(String::from))
+        .unwrap_or_else(|| "build".to_string());
+
     let response = match worker_manager
-        .send_message_stream(&session.session_id, &inbound.text, channel_type, chat_id)
+        .send_message_stream(
+            &session.session_id,
+            &inbound.text,
+            channel_type,
+            chat_id,
+            &agent_id,
+        )
         .await
     {
         Ok(rx) => stream_response_to_channel(adapter, chat_id, rx, &typing_cancel).await,
@@ -354,8 +365,7 @@ async fn stream_response_to_channel(
                     && last_draft_update.elapsed() >= draft_interval;
 
                 if should_send {
-                    let draft_text =
-                        truncate_to_char_boundary(&accumulated, MAX_MESSAGE_LENGTH);
+                    let draft_text = truncate_to_char_boundary(&accumulated, MAX_MESSAGE_LENGTH);
                     match adapter
                         .send_draft(chat_id, draft_id, draft_text, None)
                         .await
@@ -413,7 +423,6 @@ fn truncate_to_char_boundary(s: &str, max: usize) -> &str {
     }
     &s[..end]
 }
-
 
 fn publish_channel_event(
     event_broadcaster: &EventBroadcaster,

@@ -122,6 +122,23 @@ impl ChannelSessionStore {
         Ok(session)
     }
 
+    pub async fn update_metadata(
+        &self,
+        channel_type: &str,
+        chat_id: &str,
+        metadata: &str,
+    ) -> Result<(), String> {
+        let connection = self.pool.lock().await;
+        connection
+            .execute(
+                "UPDATE channel_sessions SET metadata = ?3
+                 WHERE channel_type = ?1 AND chat_id = ?2",
+                params![channel_type, chat_id, metadata],
+            )
+            .map_err(|error| format!("failed to update metadata: {error}"))?;
+        Ok(())
+    }
+
     pub async fn update_last_message(
         &self,
         channel_type: &str,

@@ -124,7 +124,11 @@ fn handle_list(json_mode: bool) -> Result<(), Box<dyn std::error::Error>> {
         channels.push(ChannelListEntry {
             channel_type: "telegram".to_string(),
             enabled: telegram.enabled,
-            details: format!("dm_policy={:?}, allow_from={:?}", telegram.effective_dm_policy(), telegram.effective_allow_from()),
+            details: format!(
+                "dm_policy={:?}, allow_from={:?}",
+                telegram.effective_dm_policy(),
+                telegram.effective_allow_from()
+            ),
         });
     }
 
@@ -262,7 +266,10 @@ async fn handle_add_telegram(json_mode: bool) -> Result<(), Box<dyn std::error::
         return Ok(());
     }
 
-    let policy_options = &["Pairing (users request access with a code)", "Allowlist (only specific IDs can message)"];
+    let policy_options = &[
+        "Pairing (users request access with a code)",
+        "Allowlist (only specific IDs can message)",
+    ];
     let policy_index = Select::new()
         .with_prompt("DM Policy")
         .items(policy_options)
@@ -452,15 +459,21 @@ impl HumanDisplay for PairingListOutput {
 }
 
 fn resolve_database_path(raw_path: &str) -> std::path::PathBuf {
-    if let Some(stripped) = raw_path.strip_prefix("~/") {
-        if let Some(home) = dirs_next::home_dir() {
-            return home.join(stripped);
-        }
+    if let Some(stripped) = raw_path.strip_prefix("~/")
+        && let Some(home) = dirs_next::home_dir()
+    {
+        return home.join(stripped);
     }
     std::path::PathBuf::from(raw_path)
 }
 
-fn open_user_store() -> Result<(crate::db::channel_users::ChannelUserStore, tokio::runtime::Handle), Box<dyn std::error::Error>> {
+fn open_user_store() -> Result<
+    (
+        crate::db::channel_users::ChannelUserStore,
+        tokio::runtime::Handle,
+    ),
+    Box<dyn std::error::Error>,
+> {
     let daemon_config = DaemonConfig::load(None).unwrap_or_default();
     let database_path = resolve_database_path(&daemon_config.database_path);
 
@@ -673,39 +686,37 @@ pub async fn execute_users(
         crate::cli::UsersCommands::Remove {
             channel,
             platform_id,
-        } => {
-            match store.revoke_user(&channel, &platform_id).await {
-                Ok(true) => {
-                    if json_mode {
-                        println!(
-                            "{}",
-                            serde_json::json!({
-                                "status": "revoked",
-                                "platform_id": platform_id,
-                                "channel": channel,
-                            })
-                        );
-                    } else {
-                        println!(
-                            "{} Revoked access for {} on {}",
-                            style("✓").green().bold(),
-                            platform_id,
-                            channel,
-                        );
-                    }
-                }
-                Ok(false) => {
-                    output_error(
-                        &format!("user '{}' not found on channel '{}'", platform_id, channel),
-                        None,
-                        json_mode,
+        } => match store.revoke_user(&channel, &platform_id).await {
+            Ok(true) => {
+                if json_mode {
+                    println!(
+                        "{}",
+                        serde_json::json!({
+                            "status": "revoked",
+                            "platform_id": platform_id,
+                            "channel": channel,
+                        })
+                    );
+                } else {
+                    println!(
+                        "{} Revoked access for {} on {}",
+                        style("✓").green().bold(),
+                        platform_id,
+                        channel,
                     );
                 }
-                Err(err) => {
-                    output_error(&err, None, json_mode);
-                }
             }
-        }
+            Ok(false) => {
+                output_error(
+                    &format!("user '{}' not found on channel '{}'", platform_id, channel),
+                    None,
+                    json_mode,
+                );
+            }
+            Err(err) => {
+                output_error(&err, None, json_mode);
+            }
+        },
     }
 
     Ok(())

@@ -130,6 +130,7 @@ async function main(): Promise<void> {
       text: string;
       channelType?: string;
       chatId?: string;
+      agentId?: string;
     }>();
 
     if (!body.sessionId || !body.text) {
@@ -165,7 +166,7 @@ async function main(): Promise<void> {
         const streamResult = await streamLlm({
           sessionId: body.sessionId,
           messageId: crypto.randomUUID(),
-          agentId: "build",
+          agentId: body.agentId || "build",
           messages: history.messages,
           channelType: history.channelType,
           channelChatId: history.chatId,

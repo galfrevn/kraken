@@ -3,8 +3,8 @@ use std::sync::Arc;
 use std::sync::atomic::{AtomicU32, Ordering};
 use std::time::Duration;
 
-use axum::Router;
 use axum::Json;
+use axum::Router;
 use axum::extract::{Path, Query, State};
 use axum::http::StatusCode;
 use axum::response::IntoResponse;
@@ -1368,7 +1368,11 @@ async fn handle_list_pairing_requests(
     let Some(reload_handle) = &state.reload_handle else {
         return Json(serde_json::json!({"error": "daemon not fully initialized"})).into_response();
     };
-    match reload_handle.channel_user_store.get_pending_requests(channel).await {
+    match reload_handle
+        .channel_user_store
+        .get_pending_requests(channel)
+        .await
+    {
         Ok(requests) => {
             let entries: Vec<serde_json::Value> = requests
                 .into_iter()

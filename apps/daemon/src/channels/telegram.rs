@@ -84,6 +84,7 @@ impl ChannelAdapter for TelegramAdapter {
                 BotCommand::new("task", "Run a background task"),
                 BotCommand::new("new", "Start a new conversation"),
                 BotCommand::new("model", "Show or change the current model"),
+                BotCommand::new("agent", "Show or switch agent (build/plan)"),
                 BotCommand::new("cost", "Show usage and costs"),
                 BotCommand::new("status", "Show daemon status"),
                 BotCommand::new("repos", "List configured repos"),
@@ -121,10 +122,8 @@ impl ChannelAdapter for TelegramAdapter {
                                     match store.is_authorized("telegram", &platform_id).await {
                                         Ok(true) => { /* authorized, continue */ }
                                         Ok(false) => {
-                                            handle_pairing_request(
-                                                &bot, &msg, sender_id, store,
-                                            )
-                                            .await;
+                                            handle_pairing_request(&bot, &msg, sender_id, store)
+                                                .await;
                                             return respond(());
                                         }
                                         Err(err) => {
@@ -134,9 +133,7 @@ impl ChannelAdapter for TelegramAdapter {
                                     }
                                 } else {
                                     // No user_store — fall back to allow_from check
-                                    if !allow_from.is_empty()
-                                        && !allow_from.contains(&sender_id)
-                                    {
+                                    if !allow_from.is_empty() && !allow_from.contains(&sender_id) {
                                         warn!(
                                             sender_id = sender_id,
                                             "ignoring message from unauthorized user"
@@ -326,10 +323,7 @@ async fn handle_pairing_request(
     sender_id: i64,
     user_store: &ChannelUserStore,
 ) {
-    let display_name = msg
-        .from
-        .as_ref()
-        .map(|u| u.first_name.clone());
+    let display_name = msg.from.as_ref().map(|u| u.first_name.clone());
 
     let platform_id = sender_id.to_string();
 
@@ -341,7 +335,10 @@ async fn handle_pairing_request(
         .unwrap_or(0);
 
     if pending_count >= 3 {
-        warn!(sender_id = sender_id, "too many pending pairing requests, ignoring");
+        warn!(
+            sender_id = sender_id,
+            "too many pending pairing requests, ignoring"
+        );
         return;
     }
 

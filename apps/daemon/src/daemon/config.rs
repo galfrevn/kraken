@@ -73,12 +73,11 @@ pub struct RepoConfig {
 impl DaemonConfig {
     pub fn resolve_repo_path(&self, name: Option<&str>) -> Option<String> {
         let repo = if let Some(repo_name) = name {
-            self.repos.iter().find(|r| r.name.eq_ignore_ascii_case(repo_name))
-        } else {
             self.repos
                 .iter()
-                .find(|r| r.default)
-                .or(self.repos.first())
+                .find(|r| r.name.eq_ignore_ascii_case(repo_name))
+        } else {
+            self.repos.iter().find(|r| r.default).or(self.repos.first())
         };
 
         repo.map(|r| {
@@ -677,20 +676,24 @@ pub struct TelegramChannelConfig {
 impl TelegramChannelConfig {
     /// Returns the effective DM policy, accounting for backward compatibility with owner_id.
     pub fn effective_dm_policy(&self) -> DmPolicy {
-        if self.owner_id.is_some() && self.dm_policy == DmPolicy::Pairing && self.allow_from.is_empty() {
+        if self.owner_id.is_some()
+            && self.dm_policy == DmPolicy::Pairing
+            && self.allow_from.is_empty()
+        {
             // Legacy config with owner_id set but no explicit dmPolicy → treat as allowlist
             return DmPolicy::Allowlist;
         }
-        self.dm_policy.clone()
+        self.dm_policy
     }
 
     /// Returns the merged list of allowed user IDs (allow_from + legacy owner_id).
     pub fn effective_allow_from(&self) -> Vec<i64> {
         let mut ids = self.allow_from.clone();
-        if let Some(owner) = self.owner_id {
-            if owner != 0 && !ids.contains(&owner) {
-                ids.push(owner);
-            }
+        if let Some(owner) = self.owner_id
+            && owner != 0
+            && !ids.contains(&owner)
+        {
+            ids.push(owner);
         }
         ids
     }
@@ -1115,7 +1118,9 @@ impl DaemonConfig {
             }
             if telegram.enabled {
                 let effective_policy = telegram.effective_dm_policy();
-                if effective_policy == DmPolicy::Allowlist && telegram.effective_allow_from().is_empty() {
+                if effective_policy == DmPolicy::Allowlist
+                    && telegram.effective_allow_from().is_empty()
+                {
                     errors.push(
                         "channels.telegram.allowFrom is required when dmPolicy is 'allowlist'"
                             .to_string(),
