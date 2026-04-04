@@ -40,21 +40,24 @@ const providers: Record<string, ProviderDefinition> = {
             name: string;
             context_length?: number;
             pricing?: { prompt?: string; completion?: string };
+            supported_parameters?: string[];
           }>;
         };
-        return data.data.map((m) => ({
-          id: m.id,
-          name: m.name,
-          providerId: "openrouter",
-          providerName: "OpenRouter",
-          contextLength: m.context_length,
-          cost: m.pricing
-            ? {
-                input: parseFloat(m.pricing.prompt ?? "0"),
-                output: parseFloat(m.pricing.completion ?? "0"),
-              }
-            : undefined,
-        }));
+        return data.data
+          .filter((m) => m.supported_parameters?.includes("tools"))
+          .map((m) => ({
+            id: m.id,
+            name: m.name,
+            providerId: "openrouter",
+            providerName: "OpenRouter",
+            contextLength: m.context_length,
+            cost: m.pricing
+              ? {
+                  input: parseFloat(m.pricing.prompt ?? "0"),
+                  output: parseFloat(m.pricing.completion ?? "0"),
+                }
+              : undefined,
+          }));
       } catch {
         return [];
       }
