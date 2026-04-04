@@ -491,8 +491,11 @@ pub enum ProviderCommands {
 pub enum WidgetCommands {
     /// Configure the iOS widget token and enable the widget API
     Setup,
-    /// Show current widget status and tunnel instructions
+    /// Show current widget status and tunnel info
     Status,
-    /// Start a Cloudflare tunnel to expose the daemon API
+    /// Start a Cloudflare tunnel in the background
     Tunnel,
+    /// Stop the running tunnel
+    #[command(name = "tunnel-stop")]
+    TunnelStop,
 }

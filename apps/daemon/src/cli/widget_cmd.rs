@@ -20,6 +20,7 @@ pub async fn execute(
         WidgetCommands::Setup => handle_setup(json_mode).await,
         WidgetCommands::Status => handle_status(json_mode).await,
         WidgetCommands::Tunnel => handle_tunnel(json_mode).await,
+        WidgetCommands::TunnelStop => handle_tunnel_stop(json_mode).await,
     }
 }
 
@@ -239,20 +240,56 @@ async fn handle_status(json_mode: bool) -> Result<(), Box<dyn std::error::Error>
         style("●").green(),
         style("enabled").green()
     );
-    println!(
-        "  {} Start a tunnel: {}",
-        style("→").dim(),
-        style("kraken widget tunnel").cyan()
-    );
+
+    if let Some(pid) = read_tunnel_pid()
+        && is_process_alive(pid)
+    {
+        let url = std::fs::read_to_string(tunnel_url_path()).unwrap_or_default();
+        println!("  {} Tunnel running (pid {})", style("●").green(), pid);
+        if !url.is_empty() {
+            println!("  {} {}", style("→").dim(), style(url.trim()).cyan());
+        }
+    } else {
+        println!(
+            "  {} Tunnel not running. Start with: {}",
+            style("●").dim(),
+            style("kraken widget tunnel").cyan()
+        );
+    }
 
     Ok(())
 }
 
-async fn handle_tunnel(json_mode: bool) -> Result<(), Box<dyn std::error::Error>> {
-    if json_mode {
-        return Err("tunnel requires interactive mode".into());
-    }
+fn tunnel_pid_path() -> std::path::PathBuf {
+    kraken_dir().join("tunnel.pid")
+}
 
+fn tunnel_url_path() -> std::path::PathBuf {
+    kraken_dir().join("tunnel.url")
+}
+
+fn tunnel_log_path() -> std::path::PathBuf {
+    kraken_dir().join("tunnel.log")
+}
+
+fn read_tunnel_pid() -> Option<u32> {
+    std::fs::read_to_string(tunnel_pid_path())
+        .ok()
+        .and_then(|s| s.trim().parse().ok())
+}
+
+fn is_process_alive(pid: u32) -> bool {
+    Command::new("kill")
+        .arg("-0")
+        .arg(pid.to_string())
+        .stdout(std::process::Stdio::null())
+        .stderr(std::process::Stdio::null())
+        .status()
+        .map(|s| s.success())
+        .unwrap_or(false)
+}
+
+async fn handle_tunnel(_json_mode: bool) -> Result<(), Box<dyn std::error::Error>> {
     if Command::new("cloudflared")
         .arg("--version")
         .output()
@@ -273,34 +310,108 @@ async fn handle_tunnel(json_mode: bool) -> Result<(), Box<dyn std::error::Error>
         return Err("cloudflared not installed".into());
     }
 
+    if let Some(pid) = read_tunnel_pid()
+        && is_process_alive(pid)
+    {
+        let url = std::fs::read_to_string(tunnel_url_path()).unwrap_or_default();
+        println!(
+            "  {} Tunnel already running (pid {})",
+            style("●").green().bold(),
+            pid
+        );
+        if !url.is_empty() {
+            println!("  {} {}", style("→").dim(), style(url.trim()).cyan());
+        }
+        return Ok(());
+    }
+
     let daemon_port = DaemonConfig::load(None)
         .map(|c| c.services.daemon_port)
         .unwrap_or(50051);
 
-    println!(
-        "\n  {} Starting tunnel to localhost:{}...",
-        style("●").green().bold(),
-        daemon_port
-    );
-    println!(
-        "  {} The public URL will appear below. Use it in the Scriptable widget.",
-        style("→").dim()
-    );
-    println!(
-        "  {} Press {} to stop.\n",
-        style("→").dim(),
-        style("Ctrl+C").bold()
-    );
+    let log_file = std::fs::File::create(tunnel_log_path())?;
 
-    let status = Command::new("cloudflared")
+    let child = Command::new("cloudflared")
         .arg("tunnel")
         .arg("--url")
         .arg(format!("http://localhost:{daemon_port}"))
-        .status()?;
+        .stdout(std::process::Stdio::null())
+        .stderr(std::process::Stdio::from(log_file))
+        .spawn()?;
 
-    if !status.success() {
-        return Err("cloudflared exited with error".into());
+    let pid = child.id();
+    std::fs::write(tunnel_pid_path(), pid.to_string())?;
+
+    println!(
+        "  {} Tunnel starting in background (pid {})...",
+        style("●").green().bold(),
+        pid
+    );
+
+    // Wait for cloudflared to log the URL
+    for _ in 0..30 {
+        tokio::time::sleep(std::time::Duration::from_millis(500)).await;
+        if let Ok(log) = std::fs::read_to_string(tunnel_log_path())
+            && let Some(url) = extract_tunnel_url(&log)
+        {
+            std::fs::write(tunnel_url_path(), &url)?;
+            println!("  {} {}", style("→").dim(), style(&url).cyan());
+            println!(
+                "\n  Stop with: {}",
+                style("kraken widget tunnel-stop").cyan()
+            );
+            return Ok(());
+        }
     }
+
+    println!(
+        "  {} Tunnel started but URL not detected yet. Check {}",
+        style("!").yellow().bold(),
+        style("~/.kraken/tunnel.log").cyan()
+    );
+
+    Ok(())
+}
+
+fn extract_tunnel_url(log: &str) -> Option<String> {
+    for line in log.lines() {
+        if let Some(pos) = line.find("https://") {
+            let url_start = &line[pos..];
+            let url_end = url_start
+                .find(|c: char| c.is_whitespace())
+                .unwrap_or(url_start.len());
+            let url = &url_start[..url_end];
+            if url.contains(".trycloudflare.com") {
+                return Some(url.to_string());
+            }
+        }
+    }
+    None
+}
+
+async fn handle_tunnel_stop(_json_mode: bool) -> Result<(), Box<dyn std::error::Error>> {
+    let Some(pid) = read_tunnel_pid() else {
+        println!("  {} No tunnel running", style("●").dim());
+        return Ok(());
+    };
+
+    if is_process_alive(pid) {
+        let _ = Command::new("kill")
+            .arg(pid.to_string())
+            .stdout(std::process::Stdio::null())
+            .stderr(std::process::Stdio::null())
+            .status();
+        println!(
+            "  {} Tunnel stopped (pid {})",
+            style("✓").green().bold(),
+            pid
+        );
+    } else {
+        println!("  {} Tunnel was not running (stale pid)", style("●").dim());
+    }
+
+    let _ = std::fs::remove_file(tunnel_pid_path());
+    let _ = std::fs::remove_file(tunnel_url_path());
 
     Ok(())
 }
