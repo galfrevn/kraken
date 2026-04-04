@@ -13,6 +13,7 @@ import type { ModelSelection } from "@/models/types.ts";
 import { getPrimaryAgents, type AgentColor } from "@/agent/agent.ts";
 import type { ThemeColors } from "@/tui/_context/theme.tsx";
 
+import { useToast } from "@/tui/_ui/toast.tsx";
 import { SessionLayout } from "@/tui/session/_components/layout.tsx";
 import { SessionPrompt } from "@/tui/session/_components/prompt.tsx";
 import { EmptyState } from "@/tui/session/_components/empty-state.tsx";
@@ -35,6 +36,7 @@ export const Home = () => {
   const [currentAgentIndex, setCurrentAgentIndex] = useState(0);
   const currentAgent = primaryAgents[currentAgentIndex] ?? primaryAgents[0]!;
   const currentAgentColor = resolveAgentColor(currentAgent.color, theme);
+  const toast = useToast();
   const [isDialogOpen, setIsDialogOpen] = useState(false);
 
   const openDialog = useCallback(async <T,>(fn: () => Promise<T>): Promise<T> => {
@@ -157,11 +159,20 @@ export const Home = () => {
   async function handlePromptSubmit(userInputText: string) {
     try {
       const createSessionResponse = await sdk.client.post("/session", { agentId: currentAgent.id });
-      if (!createSessionResponse.ok) return;
+      if (!createSessionResponse.ok) {
+        toast.show({
+          variant: "error",
+          title: "Failed to create session",
+          message: "Server returned an error",
+        });
+        return;
+      }
       const createdSession = (await createSessionResponse.json()) as { id: string };
       if (!createdSession.id) return;
       route.goToSession(createdSession.id, userInputText);
-    } catch {}
+    } catch (err) {
+      toast.show({ variant: "error", title: "Connection error", message: String(err) });
+    }
   }
 
   return (

@@ -26,6 +26,7 @@ import type { PermissionRequest } from "@/tool/permission.ts";
 import { addAllowRule } from "@/tool/permission-allowlist.ts";
 import type { FileChange } from "@/tui/session/_components/files-sidebar.tsx";
 import { getSkillSlashCommands, loadSkillByName, formatSkillContent } from "@/skill/index.ts";
+import { useToast } from "@/tui/_ui/toast.tsx";
 import { CommandPalette } from "@/tui/session/_components/command-palette.tsx";
 import { getPrimaryAgents, type AgentColor } from "@/agent/agent.ts";
 import type { ThemeColors } from "@/tui/_context/theme.tsx";
@@ -79,6 +80,7 @@ export const Session = () => {
   const commands = useCommands();
   const { current: currentModelSelection, selectModel, getModelInfo } = useModels();
   const dialog = useDialog();
+  const toast = useToast();
 
   const [isDialogOpen, setIsDialogOpen] = useState(false);
 
@@ -481,6 +483,21 @@ export const Session = () => {
         });
       }
 
+      if (eventType === "part.updated" && eventRecord.type === "error") {
+        const errorContent = (eventRecord.content as string) ?? "Unknown error";
+        setStreamingParts((prev) => [
+          ...prev,
+          { kind: "text" as const, id: crypto.randomUUID(), content: `Error: ${errorContent}` },
+        ]);
+        setIsProcessing(false);
+        toast.show({
+          variant: "error",
+          title: "Request failed",
+          message: errorContent.length > 120 ? errorContent.slice(0, 120) + "..." : errorContent,
+          duration: 8000,
+        });
+      }
+
       if (eventType === "part.updated" && eventRecord.type === "reasoning") {
         const content = (eventRecord.content as string) ?? "";
         const segmentId = (eventRecord.segmentId as string) ?? "default";
@@ -770,10 +787,21 @@ export const Session = () => {
         fileParts: fileParts.length > 0 ? fileParts : undefined,
       });
       if (!response.ok) {
+        const errorText = await response.text().catch(() => "Request failed");
         setIsProcessing(false);
+        toast.show({
+          variant: "error",
+          title: "Failed to send message",
+          message: errorText.length > 120 ? errorText.slice(0, 120) + "..." : errorText,
+        });
       }
-    } catch {
+    } catch (err) {
       setIsProcessing(false);
+      toast.show({
+        variant: "error",
+        title: "Connection error",
+        message: String(err),
+      });
     }
   }
 
