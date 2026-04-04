@@ -5,11 +5,11 @@
 <h1 align="center">Kraken</h1>
 
 <p align="center">
-  <strong>An autonomous developer agent that lives in your terminal.</strong>
+  <strong>An autonomous developer agent that lives in your terminal — and your messaging apps.</strong>
 </p>
 
 <p align="center">
-  Kraken understands your codebase, runs tasks on a schedule, watches your files for changes, receives webhooks — and acts on all of it autonomously. Think of it as a developer that never sleeps.
+  Kraken understands your codebase, runs tasks on a schedule, watches your files for changes, receives webhooks, and integrates with Telegram and other messaging channels — all while acting autonomously. Think of it as a developer that never sleeps.
 </p>
 
 ---
@@ -30,33 +30,43 @@ The TUI is optional. The daemon is the backbone.
 
 ## Architecture
 
-Kraken is a two-process system: a Rust daemon and a TypeScript app communicating over HTTP REST on localhost.
+Kraken is a multi-process system: a Rust daemon and a TypeScript app communicating over HTTP REST on localhost, plus optional messaging channel workers.
 
 The **Daemon** (Rust) handles orchestration, cron scheduling, file watching, webhook ingestion, task management, and notifications. It uses tokio for async execution, notify for file system events, and axum for the HTTP API.
 
-The **App** (TypeScript/React) contains the agent brain — the LLM execution loop, tool registry, conversation history, and terminal UI. It uses the Vercel AI SDK, OpenTUI for rendering, and Drizzle ORM for session storage.
+The **App** (TypeScript/React) contains the agent brain — the LLM execution loop, tool registry, conversation history, and terminal UI. It uses the Vercel AI SDK, OpenTUI for rendering, and SQLite for session storage.
+
+**Channel Workers** (TypeScript) bridge external messaging platforms (Telegram, etc.) with the agent, enabling remote task submission and real-time responses.
 
 | Service | Language | Port | Role |
 | --- | --- | --- | --- |
 | **Daemon** | Rust | 50051 | Orchestrator, cron, watchers, webhooks, notifications |
-| **App** | TypeScript | 7899 | TUI, agent brain, tools, sessions |
+| **App** | TypeScript | 7899 | TUI, agent brain, tools, sessions, LSP, MCP |
+| **Channels** | TypeScript | — | Messaging adapters (Telegram, etc.) |
 
 ```
-┌──────────────────────────────────────┐
-│                CLI                   │
-│         (spawns & orchestrates)      │
-├──────────────────┬───────────────────┤
-│     Daemon       │       App        │
-│     (Rust)       │   (TypeScript)   │
-│                  │                  │
-│  • Orchestrator  │  • Agent loop    │
-│  • Cron jobs     │  • Tools         │
-│  • Watchers      │  • Storage       │
-│  • Webhooks      │  • TUI           │
-│  • Notifications │  • Sessions      │
-└────────┬─────────┴─────────┬────────┘
+┌──────────────────────────────────────────────┐
+│                   CLI                        │
+│            (spawns & orchestrates)           │
+├──────────────────┬───────────────────────────┤
+│     Daemon       │          App             │
+│     (Rust)       │      (TypeScript)         │
+│                  │                          │
+│  • Orchestrator  │  • Agent loop            │
+│  • Cron jobs     │  • Tools (19 built-in)   │
+│  • Watchers      │  • LSP diagnostics       │
+│  • Webhooks      │  • MCP servers           │
+│  • Notifications │  • Sub-agents            │
+│  • Multi-repo    │  • Sessions & memory     │
+│                  │  • Audit logging         │
+└────────┬─────────┴──────────┬───────────────┘
          │  HTTP REST (localhost)  │
          └────────────────────────┘
+                    │
+         ┌──────────┴──────────┐
+         │   Channel Workers   │
+         │   (Telegram, etc.)  │
+         └─────────────────────┘
 ```
 
 For more details, see [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md).
@@ -183,7 +193,7 @@ For the full trigger reference, see [docs/DAEMON.md](docs/DAEMON.md).
 
 ## Built-in Tools
 
-The agent ships with tools for common development tasks:
+The agent ships with a comprehensive toolset for autonomous development:
 
 | Tool | Description |
 | --- | --- |
@@ -191,11 +201,113 @@ The agent ships with tools for common development tasks:
 | `read` | Read file contents with line numbers |
 | `write` | Create or overwrite files |
 | `edit` | Replace exact string matches in files |
-| `glob` | Find files by glob pattern (via ripgrep) |
-| `grep` | Search file contents with regex (via ripgrep) |
-| `schedule_task` | Schedule tasks on the daemon |
+| `glob` | Find files by glob pattern |
+| `grep` | Search file contents with regex |
+| `security` | Analyze code for vulnerabilities and secrets |
+| `schedule_task` | Schedule tasks on the daemon (cron, deferred, recurring) |
+| `skill` | Load specialized skill instructions |
+| `memory_save` | Save observations to persistent memory |
+| `memory_search` | Search persistent memory |
+| `memory_context` | Load recent memory for current project |
+| `task_list` | List daemon tasks |
+| `task_get` | Get task details and output |
+| `task_delete` | Delete pending/cancelled tasks |
+| `webfetch` | Fetch web pages as markdown/text |
+| `websearch` | Search the web for real-time info |
+| `subagent` | Delegate to specialized sub-agents (explore, general) |
+| `question` | Ask the user structured questions with options |
+| `todo` | Create and manage task lists for multi-step work |
 
-More tools are planned: web search, URL fetching, subagent tasks, batch execution, and LSP integration. See [docs/TOOLS.md](docs/TOOLS.md).
+Tools include automatic rate limiting (200 calls/session), audit logging, and LSP diagnostics that run automatically after file edits.
+
+### MCP Support
+
+Kraken connects to **Model Context Protocol** servers, extending the agent with external tools:
+
+```jsonc
+{
+  "mcp": {
+    "filesystem": {
+      "type": "local",
+      "command": ["npx", "-y", "@modelcontextprotocol/server-filesystem", "/path/to/dir"],
+      "enabled": true
+    },
+    "github": {
+      "type": "remote",
+      "url": "https://api.example.com/mcp",
+      "headers": { "Authorization": "Bearer ${GITHUB_TOKEN}" }
+    }
+  }
+}
+```
+
+Supports both **stdio** (local) and **HTTP/SSE** (remote) transports. MCP tools are automatically registered alongside built-in tools.
+
+---
+
+## SDK
+
+A TypeScript SDK is available for programmatic interaction with the daemon:
+
+```typescript
+import { DaemonClient } from "@kraken/sdk";
+
+const client = new DaemonClient({ baseUrl: "http://localhost:50051" });
+
+// Schedule tasks
+const task = await client.schedule({ prompt: "Run tests", priority: 5 });
+
+// Query memory
+const results = await client.memorySearch({ query: "api keys" });
+
+// Stream events
+client.onEvent("task_completed", (event) => console.log(event));
+```
+
+See [`packages/sdk/`](packages/sdk/) for the full API.
+
+---
+
+## Skills System
+
+Skills provide specialized instructions for specific tasks. They're loaded on-demand:
+
+- **memory** — Persistent memory management
+- **triggers** — Cron jobs, webhooks, file watchers
+- **secrets** — API key and secret management
+- **websearch** — Web search configuration
+- **heartbeat** — Autonomous periodic task execution
+- **daemon** — Daemon management and maintenance
+- **notifications** — Slack, Discord, Email, GitHub notifications
+- **channels** — External messaging adapters (Telegram, etc.)
+- **repos** — Multi-repo configuration and management
+- **lsp** — Language Server Protocol integration
+
+Skills are defined in [`packages/skills/`](packages/skills/) and can be extended.
+
+---
+
+## LSP Integration
+
+Kraken integrates with Language Server Protocol servers to provide real-time code diagnostics. After editing files, the agent automatically:
+
+1. Collects diagnostics from the LSP server
+2. Injects errors and warnings into the agent context
+3. Can auto-fix issues based on diagnostic feedback
+
+```jsonc
+{
+  "lsp": {
+    "enabled": true,
+    "servers": {
+      "typescript": {
+        "command": ["typescript-language-server", "--stdio"],
+        "rootPatterns": ["tsconfig.json", "package.json"]
+      }
+    }
+  }
+}
+```
 
 ---
 
@@ -215,11 +327,13 @@ cd apps/daemon && cargo test  # Run daemon tests
 
 ```
 apps/
-  app/            TypeScript/React — TUI + agent brain, tools, sessions
-  daemon/         Rust — Daemon: orchestrator, cron, watchers, webhooks
+  app/            TypeScript/React — TUI + agent brain, tools, sessions, LSP, MCP
+  daemon/         Rust — Daemon: orchestrator, cron, watchers, webhooks, multi-repo
 packages/
-  configuration/  Shared TypeScript config
-docs/             Documentation (architecture, tools, config, daemon)
+  configuration/  Shared TypeScript config types
+  sdk/            TypeScript SDK for programmatic daemon interaction
+  skills/         Skill definitions (memory, triggers, secrets, etc.)
+docs/             Documentation (architecture, tools, config, daemon, roadmap)
 scripts/
   install.sh      End-user installer (macOS/Linux)
 ```
