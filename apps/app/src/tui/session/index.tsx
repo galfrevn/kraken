@@ -387,6 +387,22 @@ export const Session = () => {
             }
             for (const tc of toolCallParts) {
               const matchingResult = toolResultParts.find((tr) => tr.toolCallId === tc.toolCallId);
+              let formattedResult = matchingResult?.content;
+              if (formattedResult) {
+                try {
+                  const parsed = JSON.parse(formattedResult) as {
+                    title?: string;
+                    content?: string;
+                  };
+                  if (parsed.title && parsed.content) {
+                    formattedResult = `[${parsed.title}]\n${parsed.content}`;
+                  } else if (parsed.content) {
+                    formattedResult = parsed.content;
+                  }
+                } catch {
+                  // already plain text
+                }
+              }
               parts.push({
                 kind: "tool-call",
                 id: tc.id,
@@ -394,8 +410,11 @@ export const Session = () => {
                 toolCallId: tc.toolCallId ?? "",
                 toolInput: tc.toolInput,
                 state: "completed",
-                resultContent: matchingResult?.content,
+                resultContent: formattedResult,
               });
+            }
+            for (const tp of textParts) {
+              parts.push({ kind: "text", id: tp.id, content: tp.content });
             }
             for (const e of errorParts) {
               parts.push({ kind: "error", id: e.id, content: e.content });
