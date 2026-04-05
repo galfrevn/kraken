@@ -38,6 +38,17 @@ jobs:
           mkdir -p dist/app
           bun build apps/app/src/index.tsx --outdir dist/app --target bun
 
+      - name: Create unhashed wasm copies
+        run: |
+          cd dist/app
+          for f in *.wasm; do
+            # Strip the hash: tree-sitter-markdown-411r6y9b.wasm → tree-sitter-markdown.wasm
+            unhashed=$(echo "$f" | sed -E 's/-[a-z0-9]{8}\.wasm$/.wasm/')
+            if [ "$unhashed" != "$f" ] && [ ! -f "$unhashed" ]; then
+              cp "$f" "$unhashed"
+            fi
+          done
+
       - name: Bundle worker
         run: bun build apps/app/src/worker.ts --outfile dist/worker.js --target bun
 

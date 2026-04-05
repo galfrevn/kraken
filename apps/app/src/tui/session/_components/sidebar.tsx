@@ -1,6 +1,6 @@
-import { readFileSync } from "fs";
+import { readFileSync, existsSync } from "fs";
 import { spawnSync } from "child_process";
-import { resolve, dirname } from "path";
+import { resolve, dirname, join } from "path";
 import { fileURLToPath } from "url";
 import { useState, useEffect } from "react";
 import { TextAttributes } from "@opentui/core";
@@ -12,7 +12,6 @@ import { Bus, Events } from "@/bus/index.ts";
 import { getLspManager } from "@/lsp/manager.ts";
 
 const SIDEBAR_WIDTH = 42;
-const currentFileDirectory = dirname(fileURLToPath(import.meta.url));
 
 const resolvedGitBranch = (() => {
   try {
@@ -28,15 +27,29 @@ const resolvedGitBranch = (() => {
 })();
 
 const resolvedApplicationVersion = (() => {
+  // Try ~/.kraken/version first (production install)
   try {
+    const home = process.env.HOME ?? process.env.USERPROFILE ?? ".";
+    const versionFile = join(home, ".kraken", "version");
+    if (existsSync(versionFile)) {
+      const version = readFileSync(versionFile, "utf-8").trim();
+      if (version && version !== "source") return version;
+    }
+  } catch {}
+
+  // Fallback: read from package.json relative to source (development)
+  try {
+    const currentFileDirectory = dirname(fileURLToPath(import.meta.url));
     const packageJsonPath = resolve(currentFileDirectory, "../../../../package.json");
-    const packageJsonContent = JSON.parse(readFileSync(packageJsonPath, "utf-8")) as {
-      version: string;
-    };
-    return packageJsonContent.version;
-  } catch {
-    return "0.1.0";
-  }
+    if (existsSync(packageJsonPath)) {
+      const packageJsonContent = JSON.parse(readFileSync(packageJsonPath, "utf-8")) as {
+        version: string;
+      };
+      return packageJsonContent.version;
+    }
+  } catch {}
+
+  return "0.2.0";
 })();
 
 interface TodoSidebarItem {
