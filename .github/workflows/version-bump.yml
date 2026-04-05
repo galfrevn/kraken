@@ -26,6 +26,11 @@ jobs:
         with:
           fetch-depth: 0
 
+      - name: Install Bun
+        uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: latest
+
       - name: Calculate next version
         id: bump
         run: |
@@ -39,14 +44,35 @@ jobs:
           esac
 
           NEXT="${MAJOR}.${MINOR}.${PATCH}"
-          echo "{\"version\":\"${NEXT}\"}" | jq . > version.json
           echo "version=$NEXT" >> "$GITHUB_OUTPUT"
+
+      - name: Update all version files
+        run: |
+          VERSION="${{ steps.bump.outputs.version }}"
+
+          # version.json (source of truth)
+          echo "{\"version\":\"${VERSION}\"}" | jq . > version.json
+
+          # Root package.json
+          jq --arg v "$VERSION" '.version = $v' package.json > tmp.json && mv tmp.json package.json
+
+          # App packages
+          for pkg in apps/app/package.json packages/sdk/package.json packages/skills/package.json packages/visuals/package.json packages/configuration/package.json; do
+            if [ -f "$pkg" ]; then
+              jq --arg v "$VERSION" '.version = $v' "$pkg" > tmp.json && mv tmp.json "$pkg"
+            fi
+          done
+
+          # Cargo.toml (daemon)
+          sed -i "s/^version = \".*\"/version = \"${VERSION}\"/" apps/daemon/Cargo.toml
 
       - name: Commit, tag, and push
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
-          git add version.json
+          git add version.json package.json apps/app/package.json apps/daemon/Cargo.toml \
+                   packages/sdk/package.json packages/skills/package.json \
+                   packages/visuals/package.json packages/configuration/package.json
           git commit -m "chore: bump version to ${{ steps.bump.outputs.version }}"
           git tag "v${{ steps.bump.outputs.version }}"
           git push origin main
