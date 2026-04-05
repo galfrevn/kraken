@@ -49,20 +49,9 @@ Kraken is a two-process system — a Rust daemon and a TypeScript agent — that
 - [SDK](docs/tech/sdk.md) — TypeScript client library
 - [LLM Context](docs/tech/llm-context.md) — Condensed reference for AI agents
 
-## Development
+## Contributing
 
-```bash
-git clone https://github.com/galfrevn/kraken.git
-cd kraken && bun install && bun run dev
-```
-
-Requires [Bun](https://bun.sh) 1.3.10+ and [Rust](https://rustup.rs) stable.
-
-```bash
-bun run lint            # oxlint + cargo clippy
-bun run typecheck       # TypeScript type checking
-bun run format          # oxfmt + cargo fmt
-```
+See [Development Guide](docs/tech/development.md) for setup, build commands, and contribution guidelines.
 
 ## License
 
