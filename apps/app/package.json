@@ -8,7 +8,7 @@
     "start": "bun run src/index.tsx",
     "worker": "bun run src/worker.ts",
     "channel-worker": "bun run src/channel-worker.ts",
-    "build": "bun build src/index.tsx --outdir dist/app --target bun && node -e \"const fs=require('fs'),p=require('path'),d='dist/app';fs.readdirSync(d).filter(f=>f.endsWith('.wasm')).forEach(f=>{const u=f.replace(/-[a-z0-9]{8}\\.wasm$/,'.wasm');if(u!==f&&!fs.existsSync(p.join(d,u)))fs.copyFileSync(p.join(d,f),p.join(d,u))})\" && bun build src/worker.ts --outfile dist/worker.js --target bun && bun build src/channel-worker.ts --outfile dist/channel-worker.js --target bun",
+    "build": "bun build src/index.tsx --outdir dist/app --target bun && cd dist/app && for f in *.wasm; do b=$(echo $f | sed -E 's/-[a-z0-9]{8}\\.wasm/.wasm/'); [ \"$b\" != \"$f\" ] && cp $f $b; done && cd ../.. && bun build src/worker.ts --outfile dist/worker.js --target bun && bun build src/channel-worker.ts --outfile dist/channel-worker.js --target bun",
     "lint": "oxlint src/",
     "format": "oxfmt src/",
     "typecheck": "tsc --noEmit",
