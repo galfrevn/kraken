@@ -560,15 +560,25 @@ pub async fn run_daemon() -> Result<(), Box<dyn std::error::Error>> {
             error!(error = %init_error, "failed to initialize channel sessions table");
             return Err(format!("failed to initialize channel sessions: {init_error}").into());
         } else {
-            let channel_worker_script_candidates = [
-                "apps/app/src/channel-worker.ts",
-                "../app/src/channel-worker.ts",
-                "src/channel-worker.ts",
+            // Production bundle first, then development source paths
+            let channel_worker_kraken_home = dirs_next::home_dir()
+                .unwrap_or_default()
+                .join(".kraken");
+            let production_channel_worker = channel_worker_kraken_home.join("lib").join("channel-worker.js");
+            let channel_worker_script_candidates: Vec<std::path::PathBuf> = vec![
+                production_channel_worker,
+                std::path::PathBuf::from("apps/app/src/channel-worker.ts"),
+                std::path::PathBuf::from("../app/src/channel-worker.ts"),
+                std::path::PathBuf::from("src/channel-worker.ts"),
             ];
             let channel_worker_script_path = channel_worker_script_candidates
                 .iter()
-                .find(|path| std::path::Path::new(path).exists())
-                .map(|path| path.to_string())
+                .find(|path| path.exists())
+                .map(|path| {
+                    std::fs::canonicalize(path)
+                        .map(|absolute| absolute.to_string_lossy().to_string())
+                        .unwrap_or_else(|_| path.to_string_lossy().to_string())
+                })
                 .unwrap_or_else(|| "apps/app/src/channel-worker.ts".to_string());
 
             let channel_worker_manager =
@@ -636,15 +646,25 @@ pub async fn run_daemon() -> Result<(), Box<dyn std::error::Error>> {
         Arc::clone(&channel_user_store),
     ));
 
-    let worker_script_candidates = vec!["apps/app/src/worker.ts", "../app/src/worker.ts"];
+    let kraken_home = dirs_next::home_dir()
+        .unwrap_or_default()
+        .join(".kraken");
+
+    // Production bundle first, then development source paths
+    let production_worker = kraken_home.join("lib").join("worker.js");
+    let worker_script_candidates: Vec<std::path::PathBuf> = vec![
+        production_worker,
+        std::path::PathBuf::from("apps/app/src/worker.ts"),
+        std::path::PathBuf::from("../app/src/worker.ts"),
+    ];
 
     let worker_script_path = worker_script_candidates
         .iter()
-        .find(|candidate_path| std::path::Path::new(candidate_path).exists())
+        .find(|candidate_path| candidate_path.exists())
         .map(|found_path| {
             std::fs::canonicalize(found_path)
                 .map(|absolute| absolute.to_string_lossy().to_string())
-                .unwrap_or_else(|_| found_path.to_string())
+                .unwrap_or_else(|_| found_path.to_string_lossy().to_string())
         })
         .unwrap_or_else(|| {
             warn!(

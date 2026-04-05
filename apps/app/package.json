@@ -1,6 +1,6 @@
 {
   "name": "@kraken/app",
-  "version": "0.1.0",
+  "version": "0.1.4",
   "private": true,
   "type": "module",
   "scripts": {
@@ -8,7 +8,7 @@
     "start": "bun run src/index.tsx",
     "worker": "bun run src/worker.ts",
     "channel-worker": "bun run src/channel-worker.ts",
-    "build": "bun build src/index.tsx --outdir dist --target bun",
+    "build": "bun build src/index.tsx --outdir dist/app --target bun && bun build src/worker.ts --outfile dist/worker.js --target bun && bun build src/channel-worker.ts --outfile dist/channel-worker.js --target bun",
     "lint": "oxlint src/",
     "format": "oxfmt src/",
     "typecheck": "tsc --noEmit",

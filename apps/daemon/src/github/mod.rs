@@ -43,6 +43,7 @@ impl GitHubClient {
             .map_err(|e| format!("failed to parse github response: {e}"))
     }
 
+    #[allow(dead_code)]
     async fn get_text(&self, path: &str) -> Result<String, String> {
         let url = format!("{GITHUB_API_BASE}{path}");
         debug!(url = %url, "github GET text");
@@ -139,6 +140,7 @@ impl GitHubClient {
         self.get(&format!("/repos/{repo}/pulls/{number}")).await
     }
 
+    #[allow(dead_code)]
     pub async fn get_pr_diff(&self, repo: &str, number: u64) -> Result<String, String> {
         self.get_text(&format!("/repos/{repo}/pulls/{number}"))
             .await
@@ -199,6 +201,7 @@ impl GitHubClient {
             .ok_or_else(|| "unexpected response format".to_string())
     }
 
+    #[allow(dead_code)]
     pub async fn get_issue(&self, repo: &str, number: u64) -> Result<Value, String> {
         self.get(&format!("/repos/{repo}/issues/{number}")).await
     }
@@ -224,6 +227,7 @@ impl GitHubClient {
         .await
     }
 
+    #[allow(dead_code)]
     pub async fn add_labels(
         &self,
         repo: &str,
@@ -239,6 +243,7 @@ impl GitHubClient {
 
     // ── Repository ───────────────────────────────────────────────────
 
+    #[allow(dead_code)]
     pub async fn list_branches(&self, repo: &str) -> Result<Vec<Value>, String> {
         let result = self
             .get(&format!("/repos/{repo}/branches?per_page=30"))
@@ -249,6 +254,7 @@ impl GitHubClient {
             .ok_or_else(|| "unexpected response format".to_string())
     }
 
+    #[allow(dead_code)]
     pub async fn compare(&self, repo: &str, base: &str, head: &str) -> Result<Value, String> {
         self.get(&format!("/repos/{repo}/compare/{base}...{head}"))
             .await

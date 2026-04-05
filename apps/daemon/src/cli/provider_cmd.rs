@@ -7,7 +7,6 @@ use tabled::{Table, Tabled};
 use crate::cli::ProviderCommands;
 use crate::cli::env_helpers::{read_env_map, resolve_env_file_path, write_env_map};
 
-const KNOWN_PROVIDERS: &[(&str, &str)] = &[("openrouter", "OPENROUTER_API_KEY"), ("copilot", "")];
 const MASK_MIN_LENGTH: usize = 8;
 const MASK_VISIBLE_PREFIX: usize = 4;
 
@@ -217,18 +216,16 @@ fn handle_remove(provider: String, json_mode: bool) -> Result<(), Box<dyn std::e
     if provider_lower == "copilot" {
         let home = dirs_next::home_dir().unwrap_or_default();
         let auth_path = home.join(".kraken").join("auth.json");
-        if auth_path.exists() {
-            if let Ok(contents) = std::fs::read_to_string(&auth_path) {
-                if let Ok(mut json) = serde_json::from_str::<serde_json::Value>(&contents) {
-                    if let Some(obj) = json.as_object_mut() {
-                        obj.remove("copilot");
-                        let _ = std::fs::write(
-                            &auth_path,
-                            serde_json::to_string_pretty(&json).unwrap_or_default(),
-                        );
-                    }
-                }
-            }
+        if auth_path.exists()
+            && let Ok(contents) = std::fs::read_to_string(&auth_path)
+            && let Ok(mut json) = serde_json::from_str::<serde_json::Value>(&contents)
+            && let Some(obj) = json.as_object_mut()
+        {
+            obj.remove("copilot");
+            let _ = std::fs::write(
+                &auth_path,
+                serde_json::to_string_pretty(&json).unwrap_or_default(),
+            );
         }
         if json_mode {
             println!(

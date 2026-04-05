@@ -89,6 +89,7 @@ pub async fn execute(fix: bool, json_mode: bool) -> Result<(), Box<dyn std::erro
     results.push(await_check_daemon().await);
     results.push(check_database());
     results.push(check_disk_space());
+    results.push(check_app_bundle());
     results.push(check_worker_script());
 
     let passed = results
@@ -576,14 +577,28 @@ fn check_disk_space() -> CheckResult {
 }
 
 fn check_worker_script() -> CheckResult {
-    let candidates = ["apps/app/src/worker.ts", "../app/src/worker.ts"];
+    let kraken_home = kraken_home_directory();
 
-    for candidate_path in &candidates {
+    // Production bundle (absolute path)
+    let production_worker = kraken_home.join("lib").join("worker.js");
+    if production_worker.exists() {
+        return CheckResult {
+            name: "worker".to_string(),
+            status: CheckStatus::Pass,
+            message: "Worker bundle found at ~/.kraken/lib/worker.js".to_string(),
+            fix_hint: None,
+            auto_fixable: false,
+        };
+    }
+
+    // Development source (relative paths)
+    let dev_candidates = ["apps/app/src/worker.ts", "../app/src/worker.ts"];
+    for candidate_path in &dev_candidates {
         if std::path::Path::new(candidate_path).exists() {
             return CheckResult {
                 name: "worker".to_string(),
                 status: CheckStatus::Pass,
-                message: format!("Worker script found at {candidate_path}"),
+                message: format!("Worker source found at {candidate_path}"),
                 fix_hint: None,
                 auto_fixable: false,
             };
@@ -593,8 +608,50 @@ fn check_worker_script() -> CheckResult {
     CheckResult {
         name: "worker".to_string(),
         status: CheckStatus::Warning,
-        message: "Worker script not found (run from kraken repo root)".to_string(),
-        fix_hint: None,
+        message: "Worker script not found".to_string(),
+        fix_hint: Some(
+            "Reinstall kraken or run from the repo root for development".to_string(),
+        ),
+        auto_fixable: false,
+    }
+}
+
+fn check_app_bundle() -> CheckResult {
+    let kraken_home = kraken_home_directory();
+
+    // Production bundle
+    let production_app = kraken_home.join("lib").join("app").join("index.js");
+    if production_app.exists() {
+        return CheckResult {
+            name: "app".to_string(),
+            status: CheckStatus::Pass,
+            message: "TUI app bundle found at ~/.kraken/lib/app/index.js".to_string(),
+            fix_hint: None,
+            auto_fixable: false,
+        };
+    }
+
+    // Development source
+    let dev_candidates = ["apps/app/src/index.tsx", "../app/src/index.tsx"];
+    for candidate_path in &dev_candidates {
+        if std::path::Path::new(candidate_path).exists() {
+            return CheckResult {
+                name: "app".to_string(),
+                status: CheckStatus::Pass,
+                message: format!("TUI source found at {candidate_path}"),
+                fix_hint: None,
+                auto_fixable: false,
+            };
+        }
+    }
+
+    CheckResult {
+        name: "app".to_string(),
+        status: CheckStatus::Fail,
+        message: "TUI app not found".to_string(),
+        fix_hint: Some(
+            "Reinstall: curl -fsSL https://raw.githubusercontent.com/galfrevn/kraken/main/scripts/install.sh | bash".to_string(),
+        ),
         auto_fixable: false,
     }
 }
