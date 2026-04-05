@@ -16,8 +16,20 @@ permissions:
 
 jobs:
   build-app:
-    name: Build — App bundles
-    runs-on: ubuntu-latest
+    name: Build — App (${{ matrix.app-platform }})
+    strategy:
+      matrix:
+        include:
+          - app-platform: darwin
+            os: macos-latest
+            native-lib: libopentui.dylib
+            native-pkg: core-darwin-arm64
+          - app-platform: linux
+            os: ubuntu-latest
+            native-lib: libopentui.so
+            native-pkg: core-linux-x64-gnu
+
+    runs-on: ${{ matrix.os }}
 
     steps:
       - name: Checkout repository
@@ -42,6 +54,21 @@ jobs:
             [ "$base" != "$f" ] && cp "$f" "$base"
           done
 
+      - name: Copy native library
+        run: |
+          NATIVE_LIB=$(find node_modules/.bun -name "${{ matrix.native-lib }}" -type f | head -1)
+          if [ -n "$NATIVE_LIB" ]; then
+            cp "$NATIVE_LIB" dist/app/${{ matrix.native-lib }}
+            echo "Copied $NATIVE_LIB → dist/app/${{ matrix.native-lib }}"
+          else
+            echo "Warning: native library ${{ matrix.native-lib }} not found"
+          fi
+
+      - name: Patch dynamic import to use local native library
+        run: |
+          sed -i.bak "s|var module = await import(\`@opentui/core-\${process.platform}-\${process.arch}/index.ts\`);|var module = { default: resolve2(import.meta.dirname, \"${{ matrix.native-lib }}\") };|" dist/app/index.js
+          rm -f dist/app/index.js.bak
+
       - name: Bundle worker
         run: bun build apps/app/src/worker.ts --outfile dist/worker.js --target bun
 
@@ -60,7 +87,7 @@ jobs:
       - name: Upload app bundle
         uses: actions/upload-artifact@v4
         with:
-          name: kraken-app-bundle
+          name: kraken-app-bundle-${{ matrix.app-platform }}
           path: dist/
 
   build:
@@ -158,11 +185,16 @@ jobs:
             cp "artifacts/kraken-daemon-$platform/kraken" "release/$platform/kraken"
             chmod +x "release/$platform/kraken"
 
-            # App bundle (JS + skills — platform-independent)
-            cp -r artifacts/kraken-app-bundle/app "release/$platform/app"
-            cp artifacts/kraken-app-bundle/worker.js "release/$platform/worker.js"
-            cp artifacts/kraken-app-bundle/channel-worker.js "release/$platform/channel-worker.js"
-            cp -r artifacts/kraken-app-bundle/skills "release/$platform/skills"
+            # App bundle — use platform-specific bundle (darwin or linux) for native lib
+            case "$platform" in
+              darwin-*) app_bundle="kraken-app-bundle-darwin" ;;
+              linux-*)  app_bundle="kraken-app-bundle-linux" ;;
+            esac
+
+            cp -r "artifacts/$app_bundle/app" "release/$platform/app"
+            cp "artifacts/$app_bundle/worker.js" "release/$platform/worker.js"
+            cp "artifacts/$app_bundle/channel-worker.js" "release/$platform/channel-worker.js"
+            cp -r "artifacts/$app_bundle/skills" "release/$platform/skills"
 
             # Create tarball
             tar -czf "kraken-$platform.tar.gz" -C "release/$platform" .
