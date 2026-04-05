@@ -80,10 +80,6 @@ jobs:
             platform: linux-arm64
             rust_target: aarch64-unknown-linux-gnu
             ext: ""
-          - os: windows-latest
-            platform: windows-x64
-            rust_target: x86_64-pc-windows-msvc
-            ext: ".exe"
 
     runs-on: ${{ matrix.os }}
 
@@ -168,17 +164,6 @@ jobs:
             tar -czf "kraken-$platform.tar.gz" -C "release/$platform" .
             echo "  ✓ kraken-$platform.tar.gz ($(du -h "kraken-$platform.tar.gz" | cut -f1))"
           done
-
-          # Windows (separate handling for .exe)
-          echo "Packaging windows-x64..."
-          mkdir -p release/windows-x64
-          cp "artifacts/kraken-daemon-windows-x64/kraken.exe" "release/windows-x64/kraken.exe"
-          cp -r artifacts/kraken-app-bundle/app "release/windows-x64/app"
-          cp artifacts/kraken-app-bundle/worker.js "release/windows-x64/worker.js"
-          cp artifacts/kraken-app-bundle/channel-worker.js "release/windows-x64/channel-worker.js"
-          cp -r artifacts/kraken-app-bundle/skills "release/windows-x64/skills"
-          tar -czf "kraken-windows-x64.tar.gz" -C "release/windows-x64" .
-          echo "  ✓ kraken-windows-x64.tar.gz ($(du -h "kraken-windows-x64.tar.gz" | cut -f1))"
 
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v2

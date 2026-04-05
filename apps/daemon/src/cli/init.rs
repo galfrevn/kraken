@@ -9,14 +9,13 @@ use crate::daemon::config::{
     NotificationsFileConfig, TriggersFileConfig, WatcherTriggerFileConfig,
 };
 
-const LLM_PROVIDER_OPTIONS: &[&str] = &["OpenRouter", "Anthropic", "OpenAI"];
+const LLM_PROVIDER_OPTIONS: &[&str] = &["OpenRouter", "Copilot"];
 const NOTIFICATION_PROVIDER_OPTIONS: &[&str] = &["Slack", "Discord"];
 
 fn map_provider_display_name_to_config_string(provider_display_name: &str) -> &'static str {
     match provider_display_name {
         "OpenRouter" => "openrouter",
-        "Anthropic" => "anthropic",
-        "OpenAI" => "openai",
+        "Copilot" => "copilot",
         _ => "openrouter",
     }
 }
@@ -24,8 +23,7 @@ fn map_provider_display_name_to_config_string(provider_display_name: &str) -> &'
 fn map_provider_display_name_to_env_var(provider_display_name: &str) -> Option<&'static str> {
     match provider_display_name {
         "OpenRouter" => Some("OPENROUTER_API_KEY"),
-        "Anthropic" => Some("ANTHROPIC_API_KEY"),
-        "OpenAI" => Some("OPENAI_API_KEY"),
+        "Copilot" => None,
         _ => None,
     }
 }
